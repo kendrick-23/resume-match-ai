@@ -69,7 +69,64 @@ export default function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
   const resultsRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Client-side validation before sending to the server
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if (!allowedTypes.includes(file.type)) {
+      setError("Only PDF and Word (.docx) files are accepted.")
+      e.target.value = ""
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File too large. Maximum size is 5 MB.")
+      e.target.value = ""
+      return
+    }
+
+    setUploading(true)
+    setError("")
+
+    // FormData is the browser's way of sending files over HTTP.
+    // It packages the file as multipart/form-data — the same encoding
+    // an HTML <form> with enctype="multipart/form-data" would use.
+    const formData = new FormData()
+    formData.append("file", file)
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/upload-resume", {
+        method: "POST",
+        body: formData,
+        // No Content-Type header — the browser sets it automatically
+        // with the correct multipart boundary string
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.detail)
+
+      setResume(data.text)
+      setUploadedFile(data.filename)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const clearUploadedFile = () => {
+    setUploadedFile(null)
+    setResume("")
+  }
 
   const analyze = async () => {
     setLoading(true)
@@ -159,27 +216,94 @@ export default function App() {
               <span style={{ color: "#3a3a3a" }}>to any job.</span>
             </h1>
             <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: "300", color: "#555", fontSize: "1.05rem", maxWidth: "480px", lineHeight: "1.7" }}>
-              Paste your resume and a job description. Get a precise match score, gap analysis, and actionable recommendations in seconds.
+              Upload your resume or paste it in, add a job description, and get a precise match score, gap analysis, and actionable recommendations in seconds.
             </p>
           </div>
 
           {/* Input grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "2rem" }}>
-            {[
-              { label: "01 — YOUR RESUME", value: resume, setter: setResume, placeholder: "Paste your resume here..." },
-              { label: "02 — JOB DESCRIPTION", value: jobDescription, setter: setJobDescription, placeholder: "Paste the job description here..." }
-            ].map(({ label, value, setter, placeholder }) => (
-              <div key={label}>
-                <label style={{ display: "block", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", color: "#3a3a3a", letterSpacing: "0.2em", marginBottom: "0.75rem" }}>{label}</label>
-                <textarea
-                  rows={16}
-                  style={{ width: "100%", background: "#0d0d0d", border: "1px solid #1c1c1c", borderRadius: "8px", color: "#d0d0d0", padding: "1.25rem", fontSize: "0.825rem", resize: "vertical", lineHeight: "1.7", transition: "border-color 0.2s" }}
-                  placeholder={placeholder}
-                  value={value}
-                  onChange={(e) => setter(e.target.value)}
+
+            {/* Resume column */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <label style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", color: "#3a3a3a", letterSpacing: "0.2em" }}>01 — YOUR RESUME</label>
+                {/* Hidden file input — we trigger it via the visible button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={handleFileUpload}
+                  style={{ display: "none" }}
                 />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "0.4rem",
+                    padding: "0.35rem 0.75rem",
+                    background: "transparent",
+                    border: "1px solid #1c1c1c",
+                    borderRadius: "6px",
+                    color: uploading ? "#3a3a3a" : "#777",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: "0.6rem",
+                    letterSpacing: "0.05em",
+                    cursor: uploading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {uploading
+                    ? <><span style={{ display: "inline-block", width: "10px", height: "10px", border: "1.5px solid #333", borderTopColor: "#f0b429", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Extracting...</>
+                    : <><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3-3 3 3M2 9h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> Upload PDF / DOCX</>
+                  }
+                </button>
               </div>
-            ))}
+
+              {/* File status badge */}
+              {uploadedFile && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "0.5rem",
+                  marginBottom: "0.5rem", padding: "0.4rem 0.75rem",
+                  background: "#0d1a0d", border: "1px solid #1a2e1a",
+                  borderRadius: "6px",
+                }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", color: "#22c55e" }}>
+                    Extracted from: {uploadedFile}
+                  </span>
+                  <button
+                    onClick={clearUploadedFile}
+                    style={{
+                      background: "none", border: "none", color: "#555",
+                      cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: "0.7rem", padding: "0 0.25rem",
+                    }}
+                  >
+                    x
+                  </button>
+                </div>
+              )}
+
+              <textarea
+                rows={16}
+                style={{ width: "100%", background: "#0d0d0d", border: "1px solid #1c1c1c", borderRadius: "8px", color: "#d0d0d0", padding: "1.25rem", fontSize: "0.825rem", resize: "vertical", lineHeight: "1.7", transition: "border-color 0.2s" }}
+                placeholder="Paste your resume here or upload a file..."
+                value={resume}
+                onChange={(e) => { setResume(e.target.value); if (uploadedFile) setUploadedFile(null) }}
+              />
+            </div>
+
+            {/* Job description column */}
+            <div>
+              <label style={{ display: "block", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", color: "#3a3a3a", letterSpacing: "0.2em", marginBottom: "0.75rem" }}>02 — JOB DESCRIPTION</label>
+              <textarea
+                rows={16}
+                style={{ width: "100%", background: "#0d0d0d", border: "1px solid #1c1c1c", borderRadius: "8px", color: "#d0d0d0", padding: "1.25rem", fontSize: "0.825rem", resize: "vertical", lineHeight: "1.7", transition: "border-color 0.2s" }}
+                placeholder="Paste the job description here..."
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+              />
+            </div>
+
           </div>
 
           {/* Analyze button */}
