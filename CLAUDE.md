@@ -1,47 +1,574 @@
-# CLAUDE.md — Chris Kendrick
+# CLAUDE.md — Holt
+> This file is the source of truth for every build decision in this project.
+> Read it fully at the start of every session. Never deviate from it without explicit instruction.
 
-## Who I Am
-My name is Chris. I am 32, based in Casselberry/Winter Springs, FL. I am a Senior Appian Developer at GXP Partners (federal consulting) by day, and an aspiring AI/ML Engineer building toward a Senior AI/ML Engineer role within 2-3 years. I am learning full-stack development and AI engineering by building real projects after work, roughly 1-5 hours per evening on weekdays.
+---
 
-GitHub: kendrick-23
+## Project Overview
 
-## My North Star
-I want a high-paying Senior AI/ML Engineer role within 2 years. Every project I build should teach me a concrete skill, add to my portfolio, and move me closer to that goal. I am building deliberately — no risky moves, just compounding skills while staying employed.
+**Holt** is an AI-powered job search companion — a mobile-first web application that helps job seekers optimize their resumes for ATS systems, track applications, discover relevant jobs, and stay motivated throughout one of the most emotionally difficult experiences of adult life.
 
-## Active Projects
-- resume-match-ai: AI-powered resume and job description analyzer. React frontend, FastAPI + Python backend, Anthropic API. Goal: become a full job matching platform that helps users get past ATS filters, land interviews, and receive offers. Target features: PDF/Word resume upload, job description URL scraping, ATS optimization, resume editing suggestions, job matching.
-- mi-viejo-san-juan: Restaurant website POC for a potential client. Waiting on client feedback.
-- appian-helper (planned): An offline Appian code snippet and error reference tool. Like the Appian docs but more thorough, copy-paste ready, works offline, covers errors and bottlenecks.
+**The problem Holt solves:** Job seekers apply to dozens of roles and hear nothing back. Their resumes are being filtered out by ATS software before a human ever reads them. They don't know why. They have no system. They lose momentum. Holt fixes all three.
 
-## How I Want You to Work With Me
+**Mascot:** Ott the Otter — an encouraging coach who reacts to every key moment in the user's journey. Ott is never silent during important moments.
 
-### Explain as you go
-I am actively learning. When you write code, edit files, or make decisions, briefly explain what you are doing, why you are doing it, and what I should understand about this pattern. Keep it conversational — one sentence of context per meaningful action is enough.
+**Repository:** `github.com/kendrick-23/resume-match-ai` (being rebuilt as Holt)
 
-### Code quality standards
-1. Security first: API keys in environment variables only. All user inputs sanitized. Auth via managed providers only. Rate limiting on all API routes.
-2. Clean and readable: Meaningful variable names. Comments on anything non-obvious.
-3. Best practices: Proper error handling, no shortcuts, patterns that scale. Teach me the right way, not the fast way.
+---
 
-### Teaching mode
-- Use plain language. I am new to most of this.
-- Use analogies when a concept is abstract.
-- Tell me which approach is the industry standard and why.
-- Correct me clearly but constructively.
+## Tech Stack
 
-### Output format
-- Deliver code in single clean blocks, not fragments
-- Explain before or after the code block, not inside it
-- Keep explanations concise
+### Frontend
+- **Framework:** React (fresh build — no legacy code from resume-match-ai frontend)
+- **Styling:** CSS custom properties (CSS variables) — no Tailwind, no CSS-in-JS
+- **Routing:** React Router v6
+- **Animation:** CSS transitions and keyframes — no external animation library unless complexity requires Framer Motion
+- **Font loading:** Google Fonts (Nunito)
+- **Icons:** Lucide React
 
-## Memory
-Before every task, read memory.md. When I correct you, express a preference, or make a decision, update memory.md immediately.
+### Backend
+- **Framework:** FastAPI (Python) — existing backend, modify only when adding new routes
+- **Entry point:** `/backend/app/main.py`
+- **Dependencies:** `/backend/requirements.txt`
+- **Validation:** Pydantic models on all endpoints — always
+- **AI:** Anthropic Python SDK (`claude-opus-4-20250514`)
 
-## My Skill Gaps
-PostgreSQL/databases, authentication flows, cloud deployment, TypeScript, testing, Docker, RAG pipelines, vector databases. When a feature touches one of these, explain the concept — do not just write the code.
+### Auth + Database + Storage
+- **Provider:** Supabase (single platform for all three)
+- **Auth:** Supabase Auth — JWT-based, managed entirely by Supabase
+- **Database:** PostgreSQL via Supabase (row-level security enforced)
+- **Storage:** Supabase Storage (for any future file needs)
+- **Python client:** `supabase-py`
 
-## Security Rules
-1. API keys: environment variables only, never in frontend
-2. Input validation: sanitize everything at every entry point
-3. Authentication: always use a managed provider, never custom auth
-4. Rate limiting: apply to all API routes
+### Rate Limiting
+- **Library:** `slowapi` — applied per-route, per-user
+
+---
+
+## File Structure
+
+```
+holt/
+├── CLAUDE.md                    ← This file
+├── memory.md                    ← Quick-reference session context
+├── .env                         ← Never committed to git
+├── .gitignore                   ← Must include .env, __pycache__, node_modules
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py              ← FastAPI app, CORS, route registration
+│   │   ├── routes/
+│   │   │   ├── analyze.py       ← Resume analysis endpoint
+│   │   │   ├── jobs.py          ← Job aggregation endpoints
+│   │   │   ├── applications.py  ← Application tracker endpoints
+│   │   │   └── profile.py       ← User profile endpoints
+│   │   ├── models/
+│   │   │   └── schemas.py       ← All Pydantic models
+│   │   ├── services/
+│   │   │   ├── ai.py            ← Anthropic API calls
+│   │   │   ├── supabase.py      ← Supabase client, auth helpers
+│   │   │   └── parser.py        ← PDF/DOCX text extraction
+│   │   └── middleware/
+│   │       └── rate_limit.py    ← slowapi limiter configuration
+│   └── requirements.txt
+│
+└── frontend/
+    ├── public/
+    ├── src/
+    │   ├── main.jsx
+    │   ├── App.jsx              ← Router, layout shell
+    │   ├── components/
+    │   │   ├── ott/             ← All Ott SVG states
+    │   │   ├── ui/              ← Reusable: Button, Card, Badge, Input, etc.
+    │   │   └── layout/          ← BottomNav, Header, ScreenWrapper
+    │   ├── screens/
+    │   │   ├── Dashboard.jsx
+    │   │   ├── Upload.jsx
+    │   │   ├── Results.jsx
+    │   │   ├── Tracker.jsx
+    │   │   ├── Jobs.jsx
+    │   │   └── Profile.jsx
+    │   ├── hooks/               ← useAuth, useStreak, useAnalysis, etc.
+    │   ├── services/
+    │   │   └── api.js           ← All fetch calls to FastAPI backend
+    │   └── styles/
+    │       ├── tokens.css       ← All CSS custom properties (single source of truth)
+    │       ├── global.css       ← Reset, base styles, font imports
+    │       └── animations.css   ← All keyframe definitions
+    └── package.json
+```
+
+---
+
+## Design System
+
+### Aesthetic Direction
+Holt is a warm, character-led job search companion. The design feeling is: **Headspace's warmth × Duolingo's gamified energy × Family.co's illustrated playfulness** — but built for the emotional weight of a serious tool. Users are often stressed and discouraged. The interface must feel like a supportive coach, not a cold dashboard.
+
+Every screen should feel like it was designed by a person who cares about the user, not generated by a template.
+
+### Typography
+
+**Font family: Nunito** (Google Fonts, SIL Open Font License — free for commercial use)
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+```
+
+| Usage | Weight | Size (mobile) | Size (desktop) |
+|---|---|---|---|
+| Hero headline | 900 Black | 32px | 48px |
+| Screen title | 800 ExtraBold | 24px | 32px |
+| Section heading | 700 Bold | 18px | 22px |
+| Body text | 500 Medium | 15px | 16px |
+| Labels / captions | 600 SemiBold | 13px | 14px |
+| Score / data values | 800 ExtraBold | varies | varies |
+
+- All text is Nunito — one font family, multiple weights
+- JetBrains Mono may be used for match percentages and numeric scores only
+- Line height: 1.5 for body, 1.2 for headlines
+- Letter spacing: -0.02em for headlines, 0 for body
+
+### Color Tokens
+
+All colors live in `src/styles/tokens.css`. These are the ONLY colors used in the app. Never hardcode hex values inside component files.
+
+```css
+:root {
+  /* === PRIMARY BRAND === */
+  --color-accent:           #2BB5C0;  /* Warm teal — buttons, links, highlights */
+  --color-accent-dark:      #1E8F99;  /* Pressed state, shadows */
+  --color-accent-light:     #E8F7F9;  /* Tinted backgrounds, hover states */
+
+  /* === SEMANTIC COLORS === */
+  --color-success:          #58CC02;  /* Strengths found, high match */
+  --color-success-light:    #F0FDE4;  /* Success background tint */
+  --color-danger:           #FF4B4B;  /* Gaps identified, low match */
+  --color-danger-light:     #FFF0F0;  /* Danger background tint */
+  --color-warning:          #FFC800;  /* Caution, medium match */
+  --color-warning-light:    #FFFBEB;  /* Warning background tint */
+  --color-info:             #4A90D9;  /* Neutral information */
+  --color-info-light:       #EBF4FF;  /* Info background tint */
+
+  /* === BACKGROUNDS === */
+  --color-bg:               #FAF7F2;  /* Warm off-white — primary background */
+  --color-surface:          #F0EBE3;  /* Cards, secondary surfaces */
+  --color-surface-raised:   #FFFFFF;  /* Elevated modals, sheets */
+  --color-surface-overlay:  rgba(0, 0, 0, 0.4); /* Modal backdrops */
+
+  /* === BORDERS === */
+  --color-border:           #E8E0D5;  /* Standard borders */
+  --color-border-strong:    #C8BFB4;  /* Emphasized borders */
+
+  /* === TEXT === */
+  --color-text:             #2D2A26;  /* Warm near-black — primary text */
+  --color-text-secondary:   #5A5349;  /* Secondary text */
+  --color-text-muted:       #7A7169;  /* Placeholder, captions */
+  --color-text-inverse:     #FFFFFF;  /* Text on dark backgrounds */
+
+  /* === OTT THE OTTER === */
+  --color-ott-brown:        #8B5E3C;  /* Body fur */
+  --color-ott-cream:        #F5E6C8;  /* Belly, muzzle */
+  --color-ott-dark:         #5C3D22;  /* Dark fur detail, nose */
+  --color-ott-accent:       #2BB5C0;  /* Teal detail — scarf/collar/paws */
+
+  /* === SPACING SCALE === */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* === LAYOUT === */
+  --max-width:        480px;   /* Mobile content max-width */
+  --max-width-tablet: 768px;   /* Tablet breakpoint */
+  --max-width-desktop: 1200px; /* Desktop max-width */
+  --bottom-nav-height: 72px;   /* Bottom navigation bar height */
+  --header-height:    56px;    /* Top header height */
+
+  /* === SHAPE === */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-full: 9999px;  /* Pills, circles */
+
+  /* === SHADOWS === */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
+  --shadow-button: 0 4px 0 var(--color-accent-dark);  /* 3D press effect on primary buttons */
+
+  /* === TRANSITIONS === */
+  --transition-fast:   150ms ease-out;
+  --transition-base:   250ms ease-out;
+  --transition-slow:   400ms ease-out;
+  --transition-spring: 350ms cubic-bezier(0.34, 1.56, 0.64, 1);  /* Springy — use for Ott */
+}
+```
+
+### Component Patterns
+
+#### Primary Button
+```css
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 14px 28px;
+  border-radius: var(--radius-full);
+  border: none;
+  box-shadow: var(--shadow-button);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  min-height: 52px; /* Accessibility minimum */
+}
+
+.btn-primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--color-accent-dark);
+}
+```
+> The 3D press effect (box-shadow shrinks on :active) is the defining Duolingo-inspired interaction. Apply it to ALL primary buttons throughout the app. Never skip this.
+
+#### Card
+```css
+.card {
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+```
+
+#### Bottom Navigation Bar
+- Fixed to bottom of viewport
+- Height: `var(--bottom-nav-height)` = 72px
+- Background: `var(--color-surface-raised)` with top border
+- 5 tabs: Dashboard, Upload, Results, Tracker, Jobs
+- Active tab uses `--color-accent` for icon and label
+- Inactive tabs use `--color-text-muted`
+- All tap targets minimum 44px × 44px
+- Safe area inset padding for iPhone home indicator
+
+### Motion Principles
+
+**Guiding rule:** Motion must serve the user, never distract them. Job seekers are stressed. Unnecessary animation increases cognitive load.
+
+| Moment | Animation | Duration | Easing |
+|---|---|---|---|
+| Screen entrance | Fade up (translateY 12px → 0, opacity 0 → 1) | 300ms | ease-out |
+| Card stagger | 60ms delay between each card | 250ms | ease-out |
+| Score ring fill | Stroke-dashoffset animation on mount | 800ms | ease-out |
+| Ott entrance | Scale 0.8 → 1 + fade | 350ms | spring |
+| Ott celebration | Bounce (translateY 0 → -16px → 0) | 600ms | spring |
+| Button press | translateY 3px | 100ms | ease-out |
+| Tab switch | Fade + slight scale (0.96 → 1) | 200ms | ease-out |
+| Milestone reveal | Full-screen pulse + Ott celebration | 500ms | spring |
+
+**Never:** Looping animations on idle screens. Spinning loaders on fast operations. Parallax. Scroll-jacking.
+
+---
+
+## Ott the Otter — Mascot System
+
+### Character Description
+Ott is a compact, expressive otter built from rounded geometric shapes (circles, rounded rectangles, rounded triangles — same system as Duolingo's illustrations). Brown body, cream belly, teal accent details (scarf or collar). Wide eyes with large pupils. Visible whiskers. Small round nose. Always upright in mobile UI.
+
+### SVG State System
+Ott is an SVG component that accepts a `state` prop. Each state is a complete, distinct pose.
+
+```jsx
+<Ott state="idle" size={120} />
+```
+
+| State | Trigger | Description |
+|---|---|---|
+| `idle` | Dashboard default, no activity | Standing upright, slight smile, eyes forward |
+| `thinking` | AI analysis running | Leaning forward, paw on chin, magnifying glass in other paw |
+| `celebrating` | Score reveal ≥ 70%, milestone unlocked | Both paws raised, big grin, animated bounce |
+| `encouraging` | Score reveal 40–69% | One paw thumbs-up, warm confident smile |
+| `coaching` | Score reveal < 40%, gap identified | Gentle concerned expression, one paw extended toward user |
+| `waiting` | Upload zone before file selected | Sitting, looking up expectantly with slight tilt |
+| `excited` | Streak milestone, badge earned | Spinning or jumping, arms wide |
+| `waving` | Empty states, onboarding | Waving hello with big friendly smile |
+| `sleeping` | Streak broken (gentle, not shaming) | Eyes half-closed, small Zzz, still smiling |
+
+### Ott Placement by Screen
+
+| Screen | Ott Presence | Position |
+|---|---|---|
+| Dashboard | Moderate — shows streak reaction | Top of feed, above stats |
+| Upload | Moderate — occupies upload zone | Center of upload card |
+| Analysis (loading) | Heavy — main focus | Center screen, animated thinking |
+| Score reveal | Heavy — full emotional reaction | Above score ring |
+| Results detail | Minimal — small corner presence | Fixed bottom-right, 60px |
+| Tracker | Moderate — reacts to status changes | Top of screen |
+| Job Aggregator | Minimal — ambient | Tab icon area only |
+| Profile | Minimal | Header area |
+| Empty states | Heavy — Ott is the screen | Full center |
+| Milestone unlock | Heavy — full screen celebration | Full screen overlay |
+| Streak broken | Gentle/moderate | Top of dashboard |
+
+**Rule:** Ott is never absent from the app. On screens where his presence is "Minimal," he exists as a small 40–60px ambient version in the corner. He never disappears entirely.
+
+---
+
+## Gamification System
+
+All gamification elements must map directly to real job search progress. No points or badges for trivial actions.
+
+### Application Streak
+- Counts consecutive days the user takes at least one meaningful action
+- Qualifying actions: running an analysis, logging an application, updating a tracker status, searching for jobs
+- Displayed prominently on Dashboard with Ott reacting to streak length
+- Broken streak: Ott shows `sleeping` state, gentle message, no shame language
+- Never use words like "failed" or "broken" — use "take a rest day" or "pick back up today"
+
+### Resume Score Ring (existing — preserve and extend)
+- Already built in the codebase
+- Extend to: show score history over time (chart of last 5 analyses)
+- Score thresholds determine Ott's state on reveal:
+  - ≥ 70%: `celebrating`
+  - 40–69%: `encouraging`
+  - < 40%: `coaching`
+
+### Milestone Badge System
+Badges are earned for real achievements only. Each badge triggers a full-screen Ott celebration moment.
+
+| Badge | Trigger | Name |
+|---|---|---|
+| First Dive | First analysis run | 🌊 |
+| Sharp Eye | First score ≥ 80% | 👁️ |
+| Consistent | 7-day streak | 🔥 |
+| Dedicated | 30-day streak | ⭐ |
+| First Wave | First application tracked | 📋 |
+| Making Moves | 10 applications tracked | 💼 |
+| Momentum | First application status updated to "Interview" | 🎯 |
+| Upgraded | Resume score improved by 20+ points from first analysis | 📈 |
+
+### Application Pipeline Tracker
+Visual kanban-style tracker with stages:
+`Saved → Applied → Responded → Interview → Offer → Closed`
+
+- Each card shows: company, role, date, match score if analyzed
+- Moving a card to "Interview" triggers Ott `celebrating`
+- Ott reacts to total pipeline activity on Dashboard
+
+### What Holt Does NOT Have
+- Leaderboards (job searching is private and stressful)
+- XP / points currency (no real-world value in this context)
+- Daily quests or challenges (the goal IS the job, not the app)
+- Penalty mechanics (never shame the user for inactivity)
+
+---
+
+## Screen Specifications
+
+### 1. Dashboard
+- Ott greeting at top with streak count
+- Today's summary: applications logged, analyses run
+- Quick action cards: "Analyze a resume" | "Log an application" | "Search jobs"
+- Recent activity feed
+- Milestone badge shelf (most recent 3)
+- Bottom navigation — active tab: Dashboard
+
+### 2. Upload (Resume Analysis)
+- Ott in `waiting` state inside upload zone
+- Drag-and-drop + tap to upload (PDF, DOCX only, 5MB max)
+- Job description input: text area OR URL input toggle
+- On submit: Ott transitions to `thinking` state
+- Loading state: animated Ott with magnifying glass, progress copy ("Ott is reading your resume...")
+- On complete: navigate to Results screen
+
+### 3. Results (Score + Analysis)
+- Score ring (existing component, preserved)
+- Ott state determined by score threshold
+- Three sections: Overall Score | Strengths | Gaps
+- Each strength: green badge + explanation
+- Each gap: red badge + specific action ("Add 'Python' to your skills section")
+- Recommendations section: numbered list, clear actions
+- "Optimize for this job" CTA → triggers tailored resume generation (Phase 2)
+- Save result button → stores to Supabase with timestamp
+
+### 4. Application Tracker
+- Pipeline view: horizontal scroll or column layout
+- Add application: company, role, link, date, notes
+- Match score auto-populated if resume was analyzed against this job
+- Status updates trigger Ott reactions
+- Follow-up reminders: date field per application
+
+### 5. Job Aggregator
+- Search bar with filters: title, location, remote/hybrid/onsite, salary range
+- Job cards: company, title, location, posted date, match score indicator
+- Match score calculated against most recent uploaded resume
+- Sources: USAJobs API (prioritized given federal background), Indeed RSS, Adzuna
+- Save job button → auto-creates entry in Application Tracker at "Saved" stage
+
+### 6. Profile / Settings
+- Name, job title, target roles, target salary range
+- Resume vault: list of analyzed resumes with scores + dates
+- Streak history
+- Badge collection
+- Account settings: email, password change, delete account
+- Delete data: removes all stored resume text and application data from Supabase
+
+---
+
+## Security Standards (Non-Negotiable)
+
+These rules apply to every file, every route, every PR. No exceptions.
+
+### 1. API Keys & Secrets
+- ALL keys stored as environment variables only — never in source code
+- `.env` is in `.gitignore` — never committed
+- Frontend receives ZERO secret keys
+- Supabase anon key may be used in the frontend (it is designed to be public, protected by RLS)
+- Supabase service role key: backend only, never frontend
+
+### 2. Authentication — Supabase Auth
+- All auth handled by Supabase — never roll custom auth
+- Protected FastAPI routes validate JWT on every request using `supabase-py`
+- **CRITICAL RLS RULE:** Never use a single global service-role Supabase client for user operations. Use per-request user JWT context so Row Level Security is enforced. Each user can only read and write their own data.
+- Passwords are never handled or stored by Holt — delegated entirely to Supabase Auth
+
+### 3. File Upload Validation
+- Allowed MIME types: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/msword`
+- Allowed extensions: `.pdf`, `.docx`, `.doc`
+- Maximum file size: 5MB — reject before processing
+- Validate actual file signature (magic bytes), not just the extension
+- Files are parsed for text content only — never executed, never rendered server-side in a browser context
+- Raw files are NOT stored — only extracted text is saved to Supabase
+- Validation happens in the FastAPI route before any processing begins
+
+### 4. Input Validation — Pydantic on All Endpoints
+- Every POST endpoint has a Pydantic model — no raw dict access
+- Text fields: strip HTML tags, enforce character limits
+- Job description text: max 10,000 characters
+- URL inputs: validate format, check scheme is http/https
+- Profile fields: max lengths enforced per field
+
+### 5. Rate Limiting — slowapi
+Applied per-user (by user ID from JWT), falling back to IP for unauthenticated routes.
+
+| Route | Limit |
+|---|---|
+| `POST /analyze` | 10 / hour |
+| `POST /upload` | 20 / hour |
+| `GET /jobs/search` | 30 / hour |
+| `POST /auth/*` | 5 attempts / 15 minutes (by IP) |
+| All other routes | 100 / hour |
+
+When app scales to multi-instance deployment: add Redis backend to slowapi for shared counters.
+
+### 6. CORS
+```python
+# Development
+allow_origins = ["http://localhost:3000", "http://localhost:5173"]
+
+# Production — environment variable
+allow_origins = [os.getenv("FRONTEND_URL")]
+```
+Never use `allow_origins = ["*"]` in production.
+
+### 7. Data Storage
+- Resume text stored in Supabase (NOT raw files)
+- All user data protected by Supabase Row Level Security
+- Users can delete all their data from Profile settings
+- Deletion removes: resume text, analysis results, application tracker data, profile
+
+### 8. HTTPS
+- Production: HTTPS only — enforce at deployment layer
+- HTTP requests redirect to HTTPS
+- Set at infrastructure level (Render, Railway, or equivalent)
+
+---
+
+## Development Workflow
+
+### Environment Setup
+```bash
+# Backend
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt --break-system-packages
+uvicorn app.main:app --reload --port 8000
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+### Environment Variables
+```
+# backend/.env
+ANTHROPIC_API_KEY=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+FRONTEND_URL=http://localhost:5173
+
+# frontend/.env
+VITE_API_URL=http://localhost:8000
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+### Git Workflow
+- `git pull --rebase` before starting any session to avoid conflicts
+- Commit after each meaningful feature completion, not during
+- Never commit `.env` files — ever
+- Branch naming: `feature/screen-name` or `fix/description`
+
+### Code Style
+- Python: follow PEP 8, use type hints on all function signatures
+- JavaScript: ES modules, async/await (no .then chains), destructuring
+- CSS: BEM-like naming (`.card__title`, `.btn--primary`) for component styles
+- No inline styles in JSX unless dynamically computed
+- All magic numbers → CSS variables or named constants
+
+---
+
+## What Holt Should NEVER Look Like
+
+These are hard constraints on every design decision:
+
+- ❌ Dark background / dark mode (this is a warm cream app)
+- ❌ Purple or blue gradients
+- ❌ Glassmorphism (frosted blur cards)
+- ❌ Inter, Roboto, or Arial fonts
+- ❌ Sharp 0px border radius on interactive elements
+- ❌ Generic gray loading spinners — use Ott in thinking state
+- ❌ Corporate stock photo illustrations
+- ❌ Tables for primary data display — use cards
+- ❌ Hamburger menus — use bottom navigation
+- ❌ Walls of text — break into cards with icons
+- ❌ AI-generated visual aesthetic — every screen should feel intentional
+- ❌ Identical visual design to Teal, Jobscan, Careerflow, or LinkedIn
+
+---
+
+## Phase Roadmap (For Context Only — Build in Order)
+
+| Phase | What gets built |
+|---|---|
+| **Phase 1 (Now)** | Design system, Ott SVG, UI components, all 6 screens (UI only), bottom nav |
+| **Phase 2** | Backend routes for auth (Supabase), application tracker CRUD, resume score history |
+| **Phase 3** | Job aggregation (USAJobs API first, then Indeed/Adzuna) |
+| **Phase 4** | ATS resume tailoring (new AI prompt — generate optimized resume version) |
+| **Phase 5** | Cloud deployment (Render or Railway for backend, Vercel for frontend) |
+
+---
+
+*Last updated: April 2026*
+*Maintained by: Chris (kendrick-23)*
