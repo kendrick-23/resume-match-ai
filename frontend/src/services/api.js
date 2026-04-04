@@ -55,6 +55,65 @@ export async function analyzeResume(resumeText, jobDescription) {
   return parseAnalysisResult(data.result);
 }
 
+/* ============================================
+   Application Tracker CRUD
+   ============================================ */
+
+export async function listApplications() {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/applications`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load applications');
+  }
+  return res.json();
+}
+
+export async function createApplication(data) {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to create application');
+  }
+  return res.json();
+}
+
+export async function updateApplication(id, data) {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/applications/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to update application');
+  }
+  return res.json();
+}
+
+export async function deleteApplication(id) {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/applications/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to delete application');
+  }
+  return res.json();
+}
+
 /**
  * Parse the raw text response from the AI into structured data.
  */

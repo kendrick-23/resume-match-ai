@@ -74,6 +74,10 @@ async def get_current_user(
         return {"user_id": res.user.id, "token": token}
 
 
+from app.routes.applications import router as applications_router
+app.include_router(applications_router)
+
+
 class AnalyzeRequest(BaseModel):
     resume: str
     job_description: str

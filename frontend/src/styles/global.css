@@ -102,6 +102,28 @@ ul, ol {
   max-width: var(--max-width);
 }
 
+/* === TRACKER STAGE TABS === */
+.tracker-stage-tab {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tracker-stage-tab--active {
+  background: var(--color-accent-light);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 /* === DESKTOP TYPOGRAPHY OVERRIDES === */
 @media (min-width: 768px) {
   body {
