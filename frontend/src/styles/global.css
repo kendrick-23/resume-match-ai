@@ -87,6 +87,21 @@ ul, ol {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* === AUTH SCREEN LAYOUT === */
+.auth-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+
+.auth-screen__inner {
+  width: 100%;
+  max-width: var(--max-width);
+}
+
 /* === DESKTOP TYPOGRAPHY OVERRIDES === */
 @media (min-width: 768px) {
   body {

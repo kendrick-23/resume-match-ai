@@ -1,12 +1,22 @@
+import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
-import { User, FileText, Award, Settings, Trash2 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth.jsx';
+import { User, FileText, Award, Settings, Trash2, LogOut } from 'lucide-react';
 
 export default function Profile() {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
   return (
     <ScreenWrapper>
       {/* Header with Ott */}
@@ -35,7 +45,7 @@ export default function Profile() {
             <User size={24} style={{ color: 'var(--color-accent)' }} />
           </div>
           <div>
-            <p style={{ fontWeight: 700 }}>Job Seeker</p>
+            <p style={{ fontWeight: 700 }}>{user?.email || 'Job Seeker'}</p>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
               No target role set
             </p>
@@ -103,6 +113,9 @@ export default function Profile() {
       </h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         <Button variant="secondary" full>Change Password</Button>
+        <Button variant="secondary" full onClick={handleSignOut}>
+          <LogOut size={16} /> Sign Out
+        </Button>
         <Button
           variant="ghost"
           full

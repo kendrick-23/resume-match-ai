@@ -1,15 +1,25 @@
+import { supabase } from './supabase';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+async function authHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return {};
+  return { Authorization: `Bearer ${session.access_token}` };
+}
 
 /**
  * Upload a resume file and extract text via the backend.
  * Returns { text, filename }.
  */
 export async function uploadResume(file) {
+  const headers = await authHeaders();
   const formData = new FormData();
   formData.append('file', file);
 
   const res = await fetch(`${API_URL}/upload-resume`, {
     method: 'POST',
+    headers,
     body: formData,
   });
 
@@ -26,9 +36,10 @@ export async function uploadResume(file) {
  * Returns parsed { score, strengths, gaps, recommendations, summary }.
  */
 export async function analyzeResume(resumeText, jobDescription) {
+  const headers = await authHeaders();
   const res = await fetch(`${API_URL}/analyze`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({
       resume: resumeText,
       job_description: jobDescription,
