@@ -40,6 +40,11 @@
   color: var(--color-accent);
 }
 
+.bottom-nav__tab--active .bottom-nav__icon,
+.bottom-nav__tab--active .bottom-nav__label {
+  animation: tab-activate 200ms ease-out both;
+}
+
 .bottom-nav__icon {
   width: 24px;
   height: 24px;

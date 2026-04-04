@@ -25,12 +25,14 @@
 
 .card--interactive {
   cursor: pointer;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow var(--transition-fast);
 }
 
 .card--interactive:active {
   transform: translateY(2px);
   box-shadow: none;
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out;
 }
 
 .card--interactive:hover:not(:active) {

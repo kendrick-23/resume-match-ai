@@ -7,34 +7,30 @@
   animation: ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* Celebrating: single bounce on reveal */
+/* Celebrating: entrance + 3x bounce dance */
 .ott--celebrating {
   animation:
     ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
-    ott-bounce 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms both;
+    ott-celebrate 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms 3;
 }
 
-/* Excited: single bounce on milestone */
+/* Excited: entrance + 3x bounce dance */
 .ott--excited {
   animation:
     ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
-    ott-bounce 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms both;
+    ott-celebrate 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms 3;
 }
 
-@keyframes ott-entrance {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* Thinking: gentle side-to-side sway */
+.ott--thinking {
+  animation:
+    ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    ott-sway 2s ease-in-out 350ms 2;
 }
 
-@keyframes ott-bounce {
-  0% { transform: translateY(0); }
-  35% { transform: translateY(-16px); }
-  65% { transform: translateY(-4px); }
-  100% { transform: translateY(0); }
+@keyframes ott-sway {
+  0%   { transform: rotate(0deg); }
+  25%  { transform: rotate(3deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
 }

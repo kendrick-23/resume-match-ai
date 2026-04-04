@@ -1,0 +1,186 @@
+/* ============================================
+   Holt Animations
+   All keyframe definitions and animation utilities.
+   Imported globally — classes available everywhere.
+   ============================================ */
+
+/* === 1. SCREEN ENTRANCE — fade up from 12px below === */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* === 2. CARD STAGGER — children fade in with 60ms delay between each === */
+
+.screen__content > * {
+  animation: fade-up 250ms ease-out both;
+}
+
+.screen__content > *:nth-child(1)  { animation-delay: 0ms; }
+.screen__content > *:nth-child(2)  { animation-delay: 60ms; }
+.screen__content > *:nth-child(3)  { animation-delay: 120ms; }
+.screen__content > *:nth-child(4)  { animation-delay: 180ms; }
+.screen__content > *:nth-child(5)  { animation-delay: 240ms; }
+.screen__content > *:nth-child(6)  { animation-delay: 300ms; }
+.screen__content > *:nth-child(7)  { animation-delay: 360ms; }
+.screen__content > *:nth-child(8)  { animation-delay: 420ms; }
+.screen__content > *:nth-child(9)  { animation-delay: 480ms; }
+.screen__content > *:nth-child(10) { animation-delay: 540ms; }
+.screen__content > *:nth-child(11) { animation-delay: 600ms; }
+.screen__content > *:nth-child(12) { animation-delay: 660ms; }
+
+/* === 3. BUTTON PRESS — spring feel with transform + box-shadow === */
+
+@keyframes btn-spring-back {
+  0%   { transform: translateY(3px); }
+  50%  { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
+}
+
+/* === 4. SCORE RING — dramatic stroke fill on reveal === */
+
+@keyframes score-ring-fill {
+  from {
+    stroke-dashoffset: var(--score-ring-circumference, 283);
+  }
+  to {
+    stroke-dashoffset: var(--score-ring-offset, 0);
+  }
+}
+
+.score-ring__circle {
+  animation: score-ring-fill 800ms ease-out both;
+  animation-delay: 300ms;
+}
+
+/* === 5. OTT ENTRANCE — spring scale 0.8 -> 1.05 -> 1 === */
+
+@keyframes ott-entrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* === 6. OTT CELEBRATION — bounce dance, repeats 3x === */
+
+@keyframes ott-celebrate {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-20px); }
+  60%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+
+/* === 7. MILESTONE REVEAL — full-screen overlay === */
+
+@keyframes milestone-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes milestone-badge-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(8px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes milestone-pulse {
+  0%   { transform: scale(1); opacity: 1; }
+  50%  { transform: scale(1.15); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.milestone-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-overlay);
+  animation: milestone-overlay-in 300ms ease-out both;
+}
+
+.milestone-overlay__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  animation: milestone-pulse 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.milestone-overlay__badge {
+  font-size: 64px;
+  animation: milestone-badge-drop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms both;
+}
+
+.milestone-overlay__title {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--color-text-inverse);
+  animation: fade-up 300ms ease-out 400ms both;
+}
+
+.milestone-overlay__subtitle {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--color-text-inverse);
+  opacity: 0.85;
+  animation: fade-up 300ms ease-out 500ms both;
+}
+
+/* === 8. TAB SWITCH — subtle scale + fade on active tab === */
+
+@keyframes tab-activate {
+  from {
+    opacity: 0.7;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* === PREFERS REDUCED MOTION — respect user preference === */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

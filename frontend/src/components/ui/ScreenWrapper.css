@@ -17,18 +17,4 @@
   margin: 0 auto;
 }
 
-/* Fade-up entrance per motion spec */
-.screen__content {
-  animation: screen-enter 300ms ease-out both;
-}
-
-@keyframes screen-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* Screen content — stagger animation applied via animations.css on children */
