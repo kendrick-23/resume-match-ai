@@ -1,0 +1,38 @@
+/* ============================================
+   Card — white surface, warm border, soft shadow
+   ============================================ */
+
+.card {
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.card__title {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.card__body {
+  color: var(--color-text-secondary);
+}
+
+.card--interactive {
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.card--interactive:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.card--interactive:hover:not(:active) {
+  box-shadow: var(--shadow-md);
+}

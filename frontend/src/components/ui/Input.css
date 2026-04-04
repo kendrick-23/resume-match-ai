@@ -1,0 +1,60 @@
+/* ============================================
+   Input — text input with warm styling
+   ============================================ */
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.input-wrapper__label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.input {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  min-height: 48px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  width: 100%;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+.input--error {
+  border-color: var(--color-danger);
+}
+
+.input--error:focus {
+  box-shadow: 0 0 0 3px var(--color-danger-light);
+}
+
+.input-wrapper__error {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-danger);
+}
+
+/* Textarea variant */
+textarea.input {
+  min-height: 100px;
+  resize: vertical;
+  line-height: 1.5;
+}

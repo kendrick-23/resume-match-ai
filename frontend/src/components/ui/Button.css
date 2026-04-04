@@ -1,0 +1,83 @@
+/* ============================================
+   Button — primary, secondary, ghost variants
+   3D press effect on primary (Duolingo-inspired)
+   ============================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 14px 28px;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  min-height: 52px;
+  min-width: 44px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+    background var(--transition-fast), color var(--transition-fast);
+  user-select: none;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === PRIMARY === */
+.btn--primary {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-button);
+}
+
+.btn--primary:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--color-accent-dark);
+}
+
+.btn--primary:hover:not(:disabled):not(:active) {
+  background: var(--color-accent-dark);
+}
+
+/* === SECONDARY === */
+.btn--secondary {
+  background: var(--color-surface-raised);
+  color: var(--color-accent);
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 3px 0 var(--color-border-strong);
+}
+
+.btn--secondary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--color-border-strong);
+}
+
+.btn--secondary:hover:not(:disabled):not(:active) {
+  background: var(--color-accent-light);
+}
+
+/* === GHOST === */
+.btn--ghost {
+  background: transparent;
+  color: var(--color-accent);
+  box-shadow: none;
+}
+
+.btn--ghost:active:not(:disabled) {
+  background: var(--color-accent-light);
+}
+
+.btn--ghost:hover:not(:disabled):not(:active) {
+  background: var(--color-accent-light);
+}
+
+/* === FULL WIDTH === */
+.btn--full {
+  width: 100%;
+}
