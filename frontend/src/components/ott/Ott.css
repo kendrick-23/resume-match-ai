@@ -1,0 +1,40 @@
+/* ============================================
+   Ott the Otter — Animation Styles
+   ============================================ */
+
+.ott {
+  display: block;
+  animation: ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Celebrating: single bounce on reveal */
+.ott--celebrating {
+  animation:
+    ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    ott-bounce 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms both;
+}
+
+/* Excited: single bounce on milestone */
+.ott--excited {
+  animation:
+    ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    ott-bounce 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms both;
+}
+
+@keyframes ott-entrance {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ott-bounce {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(-16px); }
+  65% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}

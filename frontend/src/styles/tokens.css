@@ -1,0 +1,82 @@
+/* ============================================
+   Holt Design Tokens
+   Single source of truth for all design values.
+   Never hardcode hex values in component files.
+   ============================================ */
+
+:root {
+  /* === PRIMARY BRAND === */
+  --color-accent:           #2BB5C0;  /* Warm teal — buttons, links, highlights */
+  --color-accent-dark:      #1E8F99;  /* Pressed state, shadows */
+  --color-accent-light:     #E8F7F9;  /* Tinted backgrounds, hover states */
+
+  /* === SEMANTIC COLORS === */
+  --color-success:          #58CC02;  /* Strengths found, high match */
+  --color-success-light:    #F0FDE4;  /* Success background tint */
+  --color-danger:           #FF4B4B;  /* Gaps identified, low match */
+  --color-danger-light:     #FFF0F0;  /* Danger background tint */
+  --color-warning:          #FFC800;  /* Caution, medium match */
+  --color-warning-light:    #FFFBEB;  /* Warning background tint */
+  --color-info:             #4A90D9;  /* Neutral information */
+  --color-info-light:       #EBF4FF;  /* Info background tint */
+
+  /* === BACKGROUNDS === */
+  --color-bg:               #FAF7F2;  /* Warm off-white — primary background */
+  --color-surface:          #F0EBE3;  /* Cards, secondary surfaces */
+  --color-surface-raised:   #FFFFFF;  /* Elevated modals, sheets */
+  --color-surface-overlay:  rgba(0, 0, 0, 0.4); /* Modal backdrops */
+
+  /* === BORDERS === */
+  --color-border:           #E8E0D5;  /* Standard borders */
+  --color-border-strong:    #C8BFB4;  /* Emphasized borders */
+
+  /* === TEXT === */
+  --color-text:             #2D2A26;  /* Warm near-black — primary text */
+  --color-text-secondary:   #5A5349;  /* Secondary text */
+  --color-text-muted:       #7A7169;  /* Placeholder, captions */
+  --color-text-inverse:     #FFFFFF;  /* Text on dark backgrounds */
+
+  /* === OTT THE OTTER === */
+  --color-ott-brown:        #8B5E3C;  /* Body fur */
+  --color-ott-cream:        #F5E6C8;  /* Belly, muzzle */
+  --color-ott-dark:         #5C3D22;  /* Dark fur detail, nose */
+  --color-ott-accent:       #2BB5C0;  /* Teal detail — scarf/collar/paws */
+
+  /* === SPACING SCALE === */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* === LAYOUT === */
+  --max-width:        480px;   /* Mobile content max-width */
+  --max-width-tablet: 768px;   /* Tablet breakpoint */
+  --max-width-desktop: 1200px; /* Desktop max-width */
+  --bottom-nav-height: 72px;   /* Bottom navigation bar height */
+  --header-height:    56px;    /* Top header height */
+
+  /* === SHAPE === */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-full: 9999px;  /* Pills, circles */
+
+  /* === SHADOWS === */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
+  --shadow-button: 0 4px 0 var(--color-accent-dark);  /* 3D press effect on primary buttons */
+
+  /* === TRANSITIONS === */
+  --transition-fast:   150ms ease-out;
+  --transition-base:   250ms ease-out;
+  --transition-slow:   400ms ease-out;
+  --transition-spring: 350ms cubic-bezier(0.34, 1.56, 0.64, 1);  /* Springy — use for Ott */
+}
