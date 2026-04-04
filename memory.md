@@ -142,9 +142,9 @@ Holt must be installable as a Progressive Web App:
 2. ✅ Ott SVG (9 states) — NEEDS ANATOMY FIX
 3. ✅ UI component library (Button, Card, Badge, Input, BottomNav, ScreenWrapper)
 4. ✅ 6 screen shells with React Router navigation
-5. 🔲 **CURRENT: Fix Ott anatomy — make him look like a real otter**
-6. 🔲 Add all animations (screen stagger, button spring, score ring, Ott bounce, milestones)
-7. 🔲 Connect Upload → FastAPI backend (real AI analysis)
+5. ✅ Fix Ott anatomy — make him look like a real otter
+6. ✅ Add all animations (screen stagger, button spring, score ring, Ott bounce, milestones)
+7. 🔲 **CURRENT: Connect Upload → FastAPI backend (real AI analysis)**
 8. 🔲 Supabase auth (login/signup)
 9. 🔲 Tracker CRUD (add/edit/move applications)
 10. 🔲 Job aggregation (USAJobs first)

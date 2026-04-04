@@ -4,6 +4,10 @@ import './Ott.css';
    Ott the Otter — SVG Mascot Component
    9 states, all built from rounded geometric shapes.
    Colors reference CSS custom properties from tokens.css.
+
+   Anatomy: compact, wide body with low center of gravity.
+   Small flat ears flush to head. Prominent puffy cheeks
+   (whisker pads). Thick tapered tail. Webbed paws.
    ============================================ */
 
 const C = {
@@ -20,98 +24,129 @@ const C = {
    ----------------------------------------------- */
 
 function Tail() {
+  /* Thick, flat, tapered otter tail — visible behind body to the right */
   return (
     <path
-      d="M 82 100 C 92 88, 110 92, 107 106 C 105 116, 92 118, 88 108"
+      d="M 80 96 C 96 86, 116 90, 114 102 C 112 112, 100 116, 94 110 C 88 104, 86 100, 80 96"
       style={{ fill: C.brown }}
     />
   );
 }
 
 function Feet() {
+  /* Wide, webbed otter feet */
   return (
     <g>
-      <ellipse cx={47} cy={117} rx={12} ry={5} style={{ fill: C.brown }} />
-      <ellipse cx={73} cy={117} rx={12} ry={5} style={{ fill: C.brown }} />
+      {/* Left foot */}
+      <ellipse cx={44} cy={119} rx={14} ry={5} style={{ fill: C.brown }} />
+      <g style={{ stroke: C.dark, strokeWidth: 0.8, strokeLinecap: 'round', fill: 'none' }}>
+        <line x1={38} y1={117} x2={38} y2={122} />
+        <line x1={42} y1={116} x2={42} y2={122} />
+        <line x1={46} y1={116} x2={46} y2={122} />
+      </g>
+      {/* Right foot */}
+      <ellipse cx={76} cy={119} rx={14} ry={5} style={{ fill: C.brown }} />
+      <g style={{ stroke: C.dark, strokeWidth: 0.8, strokeLinecap: 'round', fill: 'none' }}>
+        <line x1={72} y1={116} x2={72} y2={122} />
+        <line x1={76} y1={116} x2={76} y2={122} />
+        <line x1={80} y1={117} x2={80} y2={122} />
+      </g>
     </g>
   );
 }
 
 function BodyShape() {
-  return <ellipse cx={60} cy={85} rx={26} ry={30} style={{ fill: C.brown }} />;
+  /* Wide, round body — low center of gravity */
+  return <ellipse cx={60} cy={88} rx={32} ry={30} style={{ fill: C.brown }} />;
 }
 
 function BellyShape() {
-  return <ellipse cx={60} cy={83} rx={17} ry={22} style={{ fill: C.cream }} />;
+  return <ellipse cx={60} cy={86} rx={21} ry={22} style={{ fill: C.cream }} />;
 }
 
 function Scarf() {
   return (
     <g>
-      <rect x={34} y={56} width={52} height={7} rx={3.5} style={{ fill: C.accent }} />
+      <rect x={32} y={57} width={56} height={7} rx={3.5} style={{ fill: C.accent }} />
       <rect
-        x={62} y={61} width={7} height={13} rx={3.5}
+        x={64} y={62} width={7} height={13} rx={3.5}
         style={{ fill: C.accent }}
-        transform="rotate(10, 65, 67)"
+        transform="rotate(10, 67, 68)"
       />
       <rect
-        x={55} y={61} width={6} height={10} rx={3}
+        x={57} y={62} width={6} height={10} rx={3}
         style={{ fill: C.accent }}
-        transform="rotate(-8, 58, 66)"
+        transform="rotate(-8, 60, 67)"
       />
     </g>
   );
 }
 
 function HeadShape() {
-  return <ellipse cx={60} cy={36} rx={28} ry={24} style={{ fill: C.brown }} />;
+  /* Wider, flatter head — otter proportions */
+  return <ellipse cx={60} cy={36} rx={32} ry={23} style={{ fill: C.brown }} />;
 }
 
 function Ears() {
+  /* Small, flat ears — barely extending above head, flush to sides */
   return (
     <g>
-      <ellipse cx={38} cy={17} rx={10} ry={8} style={{ fill: C.brown }} />
-      <ellipse cx={38} cy={17} rx={6} ry={5} style={{ fill: C.cream }} />
-      <ellipse cx={82} cy={17} rx={10} ry={8} style={{ fill: C.brown }} />
-      <ellipse cx={82} cy={17} rx={6} ry={5} style={{ fill: C.cream }} />
+      <ellipse cx={34} cy={18} rx={6} ry={4} style={{ fill: C.brown }} />
+      <ellipse cx={34} cy={18} rx={3.5} ry={2.5} style={{ fill: C.cream }} />
+      <ellipse cx={86} cy={18} rx={6} ry={4} style={{ fill: C.brown }} />
+      <ellipse cx={86} cy={18} rx={3.5} ry={2.5} style={{ fill: C.cream }} />
+    </g>
+  );
+}
+
+function Cheeks() {
+  /* Prominent puffy whisker pads — the defining otter feature */
+  return (
+    <g>
+      <ellipse cx={43} cy={44} rx={11} ry={8} style={{ fill: C.cream }} />
+      <ellipse cx={77} cy={44} rx={11} ry={8} style={{ fill: C.cream }} />
     </g>
   );
 }
 
 function Muzzle() {
-  return <ellipse cx={60} cy={44} rx={14} ry={10} style={{ fill: C.cream }} />;
+  /* Wide muzzle connecting the cheeks */
+  return <ellipse cx={60} cy={45} rx={13} ry={9} style={{ fill: C.cream }} />;
 }
 
 function Nose() {
-  return <ellipse cx={60} cy={42} rx={3.5} ry={2.5} style={{ fill: C.dark }} />;
+  /* Small, dark, oval — otter nose is wider than tall */
+  return <ellipse cx={60} cy={42} rx={4} ry={2.5} style={{ fill: C.dark }} />;
 }
 
 function Whiskers() {
+  /* Three whiskers per side, fanning out from cheeks */
   return (
     <g style={{ stroke: C.dark, strokeWidth: 1.2, strokeLinecap: 'round' }}>
-      <line x1={46} y1={42} x2={27} y2={38} style={{ fill: 'none' }} />
-      <line x1={46} y1={44} x2={27} y2={46} style={{ fill: 'none' }} />
-      <line x1={46} y1={43} x2={29} y2={42} style={{ fill: 'none' }} />
-      <line x1={74} y1={42} x2={93} y2={38} style={{ fill: 'none' }} />
-      <line x1={74} y1={44} x2={93} y2={46} style={{ fill: 'none' }} />
-      <line x1={74} y1={43} x2={91} y2={42} style={{ fill: 'none' }} />
+      <line x1={43} y1={42} x2={22} y2={37} style={{ fill: 'none' }} />
+      <line x1={43} y1={44} x2={22} y2={46} style={{ fill: 'none' }} />
+      <line x1={43} y1={43} x2={24} y2={42} style={{ fill: 'none' }} />
+      <line x1={77} y1={42} x2={98} y2={37} style={{ fill: 'none' }} />
+      <line x1={77} y1={44} x2={98} y2={46} style={{ fill: 'none' }} />
+      <line x1={77} y1={43} x2={96} y2={42} style={{ fill: 'none' }} />
     </g>
   );
 }
 
 /* -----------------------------------------------
    EYE VARIANTS
+   Eyes are wide-set to match the broader head.
    ----------------------------------------------- */
 
 function EyesNormal() {
   return (
     <g>
-      <circle cx={49} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={49} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={47} cy={31} r={1.2} style={{ fill: C.white }} />
-      <circle cx={71} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={71} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={69} cy={31} r={1.2} style={{ fill: C.white }} />
+      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+      <circle cx={47} cy={33} r={3.5} style={{ fill: C.dark }} />
+      <circle cx={45} cy={31} r={1.2} style={{ fill: C.white }} />
+      <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
+      <circle cx={73} cy={33} r={3.5} style={{ fill: C.dark }} />
+      <circle cx={71} cy={31} r={1.2} style={{ fill: C.white }} />
     </g>
   );
 }
@@ -126,8 +161,8 @@ function EyesHappy() {
         fill: 'none',
       }}
     >
-      <path d="M 43 34 Q 49 28 55 34" />
-      <path d="M 65 34 Q 71 28 77 34" />
+      <path d="M 41 34 Q 47 28 53 34" />
+      <path d="M 67 34 Q 73 28 79 34" />
     </g>
   );
 }
@@ -142,8 +177,8 @@ function EyesSleeping() {
         fill: 'none',
       }}
     >
-      <line x1={43} y1={33} x2={55} y2={33} />
-      <line x1={65} y1={33} x2={77} y2={33} />
+      <line x1={41} y1={33} x2={53} y2={33} />
+      <line x1={67} y1={33} x2={79} y2={33} />
     </g>
   );
 }
@@ -152,12 +187,12 @@ function EyesWink() {
   return (
     <g>
       {/* Left eye — normal */}
-      <circle cx={49} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={49} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={47} cy={31} r={1.2} style={{ fill: C.white }} />
+      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+      <circle cx={47} cy={33} r={3.5} style={{ fill: C.dark }} />
+      <circle cx={45} cy={31} r={1.2} style={{ fill: C.white }} />
       {/* Right eye — wink arc */}
       <path
-        d="M 65 34 Q 71 28 77 34"
+        d="M 67 34 Q 73 28 79 34"
         style={{
           stroke: C.dark,
           strokeWidth: 2.5,
@@ -172,12 +207,12 @@ function EyesWink() {
 function EyesWide() {
   return (
     <g>
-      <circle cx={49} cy={32} r={7} style={{ fill: C.white }} />
-      <circle cx={49} cy={33} r={4} style={{ fill: C.dark }} />
-      <circle cx={47} cy={30} r={1.4} style={{ fill: C.white }} />
-      <circle cx={71} cy={32} r={7} style={{ fill: C.white }} />
-      <circle cx={71} cy={33} r={4} style={{ fill: C.dark }} />
-      <circle cx={69} cy={30} r={1.4} style={{ fill: C.white }} />
+      <circle cx={47} cy={32} r={7} style={{ fill: C.white }} />
+      <circle cx={47} cy={33} r={4} style={{ fill: C.dark }} />
+      <circle cx={45} cy={30} r={1.4} style={{ fill: C.white }} />
+      <circle cx={73} cy={32} r={7} style={{ fill: C.white }} />
+      <circle cx={73} cy={33} r={4} style={{ fill: C.dark }} />
+      <circle cx={71} cy={30} r={1.4} style={{ fill: C.white }} />
     </g>
   );
 }
@@ -185,12 +220,12 @@ function EyesWide() {
 function EyesLookUp() {
   return (
     <g>
-      <circle cx={49} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={49} cy={30} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={47} cy={28.5} r={1.2} style={{ fill: C.white }} />
-      <circle cx={71} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={71} cy={30} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={69} cy={28.5} r={1.2} style={{ fill: C.white }} />
+      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+      <circle cx={47} cy={30} r={3.5} style={{ fill: C.dark }} />
+      <circle cx={45} cy={28.5} r={1.2} style={{ fill: C.white }} />
+      <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
+      <circle cx={73} cy={30} r={3.5} style={{ fill: C.dark }} />
+      <circle cx={71} cy={28.5} r={1.2} style={{ fill: C.white }} />
     </g>
   );
 }
@@ -198,12 +233,12 @@ function EyesLookUp() {
 function EyesLookSide() {
   return (
     <g>
-      <circle cx={49} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={51} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={49.5} cy={31} r={1.2} style={{ fill: C.white }} />
-      <circle cx={71} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={73} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={71.5} cy={31} r={1.2} style={{ fill: C.white }} />
+      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+      <circle cx={49} cy={33} r={3.5} style={{ fill: C.dark }} />
+      <circle cx={47.5} cy={31} r={1.2} style={{ fill: C.white }} />
+      <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
+      <circle cx={75} cy={33} r={3.5} style={{ fill: C.dark }} />
+      <circle cx={73.5} cy={31} r={1.2} style={{ fill: C.white }} />
     </g>
   );
 }
@@ -258,21 +293,21 @@ function BrowsConcerned() {
         fill: 'none',
       }}
     >
-      <line x1={43} y1={24} x2={52} y2={22} />
-      <line x1={77} y1={24} x2={68} y2={22} />
+      <line x1={41} y1={24} x2={50} y2={22} />
+      <line x1={79} y1={24} x2={70} y2={22} />
     </g>
   );
 }
 
 /* -----------------------------------------------
-   ARM HELPERS
+   ARM HELPERS — positioned for wider body
    ----------------------------------------------- */
 
 function LeftArm({ transform }) {
   return (
     <g transform={transform}>
-      <rect x={26} y={70} width={12} height={28} rx={6} style={{ fill: C.brown }} />
-      <circle cx={32} cy={98} r={6.5} style={{ fill: C.accent }} />
+      <rect x={22} y={72} width={12} height={26} rx={6} style={{ fill: C.brown }} />
+      <ellipse cx={28} cy={98} rx={7} ry={5} style={{ fill: C.accent }} />
     </g>
   );
 }
@@ -280,8 +315,8 @@ function LeftArm({ transform }) {
 function RightArm({ transform }) {
   return (
     <g transform={transform}>
-      <rect x={82} y={70} width={12} height={28} rx={6} style={{ fill: C.brown }} />
-      <circle cx={88} cy={98} r={6.5} style={{ fill: C.accent }} />
+      <rect x={86} y={72} width={12} height={26} rx={6} style={{ fill: C.brown }} />
+      <ellipse cx={92} cy={98} rx={7} ry={5} style={{ fill: C.accent }} />
     </g>
   );
 }
@@ -300,6 +335,7 @@ function OtterBase({ eyes, mouth, arms, extras, tilt }) {
       <Scarf />
       <HeadShape />
       <Ears />
+      <Cheeks />
       <Muzzle />
       {eyes}
       <Nose />
@@ -345,26 +381,26 @@ function ThinkingState() {
       arms={
         <>
           {/* Left arm — paw on chin */}
-          <LeftArm transform="rotate(130, 32, 70)" />
+          <LeftArm transform="rotate(130, 28, 72)" />
           {/* Right arm — raised, holding magnifying glass */}
-          <RightArm transform="rotate(140, 88, 70)" />
+          <RightArm transform="rotate(140, 92, 72)" />
         </>
       }
       extras={
         <g>
           {/* Magnifying glass: handle + lens */}
           <line
-            x1={106} y1={47}
-            x2={108} y2={38}
+            x1={108} y1={47}
+            x2={110} y2={38}
             style={{ stroke: C.dark, strokeWidth: 3, strokeLinecap: 'round' }}
           />
           <circle
-            cx={110} cy={28}
+            cx={112} cy={28}
             r={10}
             style={{ stroke: C.dark, strokeWidth: 2.5, fill: 'none' }}
           />
           <circle
-            cx={110} cy={28}
+            cx={112} cy={28}
             r={7}
             style={{ fill: C.accentLight, opacity: 0.4 }}
           />
@@ -381,27 +417,27 @@ function CelebratingState() {
       mouth={<MouthGrin />}
       arms={
         <>
-          <LeftArm transform="rotate(-130, 32, 70)" />
-          <RightArm transform="rotate(130, 88, 70)" />
+          <LeftArm transform="rotate(-130, 28, 72)" />
+          <RightArm transform="rotate(130, 92, 72)" />
         </>
       }
       extras={
         <g>
           {/* Celebration sparkles */}
-          <circle cx={20} cy={24} r={2.5} style={{ fill: C.accent }} />
-          <circle cx={100} cy={18} r={2} style={{ fill: C.accent }} />
-          <circle cx={14} cy={40} r={1.5} style={{ fill: C.accent }} />
-          <circle cx={106} cy={38} r={1.8} style={{ fill: C.accent }} />
+          <circle cx={18} cy={24} r={2.5} style={{ fill: C.accent }} />
+          <circle cx={102} cy={18} r={2} style={{ fill: C.accent }} />
+          <circle cx={12} cy={40} r={1.5} style={{ fill: C.accent }} />
+          <circle cx={108} cy={38} r={1.8} style={{ fill: C.accent }} />
           {/* Star shapes via rotated rects */}
           <rect
-            x={10} y={12} width={4} height={4} rx={0.5}
+            x={8} y={12} width={4} height={4} rx={0.5}
             style={{ fill: C.accent }}
-            transform="rotate(45, 12, 14)"
+            transform="rotate(45, 10, 14)"
           />
           <rect
-            x={104} y={8} width={3} height={3} rx={0.5}
+            x={106} y={8} width={3} height={3} rx={0.5}
             style={{ fill: C.accent }}
-            transform="rotate(45, 105.5, 9.5)"
+            transform="rotate(45, 107.5, 9.5)"
           />
         </g>
       }
@@ -418,21 +454,21 @@ function EncouragingState() {
         <>
           <LeftArm />
           {/* Right arm — raised in thumbs-up position */}
-          <RightArm transform="rotate(120, 88, 70)" />
+          <RightArm transform="rotate(120, 92, 72)" />
         </>
       }
       extras={
         <g>
           {/* Thumb detail on right paw */}
           <circle
-            cx={113} cy={50}
+            cx={115} cy={50}
             r={3.5}
             style={{ fill: C.accent }}
           />
           <rect
-            x={111} y={44} width={4} height={8} rx={2}
+            x={113} y={44} width={4} height={8} rx={2}
             style={{ fill: C.accent }}
-            transform="rotate(-20, 113, 48)"
+            transform="rotate(-20, 115, 48)"
           />
         </g>
       }
@@ -455,7 +491,7 @@ function CoachingState() {
         <>
           <LeftArm />
           {/* Right arm — extended outward toward user */}
-          <RightArm transform="rotate(60, 88, 70)" />
+          <RightArm transform="rotate(60, 92, 72)" />
         </>
       }
     />
@@ -471,8 +507,8 @@ function WaitingState() {
       arms={
         <>
           {/* Both arms resting in front of body */}
-          <LeftArm transform="rotate(50, 32, 70)" />
-          <RightArm transform="rotate(-50, 88, 70)" />
+          <LeftArm transform="rotate(50, 28, 72)" />
+          <RightArm transform="rotate(-50, 92, 72)" />
         </>
       }
     />
@@ -487,26 +523,26 @@ function ExcitedState() {
       arms={
         <>
           {/* Arms flung wide out to both sides */}
-          <LeftArm transform="rotate(-90, 32, 70)" />
-          <RightArm transform="rotate(90, 88, 70)" />
+          <LeftArm transform="rotate(-90, 28, 72)" />
+          <RightArm transform="rotate(90, 92, 72)" />
         </>
       }
       extras={
         <g>
           {/* Energy sparkles */}
-          <circle cx={8} cy={50} r={2.5} style={{ fill: C.accent }} />
-          <circle cx={112} cy={50} r={2.5} style={{ fill: C.accent }} />
-          <circle cx={14} cy={36} r={1.8} style={{ fill: C.accent }} />
-          <circle cx={106} cy={36} r={1.8} style={{ fill: C.accent }} />
+          <circle cx={6} cy={50} r={2.5} style={{ fill: C.accent }} />
+          <circle cx={114} cy={50} r={2.5} style={{ fill: C.accent }} />
+          <circle cx={12} cy={36} r={1.8} style={{ fill: C.accent }} />
+          <circle cx={108} cy={36} r={1.8} style={{ fill: C.accent }} />
           <rect
-            x={4} y={62} width={3} height={3} rx={0.5}
+            x={2} y={62} width={3} height={3} rx={0.5}
             style={{ fill: C.accent }}
-            transform="rotate(45, 5.5, 63.5)"
+            transform="rotate(45, 3.5, 63.5)"
           />
           <rect
-            x={113} y={62} width={3} height={3} rx={0.5}
+            x={115} y={62} width={3} height={3} rx={0.5}
             style={{ fill: C.accent }}
-            transform="rotate(45, 114.5, 63.5)"
+            transform="rotate(45, 116.5, 63.5)"
           />
         </g>
       }
@@ -523,7 +559,7 @@ function WavingState() {
         <>
           <LeftArm />
           {/* Right arm — raised high, waving */}
-          <RightArm transform="rotate(150, 88, 70)" />
+          <RightArm transform="rotate(150, 92, 72)" />
         </>
       }
     />
@@ -546,7 +582,7 @@ function SleepingState() {
         <g>
           {/* Static Zzz — no looping animation on idle screens */}
           <text
-            x={90} y={20}
+            x={92} y={20}
             style={{
               fill: C.accent,
               fontSize: '16px',
@@ -557,7 +593,7 @@ function SleepingState() {
             Z
           </text>
           <text
-            x={98} y={12}
+            x={100} y={12}
             style={{
               fill: C.accent,
               fontSize: '12px',
@@ -569,7 +605,7 @@ function SleepingState() {
             z
           </text>
           <text
-            x={104} y={6}
+            x={106} y={6}
             style={{
               fill: C.accent,
               fontSize: '9px',
