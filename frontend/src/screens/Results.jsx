@@ -1,20 +1,89 @@
+import { useLocation, useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 
-/* Placeholder score — will be driven by real data in Phase 2 */
-const PLACEHOLDER = {
-  score: null,
-  strengths: [],
-  gaps: [],
-  recommendations: [],
-};
+const RING_SIZE = 140;
+const RING_STROKE = 10;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+function ScoreRing({ score }) {
+  const offset = RING_CIRCUMFERENCE - (score / 100) * RING_CIRCUMFERENCE;
+  const color =
+    score >= 70
+      ? 'var(--color-success)'
+      : score >= 40
+        ? 'var(--color-warning)'
+        : 'var(--color-danger)';
+
+  return (
+    <div style={{ position: 'relative', width: RING_SIZE, height: RING_SIZE, margin: '0 auto' }}>
+      <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+        {/* Background track */}
+        <circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          fill="none"
+          stroke="var(--color-border)"
+          strokeWidth={RING_STROKE}
+        />
+        {/* Animated fill */}
+        <circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          fill="none"
+          stroke={color}
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={RING_CIRCUMFERENCE}
+          className="score-ring__circle"
+          style={{
+            '--score-ring-circumference': RING_CIRCUMFERENCE,
+            '--score-ring-offset': offset,
+            transform: 'rotate(-90deg)',
+            transformOrigin: '50% 50%',
+          }}
+        />
+      </svg>
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <span style={{
+          fontWeight: 800,
+          fontSize: '36px',
+          lineHeight: 1,
+          letterSpacing: '-0.02em',
+          color: 'var(--color-text)',
+        }}>
+          {score}
+        </span>
+        <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>/100</span>
+      </div>
+    </div>
+  );
+}
 
 export default function Results() {
-  const { score, strengths, gaps, recommendations } = PLACEHOLDER;
-  const hasResult = score !== null;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const result = location.state?.result;
+
+  const hasResult = result && typeof result.score === 'number';
+  const score = hasResult ? result.score : 0;
+  const strengths = hasResult ? result.strengths : [];
+  const gaps = hasResult ? result.gaps : [];
+  const recommendations = hasResult ? result.recommendations : [];
+  const summary = hasResult ? result.summary : '';
 
   const ottState = !hasResult
     ? 'waving'
@@ -33,9 +102,10 @@ export default function Results() {
         <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
           <Ott state="waving" size={120} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>No results yet</p>
-          <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-1)' }}>
+          <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-1)', marginBottom: 'var(--space-4)' }}>
             Upload a resume and job description to see your match score
           </p>
+          <Button onClick={() => navigate('/upload')}>Analyze a Resume</Button>
         </Card>
       ) : (
         <>
@@ -44,13 +114,25 @@ export default function Results() {
             <Ott state={ottState} size={100} />
           </div>
 
-          {/* Score ring placeholder */}
-          <Card style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
-            <p style={{ fontWeight: 800, fontSize: '48px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-              {score}
+          {/* Score ring */}
+          <Card style={{ textAlign: 'center', marginBottom: 'var(--space-5)', padding: 'var(--space-6) var(--space-5)' }}>
+            <ScoreRing score={score} />
+            <p style={{
+              color: 'var(--color-text-secondary)',
+              fontSize: '14px',
+              marginTop: 'var(--space-3)',
+              fontWeight: 600,
+            }}>
+              Match Score
             </p>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>/100 match score</p>
           </Card>
+
+          {/* Summary */}
+          {summary && (
+            <Card style={{ marginBottom: 'var(--space-5)' }}>
+              <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{summary}</p>
+            </Card>
+          )}
 
           {/* Strengths */}
           {strengths.length > 0 && (
@@ -109,10 +191,9 @@ export default function Results() {
             </div>
           )}
 
-          {/* Save + optimize CTAs */}
+          {/* Actions */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <Button full>Save Result</Button>
-            <Button full variant="secondary">Optimize for This Job</Button>
+            <Button full onClick={() => navigate('/upload')}>Analyze Another Resume</Button>
           </div>
         </>
       )}

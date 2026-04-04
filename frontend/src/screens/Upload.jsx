@@ -1,28 +1,61 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
 import { Upload as UploadIcon } from 'lucide-react';
+import { uploadResume, analyzeResume } from '../services/api';
 
 export default function Upload() {
   const [file, setFile] = useState(null);
   const [jobText, setJobText] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
+  const navigate = useNavigate();
 
-  const ottState = analyzing ? 'thinking' : file ? 'encouraging' : 'waiting';
+  const ottState = error
+    ? 'coaching'
+    : analyzing
+      ? 'thinking'
+      : file
+        ? 'encouraging'
+        : 'waiting';
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
-    if (selected) setFile(selected);
+    if (selected) {
+      setFile(selected);
+      setError(null);
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     const dropped = e.dataTransfer.files[0];
-    if (dropped) setFile(dropped);
+    if (dropped) {
+      setFile(dropped);
+      setError(null);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!file || !jobText.trim()) return;
+
+    setAnalyzing(true);
+    setError(null);
+
+    try {
+      const { text: resumeText } = await uploadResume(file);
+      const result = await analyzeResume(resumeText, jobText);
+      navigate('/results', { state: { result } });
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -32,7 +65,7 @@ export default function Upload() {
       {/* Upload zone */}
       <Card
         style={{ textAlign: 'center', marginBottom: 'var(--space-5)', cursor: 'pointer' }}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => !analyzing && fileInputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
       >
@@ -55,7 +88,8 @@ export default function Upload() {
             <Button
               variant="ghost"
               style={{ marginTop: 'var(--space-2)' }}
-              onClick={(e) => { e.stopPropagation(); setFile(null); }}
+              onClick={(e) => { e.stopPropagation(); setFile(null); setError(null); }}
+              disabled={analyzing}
             >
               Remove
             </Button>
@@ -83,13 +117,31 @@ export default function Upload() {
           value={jobText}
           onChange={(e) => setJobText(e.target.value)}
           style={{ minHeight: '160px' }}
+          disabled={analyzing}
         />
       </div>
+
+      {/* Error message */}
+      {error && (
+        <Card style={{
+          marginBottom: 'var(--space-4)',
+          background: 'var(--color-danger-light)',
+          borderColor: 'var(--color-danger)',
+        }}>
+          <p style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: '14px' }}>
+            {error}
+          </p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+            Don't worry — check your file and try again.
+          </p>
+        </Card>
+      )}
 
       {/* Analyze button */}
       <Button
         full
         disabled={!file || !jobText.trim() || analyzing}
+        onClick={handleAnalyze}
       >
         {analyzing ? 'Ott is reading your resume...' : 'Analyze Match'}
       </Button>
