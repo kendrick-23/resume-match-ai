@@ -236,6 +236,39 @@ export default function Results() {
             </div>
           )}
 
+          {/* Ott's Take — coaching tips */}
+          {result.coaching_tips?.length > 0 && (
+            <div style={{ marginBottom: 'var(--space-5)' }}>
+              <Card style={{
+                background: 'var(--color-accent-light)',
+                borderColor: 'var(--color-accent)',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                  marginBottom: 'var(--space-3)',
+                }}>
+                  <Ott state="encouraging" size={48} />
+                  <h3 style={{ color: 'var(--color-accent-dark)' }}>Ott's Take</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  {result.coaching_tips.map((tip, i) => (
+                    <p key={i} style={{
+                      color: 'var(--color-text)',
+                      lineHeight: 1.6,
+                      fontSize: '14px',
+                      paddingLeft: 'var(--space-3)',
+                      borderLeft: '3px solid var(--color-accent)',
+                    }}>
+                      {tip}
+                    </p>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          )}
+
           {/* Recommendations */}
           {recommendations.length > 0 && (
             <div style={{ marginBottom: 'var(--space-5)' }}>

@@ -284,12 +284,48 @@ SUMMARY:
             "action_type": "analysis",
         }).execute()
 
+        # Generate Ott coaching tips via Haiku (fast + cheap)
+        coaching_tips = []
+        try:
+            coaching_prompt = f"""You are Ott, a warm and encouraging otter career coach. You speak in a friendly, specific, and actionable way — like a supportive mentor who knows ATS systems inside out.
+
+Given this resume analysis, generate exactly 2-3 coaching tips.
+
+SCORE: {score}/100
+STRENGTHS: {json.dumps(strengths)}
+GAPS: {json.dumps(gaps)}
+RESUME EXCERPT (first 500 chars): {body.resume[:500]}
+JOB DESCRIPTION EXCERPT (first 500 chars): {body.job_description[:500]}
+
+Rules for each tip:
+- Reference SPECIFIC words, skills, or phrases from the resume and job description
+- Tell the user EXACTLY what to add, change, or rephrase and WHERE
+- Focus on ATS keyword matching — use the job posting's exact terminology
+- Be warm and encouraging — acknowledge what they're doing right before suggesting changes
+- Keep each tip to 1-2 sentences
+
+Return ONLY the tips as a JSON array of strings. No other text."""
+
+            coaching_msg = anthropic_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                messages=[{"role": "user", "content": coaching_prompt}]
+            )
+            coaching_raw = coaching_msg.content[0].text.strip()
+            # Parse JSON array from response
+            coaching_tips = json.loads(coaching_raw)
+            if not isinstance(coaching_tips, list):
+                coaching_tips = []
+        except Exception:
+            coaching_tips = []
+
         return {"result": raw_result, "analysis_id": None, "parsed": {
             "score": score,
             "strengths": strengths,
             "gaps": gaps,
             "recommendations": recommendations,
             "summary": summary,
+            "coaching_tips": coaching_tips,
         }}
     except HTTPException:
         raise
