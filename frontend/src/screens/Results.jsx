@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
+import { listAnalyses } from '../services/api';
 
 const RING_SIZE = 140;
 const RING_STROKE = 10;
@@ -22,7 +24,6 @@ function ScoreRing({ score }) {
   return (
     <div style={{ position: 'relative', width: RING_SIZE, height: RING_SIZE, margin: '0 auto' }}>
       <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-        {/* Background track */}
         <circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
@@ -31,7 +32,6 @@ function ScoreRing({ score }) {
           stroke="var(--color-border)"
           strokeWidth={RING_STROKE}
         />
-        {/* Animated fill */}
         <circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
@@ -76,7 +76,55 @@ function ScoreRing({ score }) {
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
-  const result = location.state?.result;
+
+  // Result from navigation state (fresh analysis) or loaded from Supabase
+  const [result, setResult] = useState(location.state?.result || null);
+  const [pastAnalyses, setPastAnalyses] = useState([]);
+  const [loading, setLoading] = useState(!location.state?.result);
+
+  useEffect(() => {
+    // If no result from navigation, load the most recent from Supabase
+    if (!location.state?.result) {
+      loadAnalyses();
+    } else {
+      // Still load past analyses for the history section
+      loadPastAnalyses();
+    }
+  }, []);
+
+  async function loadAnalyses() {
+    try {
+      const data = await listAnalyses();
+      if (data.length > 0) {
+        const latest = data[0];
+        setResult({
+          score: latest.score,
+          strengths: typeof latest.strengths === 'string' ? JSON.parse(latest.strengths) : latest.strengths,
+          gaps: typeof latest.gaps === 'string' ? JSON.parse(latest.gaps) : latest.gaps,
+          recommendations: typeof latest.recommendations === 'string' ? JSON.parse(latest.recommendations) : latest.recommendations,
+          summary: latest.summary,
+          company_name: latest.company_name,
+          role_name: latest.role_name,
+          created_at: latest.created_at,
+        });
+        setPastAnalyses(data.slice(1));
+      }
+    } catch {
+      // Silently fail — show empty state
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadPastAnalyses() {
+    try {
+      const data = await listAnalyses();
+      // Skip the first one if it matches current result
+      setPastAnalyses(data.length > 1 ? data.slice(1) : []);
+    } catch {
+      // Silently fail
+    }
+  }
 
   const hasResult = result && typeof result.score === 'number';
   const score = hasResult ? result.score : 0;
@@ -85,20 +133,35 @@ export default function Results() {
   const recommendations = hasResult ? result.recommendations : [];
   const summary = hasResult ? result.summary : '';
 
-  const ottState = !hasResult
-    ? 'waving'
-    : score >= 70
-      ? 'celebrating'
-      : score >= 40
-        ? 'encouraging'
-        : 'coaching';
+  const ottState = loading
+    ? 'thinking'
+    : !hasResult
+      ? 'waving'
+      : score >= 70
+        ? 'celebrating'
+        : score >= 40
+          ? 'encouraging'
+          : 'coaching';
+
+  if (loading) {
+    return (
+      <ScreenWrapper>
+        <h2 style={{ marginBottom: 'var(--space-6)' }}>Results</h2>
+        <div style={{ textAlign: 'center', padding: 'var(--space-10) 0' }}>
+          <Ott state="thinking" size={100} />
+          <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-3)' }}>
+            Loading your results...
+          </p>
+        </div>
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper>
       <h2 style={{ marginBottom: 'var(--space-6)' }}>Results</h2>
 
       {!hasResult ? (
-        /* Empty state */
         <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
           <Ott state="waving" size={120} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>No results yet</p>
@@ -125,6 +188,11 @@ export default function Results() {
             }}>
               Match Score
             </p>
+            {(result.company_name || result.role_name) && (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+                {[result.role_name, result.company_name].filter(Boolean).join(' at ')}
+              </p>
+            )}
           </Card>
 
           {/* Summary */}
@@ -195,6 +263,48 @@ export default function Results() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <Button full onClick={() => navigate('/upload')}>Analyze Another Resume</Button>
           </div>
+
+          {/* Past analyses */}
+          {pastAnalyses.length > 0 && (
+            <div style={{ marginTop: 'var(--space-8)' }}>
+              <h3 style={{ marginBottom: 'var(--space-3)' }}>Previous Analyses</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {pastAnalyses.slice(0, 5).map((a) => (
+                  <Card
+                    key={a.id}
+                    interactive
+                    onClick={() => {
+                      setResult({
+                        score: a.score,
+                        strengths: typeof a.strengths === 'string' ? JSON.parse(a.strengths) : a.strengths,
+                        gaps: typeof a.gaps === 'string' ? JSON.parse(a.gaps) : a.gaps,
+                        recommendations: typeof a.recommendations === 'string' ? JSON.parse(a.recommendations) : a.recommendations,
+                        summary: a.summary,
+                        company_name: a.company_name,
+                        role_name: a.role_name,
+                        created_at: a.created_at,
+                      });
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <p style={{ fontWeight: 700, fontSize: '14px' }}>
+                          {a.role_name || a.company_name || 'Analysis'}
+                        </p>
+                        <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                          {new Date(a.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant={a.score >= 70 ? 'success' : a.score >= 40 ? 'warning' : 'danger'}>
+                        {a.score}%
+                      </Badge>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </ScreenWrapper>

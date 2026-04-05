@@ -35,7 +35,7 @@ export async function uploadResume(file) {
  * Send extracted resume text + job description for AI analysis.
  * Returns parsed { score, strengths, gaps, recommendations, summary }.
  */
-export async function analyzeResume(resumeText, jobDescription) {
+export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '') {
   const headers = await authHeaders();
   const res = await fetch(`${API_URL}/analyze`, {
     method: 'POST',
@@ -43,6 +43,8 @@ export async function analyzeResume(resumeText, jobDescription) {
     body: JSON.stringify({
       resume: resumeText,
       job_description: jobDescription,
+      company_name: companyName,
+      role_name: roleName,
     }),
   });
 
@@ -52,7 +54,35 @@ export async function analyzeResume(resumeText, jobDescription) {
   }
 
   const data = await res.json();
+  // Use server-parsed data if available, fall back to client parsing
+  if (data.parsed) return data.parsed;
   return parseAnalysisResult(data.result);
+}
+
+/* ============================================
+   Analyses History
+   ============================================ */
+
+export async function listAnalyses() {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/analyses`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load analyses');
+  }
+  return res.json();
+}
+
+export async function getAnalysis(id) {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/analyses/${id}`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load analysis');
+  }
+  return res.json();
 }
 
 /* ============================================

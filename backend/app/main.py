@@ -74,6 +74,30 @@ async def get_current_user(
         return {"user_id": res.user.id, "token": token}
 
 
+@app.get("/analyses")
+async def list_analyses(user: dict = Depends(get_current_user)):
+    sb = _user_sb(user)
+    res = sb.table("analyses") \
+        .select("*") \
+        .eq("user_id", user["user_id"]) \
+        .order("created_at", desc=True) \
+        .execute()
+    return res.data
+
+
+@app.get("/analyses/{analysis_id}")
+async def get_analysis(analysis_id: str, user: dict = Depends(get_current_user)):
+    sb = _user_sb(user)
+    res = sb.table("analyses") \
+        .select("*") \
+        .eq("id", analysis_id) \
+        .eq("user_id", user["user_id"]) \
+        .execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return res.data[0]
+
+
 from app.routes.applications import router as applications_router
 from app.routes.jobs import router as jobs_router
 app.include_router(applications_router)
@@ -83,6 +107,15 @@ app.include_router(jobs_router)
 class AnalyzeRequest(BaseModel):
     resume: str
     job_description: str
+    company_name: str = ""
+    role_name: str = ""
+
+
+def _user_sb(user: dict):
+    """Per-request Supabase client with user JWT for RLS enforcement."""
+    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    sb.postgrest.auth(user["token"])
+    return sb
 
 
 @app.get("/")
@@ -179,6 +212,55 @@ SUMMARY:
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}]
         )
-        return {"result": message.content[0].text}
+        raw_result = message.content[0].text
+
+        # Parse score from the AI response
+        import re
+        score_match = re.search(r"MATCH SCORE:\s*(\d+)", raw_result, re.IGNORECASE)
+        score = int(score_match.group(1)) if score_match else 0
+
+        # Parse sections
+        def parse_section(text: str, section: str) -> list[str]:
+            pattern = rf"{section}:\s*\n([\s\S]*?)(?=\n(?:STRENGTHS|GAPS|RECOMMENDATIONS|SUMMARY):|$)"
+            m = re.search(pattern, text, re.IGNORECASE)
+            if not m:
+                return []
+            return [line.strip().lstrip("-•* ") for line in m.group(1).split("\n") if line.strip()]
+
+        strengths = parse_section(raw_result, "STRENGTHS")
+        gaps = parse_section(raw_result, "GAPS")
+        recommendations = parse_section(raw_result, "RECOMMENDATIONS")
+        summary_match = re.search(r"SUMMARY:\s*\n([\s\S]*?)$", raw_result, re.IGNORECASE)
+        summary = summary_match.group(1).strip() if summary_match else ""
+
+        # Save analysis to Supabase
+        sb = _user_sb(user)
+        import json
+        sb.table("analyses").insert({
+            "user_id": user["user_id"],
+            "company_name": request.company_name,
+            "role_name": request.role_name,
+            "score": score,
+            "summary": summary,
+            "strengths": json.dumps(strengths),
+            "gaps": json.dumps(gaps),
+            "recommendations": json.dumps(recommendations),
+        }).execute()
+
+        # Log activity
+        sb.table("activity_log").insert({
+            "user_id": user["user_id"],
+            "action_type": "analysis",
+        }).execute()
+
+        return {"result": raw_result, "analysis_id": None, "parsed": {
+            "score": score,
+            "strengths": strengths,
+            "gaps": gaps,
+            "recommendations": recommendations,
+            "summary": summary,
+        }}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
