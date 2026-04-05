@@ -138,7 +138,7 @@ export default function Profile() {
   };
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper screenName="Profile">
       {/* Header */}
       <div style={{
         display: 'flex',

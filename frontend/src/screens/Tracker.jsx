@@ -111,7 +111,7 @@ export default function Tracker() {
       : 'idle';
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper screenName="Tracker">
       <div style={{
         display: 'flex',
         alignItems: 'center',

@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { searchJobs, createApplication, listAnalyses, getProfile } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles } from 'lucide-react';
+import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 
 export default function Jobs() {
   const [keyword, setKeyword] = useState('');
@@ -199,7 +200,7 @@ export default function Jobs() {
   }
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper screenName="Jobs">
       <h2 style={{ marginBottom: 'var(--space-5)' }}>Find Jobs</h2>
 
       {/* Recommended for You section */}
@@ -234,17 +235,17 @@ export default function Jobs() {
       {!recLoading && !hasAnalysis && !searched && (
         <Card style={{
           textAlign: 'center',
-          padding: 'var(--space-6) var(--space-5)',
+          padding: 'var(--space-5)',
           marginBottom: 'var(--space-5)',
           background: 'var(--color-accent-light)',
           borderColor: 'var(--color-accent)',
         }}>
-          <Ott state="waiting" size={60} />
+          <EmptyStateJobs size={160} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-3)', fontSize: '14px' }}>
-            Analyze your resume first to get personalized job matches
+            Analyze your resume first
           </p>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
-            We'll recommend jobs based on your skills and experience
+            Then Ott will find your best matches
           </p>
         </Card>
       )}

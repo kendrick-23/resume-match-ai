@@ -4,6 +4,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
+import HoltWordmark from '../components/ui/HoltWordmark';
 import { useAuth } from '../hooks/useAuth.jsx';
 
 export default function Signup() {
@@ -47,7 +48,10 @@ export default function Signup() {
       <div className="auth-screen__inner">
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <Ott state="excited" size={100} />
-          <h1 style={{ fontSize: '28px', marginTop: 'var(--space-3)' }}>Join Holt</h1>
+          <div style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}>
+            <HoltWordmark size="large" />
+          </div>
+          <p style={{ fontWeight: 700, fontSize: '18px', marginTop: 'var(--space-2)' }}>Create your account</p>
           <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
             Start your job search with Ott by your side
           </p>

@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
 import { Upload as UploadIcon } from 'lucide-react';
+import EmptyStateUpload from '../components/ui/EmptyStateUpload';
 import { uploadResume, analyzeResume, checkBadges } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 
@@ -108,15 +109,18 @@ export default function Upload() {
             </Button>
           </div>
         ) : (
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <UploadIcon
-              size={24}
-              style={{ color: 'var(--color-accent)', margin: '0 auto var(--space-2)' }}
-            />
-            <p style={{ fontWeight: 700 }}>Tap to upload or drag & drop</p>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
-              PDF or DOCX, 5 MB max
-            </p>
+          <div style={{ marginTop: 'var(--space-2)' }}>
+            <EmptyStateUpload size={160} />
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <UploadIcon
+                size={20}
+                style={{ color: 'var(--color-accent)', margin: '0 auto var(--space-1)' }}
+              />
+              <p style={{ fontWeight: 700 }}>Tap to upload or drag & drop</p>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+                PDF or DOCX, 5 MB max
+              </p>
+            </div>
           </div>
         )}
       </Card>

@@ -7,7 +7,8 @@ import Badge from '../components/ui/Badge';
 import Ott from '../components/ott/Ott';
 import { useStreak } from '../hooks/useStreak';
 import { getActivity, listBadges } from '../services/api';
-import { FileText, ClipboardList, Search, Settings, Clock } from 'lucide-react';
+import { FileText, ClipboardList, Search, Clock } from 'lucide-react';
+import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
 
 const BADGE_META = {
   first_dive:   { emoji: '\u{1F30A}', name: 'First Dive' },
@@ -69,33 +70,7 @@ export default function Dashboard() {
       : "You're on fire!";
 
   return (
-    <ScreenWrapper>
-      {/* Header row with profile link */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        marginBottom: 'var(--space-2)',
-      }}>
-        <button
-          onClick={() => navigate('/profile')}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--color-text-muted)',
-            padding: 'var(--space-2)',
-            minWidth: '44px',
-            minHeight: '44px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          aria-label="Profile settings"
-        >
-          <Settings size={22} />
-        </button>
-      </div>
-
+    <ScreenWrapper screenName="Dashboard">
       {/* Ott greeting + streak */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <Ott state={ottState} size={100} />
@@ -207,10 +182,10 @@ export default function Dashboard() {
         </div>
       ) : (
         <Card style={{ marginBottom: 'var(--space-6)' }}>
-          <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
-            <Ott state="waving" size={80} />
-            <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-3)' }}>
-              No activity yet. Start by analyzing a resume!
+          <div style={{ textAlign: 'center', padding: 'var(--space-4) 0' }}>
+            <EmptyStateDashboard size={180} />
+            <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-3)', fontSize: '14px' }}>
+              Upload your first resume to get started!
             </p>
           </div>
         </Card>
