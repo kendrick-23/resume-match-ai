@@ -6,6 +6,8 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
+import { generateResume, getGeneratedResume, parseResumeMarkdown } from '../services/resumeGenerator';
+import { Copy, Download } from 'lucide-react';
 
 const RING_SIZE = 140;
 const RING_STROKE = 10;
@@ -82,6 +84,12 @@ export default function Results() {
   const [pastAnalyses, setPastAnalyses] = useState([]);
   const [loading, setLoading] = useState(!location.state?.result);
 
+  // ATS Resume Generator state
+  const [resumeMd, setResumeMd] = useState(null);
+  const [generatingResume, setGeneratingResume] = useState(false);
+  const [resumeError, setResumeError] = useState('');
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     // If no result from navigation, load the most recent from Supabase
     if (!location.state?.result) {
@@ -106,7 +114,11 @@ export default function Results() {
           company_name: latest.company_name,
           role_name: latest.role_name,
           created_at: latest.created_at,
+          analysis_id: latest.id,
         });
+        if (latest.generated_resume_md) {
+          setResumeMd(latest.generated_resume_md);
+        }
         setPastAnalyses(data.slice(1));
       }
     } catch {
@@ -269,6 +281,150 @@ export default function Results() {
             </div>
           )}
 
+          {/* ATS-Ready Resume */}
+          {result.analysis_id && (
+            <div style={{ marginBottom: 'var(--space-5)' }}>
+              <h3 style={{ marginBottom: 'var(--space-3)' }}>ATS-Ready Resume</h3>
+              {!resumeMd && !generatingResume && (
+                <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
+                  <Ott state="encouraging" size={80} />
+                  <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+                    Get Your ATS-Ready Resume
+                  </p>
+                  <p style={{
+                    color: 'var(--color-text-muted)',
+                    fontSize: '13px',
+                    marginTop: 'var(--space-1)',
+                    marginBottom: 'var(--space-4)',
+                  }}>
+                    Ott will rewrite your resume using the exact keywords this job is scanning for. Takes about 15 seconds.
+                  </p>
+                  {resumeError && (
+                    <p style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+                      {resumeError}
+                    </p>
+                  )}
+                  <Button onClick={async () => {
+                    setGeneratingResume(true);
+                    setResumeError('');
+                    try {
+                      const data = await generateResume(result.analysis_id);
+                      setResumeMd(data.resume_md);
+                    } catch (err) {
+                      setResumeError(err.message);
+                    } finally {
+                      setGeneratingResume(false);
+                    }
+                  }}>
+                    Generate Resume
+                  </Button>
+                </Card>
+              )}
+
+              {generatingResume && (
+                <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
+                  <Ott state="thinking" size={80} />
+                  <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+                    Ott is tailoring your resume...
+                  </p>
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+                    Matching keywords, reframing experience, optimizing for ATS
+                  </p>
+                </Card>
+              )}
+
+              {resumeMd && !generatingResume && (
+                <div>
+                  {/* Rendered resume */}
+                  <Card style={{ marginBottom: 'var(--space-3)' }}>
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ position: 'absolute', top: 0, right: 0 }}>
+                        <Ott state="celebrating" size={40} />
+                      </div>
+                      <div style={{ lineHeight: 1.7, fontSize: '14px' }}>
+                        {parseResumeMarkdown(resumeMd).map((section, i) => {
+                          if (section.type === 'name') {
+                            return (
+                              <h2 key={i} style={{ fontSize: '20px', marginBottom: 'var(--space-3)', paddingRight: '50px' }}>
+                                {section.title}
+                              </h2>
+                            );
+                          }
+                          if (section.type === 'section') {
+                            return (
+                              <div key={i} style={{ marginBottom: 'var(--space-4)' }}>
+                                <h3 style={{
+                                  fontSize: '15px',
+                                  color: 'var(--color-accent-dark)',
+                                  borderBottom: '2px solid var(--color-accent)',
+                                  paddingBottom: 'var(--space-1)',
+                                  marginBottom: 'var(--space-2)',
+                                }}>
+                                  {section.title}
+                                </h3>
+                                {section.content.map((line, j) => (
+                                  <p key={j} style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>
+                                    {line}
+                                  </p>
+                                ))}
+                              </div>
+                            );
+                          }
+                          if (section.type === 'subsection') {
+                            return (
+                              <div key={i} style={{ marginBottom: 'var(--space-3)' }}>
+                                <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: 'var(--space-1)' }}>
+                                  {section.title}
+                                </p>
+                                <ul style={{ paddingLeft: 'var(--space-5)', margin: 0 }}>
+                                  {section.content.map((line, j) => (
+                                    <li key={j} style={{
+                                      color: 'var(--color-text-secondary)',
+                                      marginBottom: 'var(--space-1)',
+                                      listStyle: 'disc',
+                                    }}>
+                                      {line}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                    <Button
+                      variant="secondary"
+                      full
+                      onClick={async () => {
+                        const { downloadResumeAsDocx } = await import('../services/resumeGenerator.js');
+                        downloadResumeAsDocx(resumeMd, result.role_name, result.company_name);
+                      }}
+                    >
+                      <Download size={16} /> Download as Word Doc
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      full
+                      onClick={() => {
+                        navigator.clipboard.writeText(resumeMd);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      <Copy size={16} /> {copied ? 'Copied!' : 'Copy to Clipboard'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Recommendations */}
           {recommendations.length > 0 && (
             <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -316,7 +472,10 @@ export default function Results() {
                         company_name: a.company_name,
                         role_name: a.role_name,
                         created_at: a.created_at,
+                        analysis_id: a.id,
                       });
+                      setResumeMd(a.generated_resume_md || null);
+                      setResumeError('');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                   >
