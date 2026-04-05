@@ -6,7 +6,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
-import { generateResume, getGeneratedResume, parseResumeMarkdown } from '../services/resumeGenerator';
+import { generateResume, getGeneratedResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
 import { Copy, Download } from 'lucide-react';
 
 const RING_SIZE = 140;
@@ -401,10 +401,7 @@ export default function Results() {
                     <Button
                       variant="secondary"
                       full
-                      onClick={async () => {
-                        const { downloadResumeAsDocx } = await import('../services/resumeGenerator.js');
-                        downloadResumeAsDocx(resumeMd, result.role_name, result.company_name);
-                      }}
+                      onClick={() => downloadResumeAsDocx(resumeMd, result.role_name, result.company_name)}
                     >
                       <Download size={16} /> Download as Word Doc
                     </Button>
