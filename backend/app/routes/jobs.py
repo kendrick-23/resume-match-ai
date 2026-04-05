@@ -1,13 +1,16 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Optional
 
+from app.main import limiter
 from app.services.usajobs import search_usajobs
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.get("/search")
+@limiter.limit("30/hour")
 async def search_jobs(
+    request: Request,
     keyword: str = Query(..., min_length=1, max_length=200),
     location: Optional[str] = Query(default=None, max_length=200),
     salary_min: Optional[int] = Query(default=None, ge=0),

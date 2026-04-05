@@ -1,11 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 from typing import Optional
 from supabase import create_client
 from datetime import datetime, timezone, timedelta
 import os
 
-from app.main import get_current_user
+from app.main import get_current_user, limiter
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -21,7 +21,8 @@ def _user_sb(user: dict):
 
 
 @router.get("/streak")
-async def get_streak(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def get_streak(request: Request, user: dict = Depends(get_current_user)):
     """Calculate current streak: consecutive calendar days with at least one activity."""
     sb = _user_sb(user)
     res = sb.table("activity_log") \
@@ -58,7 +59,8 @@ async def get_streak(user: dict = Depends(get_current_user)):
 
 
 @router.get("/activity")
-async def get_activity(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def get_activity(request: Request, user: dict = Depends(get_current_user)):
     """Get recent activity and today's summary."""
     sb = _user_sb(user)
 
@@ -106,7 +108,8 @@ async def get_activity(user: dict = Depends(get_current_user)):
 
 
 @router.get("/badges")
-async def list_badges(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def list_badges(request: Request, user: dict = Depends(get_current_user)):
     """List all earned badges for the user."""
     sb = _user_sb(user)
     res = sb.table("badges") \
@@ -118,7 +121,8 @@ async def list_badges(user: dict = Depends(get_current_user)):
 
 
 @router.post("/badges/check")
-async def check_badges(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def check_badges(request: Request, user: dict = Depends(get_current_user)):
     """Evaluate all badge conditions and award any newly earned ones.
     Returns list of newly awarded badge keys."""
     sb = _user_sb(user)
@@ -156,7 +160,7 @@ async def check_badges(user: dict = Depends(get_current_user)):
 
     # consistent: 7-day streak
     if "consistent" not in earned:
-        streak_data = await get_streak(user)
+        streak_data = await get_streak(request, user)
         if streak_data["streak"] >= 7:
             newly_earned.append("consistent")
 
@@ -164,7 +168,7 @@ async def check_badges(user: dict = Depends(get_current_user)):
     if "dedicated" not in earned:
         if "consistent" in earned or "consistent" in newly_earned:
             # Re-use streak if already calculated
-            streak_data = await get_streak(user)
+            streak_data = await get_streak(request, user)
             if streak_data["streak"] >= 30:
                 newly_earned.append("dedicated")
 
@@ -231,7 +235,8 @@ class ProfileUpdate(BaseModel):
 
 
 @router.get("")
-async def get_profile(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def get_profile(request: Request, user: dict = Depends(get_current_user)):
     """Get the user's profile. Creates one if it doesn't exist."""
     sb = _user_sb(user)
     res = sb.table("profiles") \
@@ -250,7 +255,9 @@ async def get_profile(user: dict = Depends(get_current_user)):
 
 
 @router.patch("")
+@limiter.limit("100/hour")
 async def update_profile(
+    request: Request,
     body: ProfileUpdate,
     user: dict = Depends(get_current_user),
 ):
@@ -275,7 +282,8 @@ async def update_profile(
 
 
 @router.delete("/data")
-async def delete_all_data(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def delete_all_data(request: Request, user: dict = Depends(get_current_user)):
     """Delete all user data: analyses, applications, activity_log, badges, profile."""
     sb = _user_sb(user)
     user_id = user["user_id"]

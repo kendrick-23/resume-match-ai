@@ -1,19 +1,44 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from anthropic import Anthropic
 from supabase import create_client
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 import io
-import jwt
+import re
+import json
+import jwt as pyjwt
 from PyPDF2 import PdfReader
 from docx import Document
 
 load_dotenv()
 
+
+def _get_user_or_ip(request: Request) -> str:
+    """Rate limit key: user ID from JWT if present, otherwise client IP."""
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:]
+        secret = os.getenv("SUPABASE_JWT_SECRET")
+        if secret:
+            try:
+                payload = pyjwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
+                return payload.get("sub", get_remote_address(request))
+            except Exception:
+                pass
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_get_user_or_ip)
+
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -45,15 +70,15 @@ async def get_current_user(
 
     if SUPABASE_JWT_SECRET:
         try:
-            payload = jwt.decode(
+            payload = pyjwt.decode(
                 token,
                 SUPABASE_JWT_SECRET,
                 algorithms=["HS256"],
                 audience="authenticated",
             )
-        except jwt.ExpiredSignatureError:
+        except pyjwt.ExpiredSignatureError:
             raise HTTPException(status_code=401, detail="Token has expired")
-        except jwt.InvalidTokenError:
+        except pyjwt.InvalidTokenError:
             raise HTTPException(status_code=401, detail="Invalid token")
 
         user_id = payload.get("sub")
@@ -75,7 +100,8 @@ async def get_current_user(
 
 
 @app.get("/analyses")
-async def list_analyses(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def list_analyses(request: Request, user: dict = Depends(get_current_user)):
     sb = _user_sb(user)
     res = sb.table("analyses") \
         .select("*") \
@@ -86,7 +112,8 @@ async def list_analyses(user: dict = Depends(get_current_user)):
 
 
 @app.get("/analyses/{analysis_id}")
-async def get_analysis(analysis_id: str, user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def get_analysis(request: Request, analysis_id: str, user: dict = Depends(get_current_user)):
     sb = _user_sb(user)
     res = sb.table("analyses") \
         .select("*") \
@@ -133,7 +160,9 @@ ALLOWED_TYPES = {
 
 
 @app.post("/upload-resume")
+@limiter.limit("20/hour")
 async def upload_resume(
+    request: Request,
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
 ):
@@ -175,11 +204,13 @@ async def upload_resume(
 
 
 @app.post("/analyze")
+@limiter.limit("10/hour")
 async def analyze(
-    request: AnalyzeRequest,
+    request: Request,
+    body: AnalyzeRequest,
     user: dict = Depends(get_current_user),
 ):
-    if not request.resume.strip() or not request.job_description.strip():
+    if not body.resume.strip() or not body.job_description.strip():
         raise HTTPException(status_code=400, detail="Resume and job description are required.")
 
     prompt = f"""You are an expert resume analyst and career coach.
@@ -187,10 +218,10 @@ async def analyze(
 Compare the following resume against the job description and return a structured analysis.
 
 RESUME:
-{request.resume}
+{body.resume}
 
 JOB DESCRIPTION:
-{request.job_description}
+{body.job_description}
 
 Return your analysis in this exact format:
 
@@ -217,7 +248,6 @@ SUMMARY:
         raw_result = message.content[0].text
 
         # Parse score from the AI response
-        import re
         score_match = re.search(r"MATCH SCORE:\s*(\d+)", raw_result, re.IGNORECASE)
         score = int(score_match.group(1)) if score_match else 0
 
@@ -237,11 +267,10 @@ SUMMARY:
 
         # Save analysis to Supabase
         sb = _user_sb(user)
-        import json
         sb.table("analyses").insert({
             "user_id": user["user_id"],
-            "company_name": request.company_name,
-            "role_name": request.role_name,
+            "company_name": body.company_name,
+            "role_name": body.role_name,
             "score": score,
             "summary": summary,
             "strengths": json.dumps(strengths),

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 from typing import Optional
 from supabase import create_client
 import os
 
-from app.main import get_current_user
+from app.main import get_current_user, limiter
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -42,7 +42,8 @@ class ApplicationUpdate(BaseModel):
 
 
 @router.get("")
-async def list_applications(user: dict = Depends(get_current_user)):
+@limiter.limit("100/hour")
+async def list_applications(request: Request, user: dict = Depends(get_current_user)):
     sb = _user_sb(user)
     res = sb.table("applications") \
         .select("*") \
@@ -53,7 +54,9 @@ async def list_applications(user: dict = Depends(get_current_user)):
 
 
 @router.post("")
+@limiter.limit("100/hour")
 async def create_application(
+    request: Request,
     body: ApplicationCreate,
     user: dict = Depends(get_current_user),
 ):
@@ -79,7 +82,9 @@ async def create_application(
 
 
 @router.patch("/{app_id}")
+@limiter.limit("100/hour")
 async def update_application(
+    request: Request,
     app_id: str,
     body: ApplicationUpdate,
     user: dict = Depends(get_current_user),
@@ -111,7 +116,9 @@ async def update_application(
 
 
 @router.delete("/{app_id}")
+@limiter.limit("100/hour")
 async def delete_application(
+    request: Request,
     app_id: str,
     user: dict = Depends(get_current_user),
 ):
