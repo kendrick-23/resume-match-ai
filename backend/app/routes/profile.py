@@ -1,4 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import Optional
 from supabase import create_client
 from datetime import datetime, timezone, timedelta
 import os
@@ -217,3 +219,72 @@ async def check_badges(user: dict = Depends(get_current_user)):
         }).execute()
 
     return {"newly_earned": newly_earned}
+
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = Field(default=None, max_length=200)
+    job_title: Optional[str] = Field(default=None, max_length=200)
+    target_roles: Optional[str] = Field(default=None, max_length=500)
+    target_salary_min: Optional[int] = Field(default=None, ge=0)
+    target_salary_max: Optional[int] = Field(default=None, ge=0)
+    location: Optional[str] = Field(default=None, max_length=200)
+
+
+@router.get("")
+async def get_profile(user: dict = Depends(get_current_user)):
+    """Get the user's profile. Creates one if it doesn't exist."""
+    sb = _user_sb(user)
+    res = sb.table("profiles") \
+        .select("*") \
+        .eq("id", user["user_id"]) \
+        .execute()
+
+    if res.data:
+        return res.data[0]
+
+    # Auto-create empty profile
+    new = sb.table("profiles").insert({
+        "id": user["user_id"],
+    }).execute()
+    return new.data[0] if new.data else {}
+
+
+@router.patch("")
+async def update_profile(
+    body: ProfileUpdate,
+    user: dict = Depends(get_current_user),
+):
+    """Update the user's profile fields."""
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    sb = _user_sb(user)
+
+    # Upsert — create if not exists, update if exists
+    res = sb.table("profiles") \
+        .upsert({"id": user["user_id"], **updates}) \
+        .execute()
+
+    if not res.data:
+        raise HTTPException(status_code=500, detail="Failed to update profile")
+
+    return res.data[0]
+
+
+@router.delete("/data")
+async def delete_all_data(user: dict = Depends(get_current_user)):
+    """Delete all user data: analyses, applications, activity_log, badges, profile."""
+    sb = _user_sb(user)
+    user_id = user["user_id"]
+
+    # Delete from all tables
+    sb.table("analyses").delete().eq("user_id", user_id).execute()
+    sb.table("applications").delete().eq("user_id", user_id).execute()
+    sb.table("activity_log").delete().eq("user_id", user_id).execute()
+    sb.table("badges").delete().eq("user_id", user_id).execute()
+    sb.table("profiles").delete().eq("id", user_id).execute()
+
+    return {"deleted": True}

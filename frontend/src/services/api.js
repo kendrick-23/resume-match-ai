@@ -190,6 +190,50 @@ export async function listBadges() {
   return res.json();
 }
 
+/* ============================================
+   Profile
+   ============================================ */
+
+export async function getProfile() {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/profile`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load profile');
+  }
+  return res.json();
+}
+
+export async function updateProfile(data) {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/profile`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to update profile');
+  }
+  return res.json();
+}
+
+export async function deleteAllData() {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/profile/data`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to delete data');
+  }
+  return res.json();
+}
+
 export async function getActivity() {
   const headers = await authHeaders();
   const res = await fetch(`${API_URL}/profile/activity`, { headers });
