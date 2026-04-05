@@ -138,17 +138,31 @@ Holt must be installable as a Progressive Web App:
 - NEVER add Co-Authored-By tags to any commits
 
 ## Build Phase Order
+### Phase A — Foundation (all complete)
 1. ✅ Design tokens, global styles
-2. ✅ Ott SVG (9 states) — NEEDS ANATOMY FIX
+2. ✅ Ott SVG (9 states) + anatomy fix
 3. ✅ UI component library (Button, Card, Badge, Input, BottomNav, ScreenWrapper)
 4. ✅ 6 screen shells with React Router navigation
-5. ✅ Fix Ott anatomy — make him look like a real otter
-6. ✅ Add all animations (screen stagger, button spring, score ring, Ott bounce, milestones)
-7. 🔲 **CURRENT: Connect Upload → FastAPI backend (real AI analysis)**
-8. 🔲 Supabase auth (login/signup)
-9. 🔲 Tracker CRUD (add/edit/move applications)
-10. 🔲 Job aggregation (USAJobs first)
-11. 🔲 PWA setup
+5. ✅ All animations (screen stagger, button spring, score ring, Ott bounce, milestones)
+6. ✅ Connect Upload → FastAPI backend (real AI analysis)
+7. ✅ Supabase auth (login/signup)
+
+### Phase B — Features (all complete)
+8. ✅ Tracker CRUD (add/edit/move applications)
+9. ✅ Job aggregation (USAJobs + Holt fit score)
+10. ✅ ATS Resume Generator (Claude rewrite + Word doc download)
+11. ✅ Results sticky pill navigation (Overview, Strengths, Gaps, Ott's Take, Resume)
+
+### Phase C — Brand & Polish (all complete)
+12. ✅ Brand identity: HoltWordmark, illustrated empty states, app header
+13. ✅ Onboarding flow (3-screen welcome at /welcome)
+
+### Still to build
+- LinkedIn PDF upload
+- Within Reach job recommendations
+- Adzuna private sector jobs
+- Score history chart
+- Polish pass
 
 ## What NEVER To Do
 ❌ Dark backgrounds | ❌ Purple gradients | ❌ Glassmorphism

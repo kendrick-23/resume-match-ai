@@ -42,4 +42,133 @@
   text-transform: capitalize;
 }
 
+/* === Header right area === */
+.screen__header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* === Header Settings Menu === */
+.header-settings {
+  position: relative;
+}
+
+.header-settings__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.header-settings__trigger:hover {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.header-settings__dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: 240px;
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 200;
+  animation: settings-drop 150ms ease-out both;
+}
+
+@keyframes settings-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.header-settings__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.header-settings__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.header-settings__user-info {
+  min-width: 0;
+}
+
+.header-settings__name {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-settings__email {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-settings__divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-1) var(--space-2);
+}
+
+.header-settings__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.header-settings__item:hover {
+  background: var(--color-surface);
+}
+
+.header-settings__item--danger {
+  color: var(--color-danger);
+}
+
+.header-settings__item--danger:hover {
+  background: var(--color-danger-light);
+}
+
 /* Screen content — stagger animation applied via animations.css on children */
