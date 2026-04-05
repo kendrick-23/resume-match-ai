@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="#FAF7F2"/>
+
+  <!-- Ears -->
+  <circle cx="160" cy="140" r="44" fill="#8B5E3C"/>
+  <circle cx="160" cy="140" r="28" fill="#F5E6C8"/>
+  <circle cx="352" cy="140" r="44" fill="#8B5E3C"/>
+  <circle cx="352" cy="140" r="28" fill="#F5E6C8"/>
+
+  <!-- Head (main brown circle) -->
+  <circle cx="256" cy="260" r="160" fill="#8B5E3C"/>
+
+  <!-- Face / muzzle (cream area) -->
+  <ellipse cx="256" cy="300" rx="110" ry="100" fill="#F5E6C8"/>
+
+  <!-- Cheek puffs (whisker pads) -->
+  <circle cx="180" cy="300" r="48" fill="#F5E6C8"/>
+  <circle cx="332" cy="300" r="48" fill="#F5E6C8"/>
+
+  <!-- Eyes - white -->
+  <ellipse cx="212" cy="240" rx="28" ry="32" fill="white"/>
+  <ellipse cx="300" cy="240" rx="28" ry="32" fill="white"/>
+
+  <!-- Eyes - pupils -->
+  <circle cx="216" cy="244" r="16" fill="#5C3D22"/>
+  <circle cx="304" cy="244" r="16" fill="#5C3D22"/>
+
+  <!-- Eye shine -->
+  <circle cx="222" cy="236" r="6" fill="white"/>
+  <circle cx="310" cy="236" r="6" fill="white"/>
+
+  <!-- Nose -->
+  <ellipse cx="256" cy="290" rx="16" ry="12" fill="#5C3D22"/>
+  <!-- Nose shine -->
+  <ellipse cx="252" cy="286" rx="5" ry="3.5" fill="#8B6B50" opacity="0.5"/>
+
+  <!-- Mouth -->
+  <path d="M 242 306 Q 256 320 270 306" fill="none" stroke="#5C3D22" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Whiskers - left -->
+  <line x1="140" y1="288" x2="196" y2="296" stroke="#5C3D22" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="136" y1="304" x2="194" y2="306" stroke="#5C3D22" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="140" y1="320" x2="196" y2="316" stroke="#5C3D22" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Whiskers - right -->
+  <line x1="316" y1="296" x2="372" y2="288" stroke="#5C3D22" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="318" y1="306" x2="376" y2="304" stroke="#5C3D22" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="316" y1="316" x2="372" y2="320" stroke="#5C3D22" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Teal scarf -->
+  <path d="M 130 370 Q 256 410 382 370 Q 386 400 370 410 Q 256 448 142 410 Q 126 400 130 370Z" fill="#2BB5C0"/>
+  <!-- Scarf knot -->
+  <circle cx="256" cy="400" r="18" fill="#1E8F99"/>
+  <!-- Scarf tail left -->
+  <path d="M 244 414 L 232 450 Q 228 458 236 456 L 252 418Z" fill="#2BB5C0"/>
+  <!-- Scarf tail right -->
+  <path d="M 268 414 L 280 450 Q 284 458 276 456 L 260 418Z" fill="#2BB5C0"/>
+</svg>
