@@ -12,6 +12,7 @@ import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 export default function Upload() {
   const [file, setFile] = useState(null);
   const [jobText, setJobText] = useState('');
+  const [linkedinText, setLinkedinText] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [celebratingBadge, setCelebratingBadge] = useState(null);
@@ -51,7 +52,7 @@ export default function Upload() {
 
     try {
       const { text: resumeText } = await uploadResume(file);
-      const result = await analyzeResume(resumeText, jobText);
+      const result = await analyzeResume(resumeText, jobText, '', '', linkedinText);
 
       // Check for newly earned badges
       const badgeResult = await checkBadges();
@@ -131,6 +132,22 @@ export default function Upload() {
           style={{ minHeight: '160px' }}
           disabled={analyzing}
         />
+      </div>
+
+      {/* LinkedIn profile (optional) */}
+      <div style={{ marginBottom: 'var(--space-5)' }}>
+        <Input
+          textarea
+          label="LinkedIn Profile (optional)"
+          placeholder="Paste your LinkedIn About section, experience summary, or any profile text..."
+          value={linkedinText}
+          onChange={(e) => setLinkedinText(e.target.value)}
+          style={{ minHeight: '100px' }}
+          disabled={analyzing}
+        />
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+          Gives Ott extra context about your skills and experience
+        </p>
       </div>
 
       {/* Error message */}

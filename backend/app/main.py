@@ -138,6 +138,7 @@ class AnalyzeRequest(BaseModel):
     job_description: str
     company_name: str = ""
     role_name: str = ""
+    linkedin_text: str = ""
 
 
 def _user_sb(user: dict):
@@ -213,13 +214,21 @@ async def analyze(
     if not body.resume.strip() or not body.job_description.strip():
         raise HTTPException(status_code=400, detail="Resume and job description are required.")
 
+    linkedin_section = ""
+    if body.linkedin_text.strip():
+        linkedin_section = f"""
+
+LINKEDIN PROFILE (supplementary context about the candidate's background, skills framing, and professional narrative — use this to inform your analysis alongside the resume):
+{body.linkedin_text.strip()}
+"""
+
     prompt = f"""You are an expert resume analyst and career coach.
 
 Compare the following resume against the job description and return a structured analysis.
 
 RESUME:
 {body.resume}
-
+{linkedin_section}
 JOB DESCRIPTION:
 {body.job_description}
 

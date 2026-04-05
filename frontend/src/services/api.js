@@ -35,7 +35,7 @@ export async function uploadResume(file) {
  * Send extracted resume text + job description for AI analysis.
  * Returns parsed { score, strengths, gaps, recommendations, summary }.
  */
-export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '') {
+export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '', linkedinText = '') {
   const headers = await authHeaders();
   const res = await fetch(`${API_URL}/analyze`, {
     method: 'POST',
@@ -45,6 +45,7 @@ export async function analyzeResume(resumeText, jobDescription, companyName = ''
       job_description: jobDescription,
       company_name: companyName,
       role_name: roleName,
+      linkedin_text: linkedinText,
     }),
   });
 
