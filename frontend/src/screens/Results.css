@@ -1,0 +1,65 @@
+/* ============================================
+   Results — sticky pill navigation + sections
+   ============================================ */
+
+/* Sticky pill bar */
+.results-pills {
+  position: sticky;
+  top: var(--header-height, 56px);
+  z-index: 50;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  margin: 0 calc(-1 * var(--space-4));
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.results-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.results-pills__pill {
+  flex-shrink: 0;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  min-height: 36px;
+}
+
+.results-pills__pill--active {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.results-pills__pill:not(.results-pills__pill--active):hover {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+/* Sections */
+.results-section {
+  padding-top: var(--space-6);
+}
+
+.results-section__title {
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: var(--space-3);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}

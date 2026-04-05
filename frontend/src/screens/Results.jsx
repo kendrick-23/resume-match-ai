@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
@@ -6,13 +6,22 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
-import { generateResume, getGeneratedResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
+import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
 import { Copy, Download } from 'lucide-react';
+import './Results.css';
 
 const RING_SIZE = 140;
 const RING_STROKE = 10;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+const PILLS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'strengths', label: 'Strengths' },
+  { id: 'gaps', label: 'Gaps' },
+  { id: 'otts-take', label: "Ott's Take" },
+  { id: 'resume', label: 'Resume' },
+];
 
 function ScoreRing({ score }) {
   const offset = RING_CIRCUMFERENCE - (score / 100) * RING_CIRCUMFERENCE;
@@ -75,11 +84,39 @@ function ScoreRing({ score }) {
   );
 }
 
+function StickyPillNav({ activePill, onPillClick }) {
+  const scrollRef = useRef(null);
+  const activeRef = useRef(null);
+
+  useEffect(() => {
+    if (activeRef.current && scrollRef.current) {
+      const container = scrollRef.current;
+      const pill = activeRef.current;
+      const scrollLeft = pill.offsetLeft - container.offsetWidth / 2 + pill.offsetWidth / 2;
+      container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+    }
+  }, [activePill]);
+
+  return (
+    <div className="results-pills" ref={scrollRef}>
+      {PILLS.map((pill) => (
+        <button
+          key={pill.id}
+          ref={pill.id === activePill ? activeRef : null}
+          className={`results-pills__pill ${pill.id === activePill ? 'results-pills__pill--active' : ''}`}
+          onClick={() => onPillClick(pill.id)}
+        >
+          {pill.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Result from navigation state (fresh analysis) or loaded from Supabase
   const [result, setResult] = useState(location.state?.result || null);
   const [pastAnalyses, setPastAnalyses] = useState([]);
   const [loading, setLoading] = useState(!location.state?.result);
@@ -90,15 +127,49 @@ export default function Results() {
   const [resumeError, setResumeError] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Sticky pill nav
+  const [activePill, setActivePill] = useState('overview');
+  const sectionRefs = useRef({});
+
   useEffect(() => {
-    // If no result from navigation, load the most recent from Supabase
     if (!location.state?.result) {
       loadAnalyses();
     } else {
-      // Still load past analyses for the history section
       loadPastAnalyses();
     }
   }, []);
+
+  // IntersectionObserver for active pill tracking
+  useEffect(() => {
+    if (!result) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActivePill(entry.target.id);
+          }
+        }
+      },
+      {
+        rootMargin: '-120px 0px -60% 0px',
+        threshold: 0.1,
+      }
+    );
+
+    // Small delay to let refs populate after render
+    const timer = setTimeout(() => {
+      for (const id of PILLS.map((p) => p.id)) {
+        const el = sectionRefs.current[id];
+        if (el) observer.observe(el);
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [result]);
 
   async function loadAnalyses() {
     try {
@@ -115,6 +186,7 @@ export default function Results() {
           role_name: latest.role_name,
           created_at: latest.created_at,
           analysis_id: latest.id,
+          coaching_tips: latest.coaching_tips,
         });
         if (latest.generated_resume_md) {
           setResumeMd(latest.generated_resume_md);
@@ -122,7 +194,7 @@ export default function Results() {
         setPastAnalyses(data.slice(1));
       }
     } catch {
-      // Silently fail — show empty state
+      // Silently fail
     } finally {
       setLoading(false);
     }
@@ -131,11 +203,21 @@ export default function Results() {
   async function loadPastAnalyses() {
     try {
       const data = await listAnalyses();
-      // Skip the first one if it matches current result
       setPastAnalyses(data.length > 1 ? data.slice(1) : []);
     } catch {
       // Silently fail
     }
+  }
+
+  function handlePillClick(id) {
+    const el = sectionRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function setSectionRef(id) {
+    return (el) => { sectionRefs.current[id] = el; };
   }
 
   const hasResult = result && typeof result.score === 'number';
@@ -184,14 +266,12 @@ export default function Results() {
         </Card>
       ) : (
         <>
-          {/* Ott reaction */}
-          <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
-            <Ott state={ottState} size={100} />
-          </div>
-
-          {/* Score ring */}
-          <Card style={{ textAlign: 'center', marginBottom: 'var(--space-5)', padding: 'var(--space-6) var(--space-5)' }}>
-            <ScoreRing score={score} />
+          {/* Score card — always at top */}
+          <Card style={{ textAlign: 'center', marginBottom: 0, padding: 'var(--space-5)' }}>
+            <Ott state={ottState} size={80} />
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <ScoreRing score={score} />
+            </div>
             <p style={{
               color: 'var(--color-text-secondary)',
               fontSize: '14px',
@@ -207,226 +287,19 @@ export default function Results() {
             )}
           </Card>
 
-          {/* Summary */}
-          {summary && (
-            <Card style={{ marginBottom: 'var(--space-5)' }}>
-              <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{summary}</p>
-            </Card>
-          )}
+          {/* Sticky pill navigation */}
+          <StickyPillNav activePill={activePill} onPillClick={handlePillClick} />
 
-          {/* Strengths */}
-          {strengths.length > 0 && (
-            <div style={{ marginBottom: 'var(--space-5)' }}>
-              <h3 style={{ marginBottom: 'var(--space-3)' }}>Strengths</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {strengths.map((s, i) => (
-                  <Card key={i}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
-                      <Badge variant="success">Match</Badge>
-                      <p style={{ color: 'var(--color-text-secondary)' }}>{s}</p>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Gaps */}
-          {gaps.length > 0 && (
-            <div style={{ marginBottom: 'var(--space-5)' }}>
-              <h3 style={{ marginBottom: 'var(--space-3)' }}>Gaps</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {gaps.map((g, i) => (
-                  <Card key={i}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
-                      <Badge variant="danger">Gap</Badge>
-                      <p style={{ color: 'var(--color-text-secondary)' }}>{g}</p>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Ott's Take — coaching tips */}
-          {result.coaching_tips?.length > 0 && (
-            <div style={{ marginBottom: 'var(--space-5)' }}>
-              <Card style={{
-                background: 'var(--color-accent-light)',
-                borderColor: 'var(--color-accent)',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-3)',
-                  marginBottom: 'var(--space-3)',
-                }}>
-                  <Ott state="encouraging" size={48} />
-                  <h3 style={{ color: 'var(--color-accent-dark)' }}>Ott's Take</h3>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  {result.coaching_tips.map((tip, i) => (
-                    <p key={i} style={{
-                      color: 'var(--color-text)',
-                      lineHeight: 1.6,
-                      fontSize: '14px',
-                      paddingLeft: 'var(--space-3)',
-                      borderLeft: '3px solid var(--color-accent)',
-                    }}>
-                      {tip}
-                    </p>
-                  ))}
-                </div>
+          {/* === OVERVIEW SECTION === */}
+          <section id="overview" ref={setSectionRef('overview')} className="results-section" style={{ scrollMarginTop: '120px' }}>
+            <h3 className="results-section__title">Overview</h3>
+            {summary && (
+              <Card>
+                <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{summary}</p>
               </Card>
-            </div>
-          )}
-
-          {/* ATS-Ready Resume */}
-          {result.analysis_id && (
-            <div style={{ marginBottom: 'var(--space-5)' }}>
-              <h3 style={{ marginBottom: 'var(--space-3)' }}>ATS-Ready Resume</h3>
-              {!resumeMd && !generatingResume && (
-                <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
-                  <Ott state="encouraging" size={80} />
-                  <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
-                    Get Your ATS-Ready Resume
-                  </p>
-                  <p style={{
-                    color: 'var(--color-text-muted)',
-                    fontSize: '13px',
-                    marginTop: 'var(--space-1)',
-                    marginBottom: 'var(--space-4)',
-                  }}>
-                    Ott will rewrite your resume using the exact keywords this job is scanning for. Takes about 15 seconds.
-                  </p>
-                  {resumeError && (
-                    <p style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
-                      {resumeError}
-                    </p>
-                  )}
-                  <Button onClick={async () => {
-                    setGeneratingResume(true);
-                    setResumeError('');
-                    try {
-                      const data = await generateResume(result.analysis_id);
-                      setResumeMd(data.resume_md);
-                    } catch (err) {
-                      setResumeError(err.message);
-                    } finally {
-                      setGeneratingResume(false);
-                    }
-                  }}>
-                    Generate Resume
-                  </Button>
-                </Card>
-              )}
-
-              {generatingResume && (
-                <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
-                  <Ott state="thinking" size={80} />
-                  <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
-                    Ott is tailoring your resume...
-                  </p>
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
-                    Matching keywords, reframing experience, optimizing for ATS
-                  </p>
-                </Card>
-              )}
-
-              {resumeMd && !generatingResume && (
-                <div>
-                  {/* Rendered resume */}
-                  <Card style={{ marginBottom: 'var(--space-3)' }}>
-                    <div style={{ position: 'relative' }}>
-                      <div style={{ position: 'absolute', top: 0, right: 0 }}>
-                        <Ott state="celebrating" size={40} />
-                      </div>
-                      <div style={{ lineHeight: 1.7, fontSize: '14px' }}>
-                        {parseResumeMarkdown(resumeMd).map((section, i) => {
-                          if (section.type === 'name') {
-                            return (
-                              <h2 key={i} style={{ fontSize: '20px', marginBottom: 'var(--space-3)', paddingRight: '50px' }}>
-                                {section.title}
-                              </h2>
-                            );
-                          }
-                          if (section.type === 'section') {
-                            return (
-                              <div key={i} style={{ marginBottom: 'var(--space-4)' }}>
-                                <h3 style={{
-                                  fontSize: '15px',
-                                  color: 'var(--color-accent-dark)',
-                                  borderBottom: '2px solid var(--color-accent)',
-                                  paddingBottom: 'var(--space-1)',
-                                  marginBottom: 'var(--space-2)',
-                                }}>
-                                  {section.title}
-                                </h3>
-                                {section.content.map((line, j) => (
-                                  <p key={j} style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>
-                                    {line}
-                                  </p>
-                                ))}
-                              </div>
-                            );
-                          }
-                          if (section.type === 'subsection') {
-                            return (
-                              <div key={i} style={{ marginBottom: 'var(--space-3)' }}>
-                                <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: 'var(--space-1)' }}>
-                                  {section.title}
-                                </p>
-                                <ul style={{ paddingLeft: 'var(--space-5)', margin: 0 }}>
-                                  {section.content.map((line, j) => (
-                                    <li key={j} style={{
-                                      color: 'var(--color-text-secondary)',
-                                      marginBottom: 'var(--space-1)',
-                                      listStyle: 'disc',
-                                    }}>
-                                      {line}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })}
-                      </div>
-                    </div>
-                  </Card>
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <Button
-                      variant="secondary"
-                      full
-                      onClick={() => downloadResumeAsDocx(resumeMd, result.role_name, result.company_name)}
-                    >
-                      <Download size={16} /> Download as Word Doc
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      full
-                      onClick={() => {
-                        navigator.clipboard.writeText(resumeMd);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                      }}
-                    >
-                      <Copy size={16} /> {copied ? 'Copied!' : 'Copy to Clipboard'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Recommendations */}
-          {recommendations.length > 0 && (
-            <div style={{ marginBottom: 'var(--space-5)' }}>
-              <h3 style={{ marginBottom: 'var(--space-3)' }}>Recommendations</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            )}
+            {recommendations.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
                 {recommendations.map((r, i) => (
                   <Card key={i}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
@@ -442,11 +315,247 @@ export default function Results() {
                   </Card>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </section>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {/* === STRENGTHS SECTION === */}
+          <section id="strengths" ref={setSectionRef('strengths')} className="results-section" style={{ scrollMarginTop: '120px' }}>
+            <h3 className="results-section__title">Strengths</h3>
+            {strengths.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {strengths.map((s, i) => (
+                  <Card key={i}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+                      <Badge variant="success">Match</Badge>
+                      <p style={{ color: 'var(--color-text-secondary)' }}>{s}</p>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                  No specific strengths identified for this role
+                </p>
+              </Card>
+            )}
+          </section>
+
+          {/* === GAPS SECTION === */}
+          <section id="gaps" ref={setSectionRef('gaps')} className="results-section" style={{ scrollMarginTop: '120px' }}>
+            <h3 className="results-section__title">Gaps</h3>
+            {gaps.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {gaps.map((g, i) => (
+                  <Card key={i}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+                      <Badge variant="danger">Gap</Badge>
+                      <p style={{ color: 'var(--color-text-secondary)' }}>{g}</p>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                  No significant gaps found — nice work!
+                </p>
+              </Card>
+            )}
+          </section>
+
+          {/* === OTT'S TAKE SECTION === */}
+          <section id="otts-take" ref={setSectionRef('otts-take')} className="results-section" style={{ scrollMarginTop: '120px' }}>
+            <h3 className="results-section__title">Ott's Take</h3>
+            <Card style={{
+              background: 'var(--color-accent-light)',
+              borderColor: 'var(--color-accent)',
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-3)',
+                marginBottom: 'var(--space-3)',
+              }}>
+                <Ott state="encouraging" size={48} />
+                <p style={{ fontWeight: 700, color: 'var(--color-accent-dark)' }}>
+                  {score >= 70 ? "You're in great shape!" : score >= 40 ? "Good foundation — let's sharpen it." : "Don't worry — here's your game plan."}
+                </p>
+              </div>
+              {result.coaching_tips?.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  {result.coaching_tips.map((tip, i) => (
+                    <p key={i} style={{
+                      color: 'var(--color-text)',
+                      lineHeight: 1.6,
+                      fontSize: '14px',
+                      paddingLeft: 'var(--space-3)',
+                      borderLeft: '3px solid var(--color-accent)',
+                    }}>
+                      {tip}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6, fontSize: '14px' }}>
+                  {score >= 70
+                    ? "Your resume is a strong match. Focus on tailoring your cover letter and preparing for behavioral interviews."
+                    : score >= 40
+                      ? "You have transferable skills. Try rewording your experience to use the same language as the job description."
+                      : "Start by addressing the gaps above. Even small keyword additions can significantly improve your ATS score."}
+                </p>
+              )}
+            </Card>
+          </section>
+
+          {/* === RESUME SECTION === */}
+          <section id="resume" ref={setSectionRef('resume')} className="results-section" style={{ scrollMarginTop: '120px' }}>
+            <h3 className="results-section__title">ATS-Ready Resume</h3>
+
+            {result.analysis_id && !resumeMd && !generatingResume && (
+              <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
+                <Ott state="encouraging" size={80} />
+                <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+                  Get Your ATS-Ready Resume
+                </p>
+                <p style={{
+                  color: 'var(--color-text-muted)',
+                  fontSize: '13px',
+                  marginTop: 'var(--space-1)',
+                  marginBottom: 'var(--space-4)',
+                }}>
+                  Ott will rewrite your resume using the exact keywords this job is scanning for. Takes about 15 seconds.
+                </p>
+                {resumeError && (
+                  <p style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+                    {resumeError}
+                  </p>
+                )}
+                <Button onClick={async () => {
+                  setGeneratingResume(true);
+                  setResumeError('');
+                  try {
+                    const data = await generateResume(result.analysis_id);
+                    setResumeMd(data.resume_md);
+                  } catch (err) {
+                    setResumeError(err.message);
+                  } finally {
+                    setGeneratingResume(false);
+                  }
+                }}>
+                  Generate Resume
+                </Button>
+              </Card>
+            )}
+
+            {generatingResume && (
+              <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
+                <Ott state="thinking" size={80} />
+                <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+                  Ott is tailoring your resume...
+                </p>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+                  Matching keywords, reframing experience, optimizing for ATS
+                </p>
+              </Card>
+            )}
+
+            {resumeMd && !generatingResume && (
+              <div>
+                <Card style={{ marginBottom: 'var(--space-3)' }}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 0, right: 0 }}>
+                      <Ott state="celebrating" size={40} />
+                    </div>
+                    <div style={{ lineHeight: 1.7, fontSize: '14px' }}>
+                      {parseResumeMarkdown(resumeMd).map((section, i) => {
+                        if (section.type === 'name') {
+                          return (
+                            <h2 key={i} style={{ fontSize: '20px', marginBottom: 'var(--space-3)', paddingRight: '50px' }}>
+                              {section.title}
+                            </h2>
+                          );
+                        }
+                        if (section.type === 'section') {
+                          return (
+                            <div key={i} style={{ marginBottom: 'var(--space-4)' }}>
+                              <h3 style={{
+                                fontSize: '15px',
+                                color: 'var(--color-accent-dark)',
+                                borderBottom: '2px solid var(--color-accent)',
+                                paddingBottom: 'var(--space-1)',
+                                marginBottom: 'var(--space-2)',
+                              }}>
+                                {section.title}
+                              </h3>
+                              {section.content.map((line, j) => (
+                                <p key={j} style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          );
+                        }
+                        if (section.type === 'subsection') {
+                          return (
+                            <div key={i} style={{ marginBottom: 'var(--space-3)' }}>
+                              <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: 'var(--space-1)' }}>
+                                {section.title}
+                              </p>
+                              <ul style={{ paddingLeft: 'var(--space-5)', margin: 0 }}>
+                                {section.content.map((line, j) => (
+                                  <li key={j} style={{
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--space-1)',
+                                    listStyle: 'disc',
+                                  }}>
+                                    {line}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                </Card>
+
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                  <Button
+                    variant="secondary"
+                    full
+                    onClick={() => downloadResumeAsDocx(resumeMd, result.role_name, result.company_name)}
+                  >
+                    <Download size={16} /> Download as Word Doc
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    full
+                    onClick={() => {
+                      navigator.clipboard.writeText(resumeMd);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                  >
+                    <Copy size={16} /> {copied ? 'Copied!' : 'Copy'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!result.analysis_id && (
+              <Card>
+                <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                  Run a fresh analysis to generate an ATS-optimized resume
+                </p>
+              </Card>
+            )}
+          </section>
+
+          {/* Bottom actions */}
+          <div style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <Button full onClick={() => navigate('/upload')}>Analyze Another Resume</Button>
           </div>
 
@@ -470,9 +579,11 @@ export default function Results() {
                         role_name: a.role_name,
                         created_at: a.created_at,
                         analysis_id: a.id,
+                        coaching_tips: a.coaching_tips,
                       });
                       setResumeMd(a.generated_resume_md || null);
                       setResumeError('');
+                      setActivePill('overview');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                   >

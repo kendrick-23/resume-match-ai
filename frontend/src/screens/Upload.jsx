@@ -83,8 +83,6 @@ export default function Upload() {
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
       >
-        <Ott state={ottState} size={100} />
-
         <input
           ref={fileInputRef}
           type="file"
@@ -94,8 +92,9 @@ export default function Upload() {
         />
 
         {file ? (
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <p style={{ fontWeight: 700 }}>{file.name}</p>
+          <div>
+            <Ott state={ottState} size={80} />
+            <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>{file.name}</p>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
               {(file.size / 1024).toFixed(0)} KB
             </p>
