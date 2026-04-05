@@ -75,7 +75,9 @@ async def get_current_user(
 
 
 from app.routes.applications import router as applications_router
+from app.routes.jobs import router as jobs_router
 app.include_router(applications_router)
+app.include_router(jobs_router)
 
 
 class AnalyzeRequest(BaseModel):

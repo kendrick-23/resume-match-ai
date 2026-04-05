@@ -114,6 +114,29 @@ export async function deleteApplication(id) {
   return res.json();
 }
 
+/* ============================================
+   Job Search
+   ============================================ */
+
+export async function searchJobs({ keyword, location, salaryMin, salaryMax, remote, page }) {
+  const headers = await authHeaders();
+  const params = new URLSearchParams();
+  if (keyword) params.set('keyword', keyword);
+  if (location) params.set('location', location);
+  if (salaryMin) params.set('salary_min', salaryMin);
+  if (salaryMax) params.set('salary_max', salaryMax);
+  if (remote) params.set('remote', 'true');
+  if (page) params.set('page', page);
+
+  const res = await fetch(`${API_URL}/jobs/search?${params}`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Job search failed');
+  }
+  return res.json();
+}
+
 /**
  * Parse the raw text response from the AI into structured data.
  */
