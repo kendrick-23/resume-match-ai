@@ -321,11 +321,15 @@ Return ONLY the tips as a JSON array of strings. No other text."""
                 messages=[{"role": "user", "content": coaching_prompt}]
             )
             coaching_raw = coaching_msg.content[0].text.strip()
-            # Parse JSON array from response
+            # Strip markdown code fences if present
+            if coaching_raw.startswith("```"):
+                coaching_raw = re.sub(r"^```(?:json)?\s*", "", coaching_raw)
+                coaching_raw = re.sub(r"\s*```$", "", coaching_raw)
             coaching_tips = json.loads(coaching_raw)
             if not isinstance(coaching_tips, list):
                 coaching_tips = []
-        except Exception:
+        except Exception as exc:
+            print(f"[Ott coaching] Failed: {exc}")
             coaching_tips = []
 
         return {"result": raw_result, "analysis_id": None, "parsed": {

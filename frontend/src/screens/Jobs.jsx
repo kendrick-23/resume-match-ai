@@ -60,13 +60,10 @@ export default function Jobs() {
       const uniqueWords = [...new Set(words)];
       setAnalysisKeywords(uniqueWords);
 
-      // Extract meaningful keywords from strengths (first 3 words of each)
-      const strengthKeywords = strengths
-        .slice(0, 3)
-        .map((s) => s.split(/\s+/).slice(0, 3).join(' '))
-        .join(' ');
-
-      const searchKeyword = roleName || strengthKeywords || 'analyst';
+      // Use role name as primary keyword, keep it short for USAJobs
+      const searchKeyword = roleName
+        ? roleName.split(/\s+/).slice(0, 3).join(' ')
+        : 'analyst';
 
       // Get user location and salary from profile
       let userLocation = '';
@@ -81,15 +78,20 @@ export default function Jobs() {
         // No profile yet
       }
 
-      const data = await searchJobs({
-        keyword: searchKeyword,
-        location: userLocation || undefined,
-        page: 1,
-      });
-
-      setRecommended(data.jobs?.slice(0, 5) || []);
-    } catch {
-      // Silently fail — recommendations are a nice-to-have
+      // Search for recommended jobs — separate try/catch so analysis data is preserved
+      try {
+        const data = await searchJobs({
+          keyword: searchKeyword,
+          location: userLocation || undefined,
+          page: 1,
+        });
+        setRecommended(data.jobs?.slice(0, 5) || []);
+      } catch (err) {
+        console.warn('[Jobs] Recommendation search failed:', err.message);
+        // Analysis data is still set — Holt scores will work on manual searches
+      }
+    } catch (err) {
+      console.warn('[Jobs] Failed to load analyses:', err.message);
     } finally {
       setRecLoading(false);
     }
