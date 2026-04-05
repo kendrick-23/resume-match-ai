@@ -56,7 +56,9 @@ export async function analyzeResume(resumeText, jobDescription, companyName = ''
 
   const data = await res.json();
   // Use server-parsed data if available, fall back to client parsing
-  if (data.parsed) return data.parsed;
+  if (data.parsed) {
+    return { ...data.parsed, analysis_id: data.analysis_id };
+  }
   return parseAnalysisResult(data.result);
 }
 

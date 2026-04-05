@@ -128,9 +128,11 @@ async def get_analysis(request: Request, analysis_id: str, user: dict = Depends(
 from app.routes.applications import router as applications_router
 from app.routes.jobs import router as jobs_router
 from app.routes.profile import router as profile_router
+from app.routes.generate_resume import router as generate_resume_router
 app.include_router(applications_router)
 app.include_router(jobs_router)
 app.include_router(profile_router)
+app.include_router(generate_resume_router)
 
 
 class AnalyzeRequest(BaseModel):
@@ -274,9 +276,9 @@ SUMMARY:
         summary_match = re.search(r"SUMMARY:\s*\n([\s\S]*?)$", raw_result, re.IGNORECASE)
         summary = summary_match.group(1).strip() if summary_match else ""
 
-        # Save analysis to Supabase
+        # Save analysis to Supabase (include original inputs for resume generation)
         sb = _user_sb(user)
-        sb.table("analyses").insert({
+        insert_res = sb.table("analyses").insert({
             "user_id": user["user_id"],
             "company_name": body.company_name,
             "role_name": body.role_name,
@@ -285,7 +287,11 @@ SUMMARY:
             "strengths": json.dumps(strengths),
             "gaps": json.dumps(gaps),
             "recommendations": json.dumps(recommendations),
+            "resume_text": body.resume,
+            "job_description_text": body.job_description,
         }).execute()
+
+        analysis_id = insert_res.data[0]["id"] if insert_res.data else None
 
         # Log activity
         sb.table("activity_log").insert({
@@ -332,7 +338,7 @@ Return ONLY the tips as a JSON array of strings. No other text."""
             print(f"[Ott coaching] Failed: {exc}")
             coaching_tips = []
 
-        return {"result": raw_result, "analysis_id": None, "parsed": {
+        return {"result": raw_result, "analysis_id": analysis_id, "parsed": {
             "score": score,
             "strengths": strengths,
             "gaps": gaps,
