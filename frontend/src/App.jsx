@@ -9,6 +9,7 @@ import Jobs from './screens/Jobs';
 import Profile from './screens/Profile';
 import Login from './screens/Login';
 import Signup from './screens/Signup';
+import Onboarding from './screens/Onboarding';
 
 const TAB_ROUTES = {
   dashboard: '/',
@@ -27,6 +28,13 @@ function ProtectedRoute({ children }) {
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
+
+  // Redirect to onboarding if not completed
+  const onboarded = localStorage.getItem('holt_onboarded');
+  if (!onboarded && window.location.pathname !== '/welcome') {
+    return <Navigate to="/welcome" replace />;
+  }
+
   return children;
 }
 
@@ -35,6 +43,19 @@ function PublicRoute({ children }) {
 
   if (loading) return null;
   if (user) return <Navigate to="/" replace />;
+  return children;
+}
+
+function OnboardingRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+
+  // Already onboarded — go to dashboard
+  const onboarded = localStorage.getItem('holt_onboarded');
+  if (onboarded) return <Navigate to="/" replace />;
+
   return children;
 }
 
@@ -48,13 +69,15 @@ function AppRoutes() {
     navigate(TAB_ROUTES[tab]);
   };
 
-  const showNav = !loading && user && !['/login', '/signup'].includes(location.pathname);
+  const hideNav = ['/login', '/signup', '/welcome'].includes(location.pathname);
+  const showNav = !loading && user && !hideNav;
 
   return (
     <>
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+        <Route path="/welcome" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
         <Route path="/results" element={<ProtectedRoute><Results /></ProtectedRoute>} />
