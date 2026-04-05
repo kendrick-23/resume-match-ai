@@ -69,6 +69,12 @@ async def create_application(
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to create application")
 
+    # Log activity
+    sb.table("activity_log").insert({
+        "user_id": user["user_id"],
+        "action_type": "application_created",
+    }).execute()
+
     return res.data[0]
 
 
@@ -94,6 +100,12 @@ async def update_application(
 
     if not res.data:
         raise HTTPException(status_code=404, detail="Application not found")
+
+    # Log activity
+    sb.table("activity_log").insert({
+        "user_id": user["user_id"],
+        "action_type": "application_updated",
+    }).execute()
 
     return res.data[0]
 

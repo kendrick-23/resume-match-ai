@@ -167,6 +167,21 @@ export async function searchJobs({ keyword, location, salaryMin, salaryMax, remo
   return res.json();
 }
 
+/* ============================================
+   Activity / Dashboard
+   ============================================ */
+
+export async function getActivity() {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/profile/activity`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load activity');
+  }
+  return res.json();
+}
+
 /**
  * Parse the raw text response from the AI into structured data.
  */
