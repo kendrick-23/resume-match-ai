@@ -25,6 +25,10 @@ export default function Jobs() {
   const [recLoading, setRecLoading] = useState(true);
   const [hasAnalysis, setHasAnalysis] = useState(false);
 
+  // Holt score data
+  const [analysisKeywords, setAnalysisKeywords] = useState([]);
+  const [salaryTarget, setSalaryTarget] = useState({ min: null, max: null });
+
   useEffect(() => {
     loadRecommendations();
   }, []);
@@ -46,6 +50,15 @@ export default function Jobs() {
       const strengths = typeof latest.strengths === 'string'
         ? JSON.parse(latest.strengths)
         : latest.strengths || [];
+      const gaps = typeof latest.gaps === 'string'
+        ? JSON.parse(latest.gaps)
+        : latest.gaps || [];
+
+      // Extract keywords for Holt score matching
+      const allText = [...strengths, ...gaps, roleName].join(' ').toLowerCase();
+      const words = allText.split(/[\s,;.()]+/).filter((w) => w.length > 3);
+      const uniqueWords = [...new Set(words)];
+      setAnalysisKeywords(uniqueWords);
 
       // Extract meaningful keywords from strengths (first 3 words of each)
       const strengthKeywords = strengths
@@ -55,11 +68,15 @@ export default function Jobs() {
 
       const searchKeyword = roleName || strengthKeywords || 'analyst';
 
-      // Get user location from profile
+      // Get user location and salary from profile
       let userLocation = '';
       try {
         const profile = await getProfile();
         userLocation = profile.location || '';
+        setSalaryTarget({
+          min: profile.target_salary_min || null,
+          max: profile.target_salary_max || null,
+        });
       } catch {
         // No profile yet
       }
@@ -138,6 +155,39 @@ export default function Jobs() {
     }
   }
 
+  function computeHoltScore(job) {
+    if (!hasAnalysis || analysisKeywords.length === 0) return null;
+
+    // 1. Keyword match (60%)
+    const jobText = `${job.title} ${job.department || ''} ${job.company || ''}`.toLowerCase();
+    const matches = analysisKeywords.filter((kw) => jobText.includes(kw));
+    const keywordScore = Math.min(100, Math.round((matches.length / Math.min(analysisKeywords.length, 10)) * 100));
+
+    // 2. Salary fit (25%)
+    let salaryScore = 50; // default unknown
+    if (salaryTarget.min && job.salary_min && job.salary_max) {
+      // Check if job salary range overlaps with target
+      const targetMax = salaryTarget.max || salaryTarget.min * 1.5;
+      if (job.salary_max >= salaryTarget.min && job.salary_min <= targetMax) {
+        salaryScore = 100;
+      } else if (job.salary_max < salaryTarget.min) {
+        salaryScore = 0;
+      }
+    }
+
+    // 3. Schedule fit (15%) — USAJobs titles don't usually indicate shift work
+    // Default to 50 (unknown) unless title suggests shift/weekend
+    let scheduleScore = 50;
+    const titleLower = job.title.toLowerCase();
+    if (titleLower.includes('shift') || titleLower.includes('weekend') || titleLower.includes('night')) {
+      scheduleScore = 0;
+    } else if (titleLower.includes('manager') || titleLower.includes('specialist') || titleLower.includes('analyst') || titleLower.includes('program')) {
+      scheduleScore = 100;
+    }
+
+    return Math.round(keywordScore * 0.6 + salaryScore * 0.25 + scheduleScore * 0.15);
+  }
+
   function formatSalary(min, max) {
     if (!min && !max) return null;
     const fmt = (n) => '$' + n.toLocaleString();
@@ -171,6 +221,7 @@ export default function Jobs() {
                 onSave={handleSave}
                 formatSalary={formatSalary}
                 recommended
+                holtScore={computeHoltScore(job)}
               />
             ))}
           </div>
@@ -298,6 +349,7 @@ export default function Jobs() {
             savedIds={savedIds}
             onSave={handleSave}
             formatSalary={formatSalary}
+            holtScore={computeHoltScore(job)}
           />
         ))}
       </div>
