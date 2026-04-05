@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, createApplication } from '../services/api';
-import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Loader2 } from 'lucide-react';
+import { searchJobs, createApplication, listAnalyses, getProfile } from '../services/api';
+import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles } from 'lucide-react';
 
 export default function Jobs() {
   const [keyword, setKeyword] = useState('');
@@ -19,6 +19,64 @@ export default function Jobs() {
   const [error, setError] = useState('');
   const [savedIds, setSavedIds] = useState(new Set());
   const [remoteOnly, setRemoteOnly] = useState(false);
+
+  // Smart feed state
+  const [recommended, setRecommended] = useState([]);
+  const [recLoading, setRecLoading] = useState(true);
+  const [hasAnalysis, setHasAnalysis] = useState(false);
+
+  useEffect(() => {
+    loadRecommendations();
+  }, []);
+
+  async function loadRecommendations() {
+    try {
+      const analyses = await listAnalyses();
+      if (!analyses || analyses.length === 0) {
+        setHasAnalysis(false);
+        setRecLoading(false);
+        return;
+      }
+
+      setHasAnalysis(true);
+      const latest = analyses[0];
+
+      // Build search keywords from analysis
+      const roleName = latest.role_name || '';
+      const strengths = typeof latest.strengths === 'string'
+        ? JSON.parse(latest.strengths)
+        : latest.strengths || [];
+
+      // Extract meaningful keywords from strengths (first 3 words of each)
+      const strengthKeywords = strengths
+        .slice(0, 3)
+        .map((s) => s.split(/\s+/).slice(0, 3).join(' '))
+        .join(' ');
+
+      const searchKeyword = roleName || strengthKeywords || 'analyst';
+
+      // Get user location from profile
+      let userLocation = '';
+      try {
+        const profile = await getProfile();
+        userLocation = profile.location || '';
+      } catch {
+        // No profile yet
+      }
+
+      const data = await searchJobs({
+        keyword: searchKeyword,
+        location: userLocation || undefined,
+        page: 1,
+      });
+
+      setRecommended(data.jobs?.slice(0, 5) || []);
+    } catch {
+      // Silently fail — recommendations are a nice-to-have
+    } finally {
+      setRecLoading(false);
+    }
+  }
 
   async function handleSearch(e) {
     e?.preventDefault();
@@ -76,7 +134,7 @@ export default function Jobs() {
       });
       setSavedIds((prev) => new Set(prev).add(job.id));
     } catch {
-      // Silently fail — user will see the button didn't change
+      // Silently fail
     }
   }
 
@@ -91,6 +149,52 @@ export default function Jobs() {
   return (
     <ScreenWrapper>
       <h2 style={{ marginBottom: 'var(--space-5)' }}>Find Jobs</h2>
+
+      {/* Recommended for You section */}
+      {!recLoading && hasAnalysis && recommended.length > 0 && !searched && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <h3 style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            marginBottom: 'var(--space-3)',
+          }}>
+            <Sparkles size={18} style={{ color: 'var(--color-accent)' }} />
+            Recommended for You
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            {recommended.map((job) => (
+              <JobCard
+                key={'rec-' + job.id + job.title}
+                job={job}
+                savedIds={savedIds}
+                onSave={handleSave}
+                formatSalary={formatSalary}
+                recommended
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* No analysis — prompt to analyze first */}
+      {!recLoading && !hasAnalysis && !searched && (
+        <Card style={{
+          textAlign: 'center',
+          padding: 'var(--space-6) var(--space-5)',
+          marginBottom: 'var(--space-5)',
+          background: 'var(--color-accent-light)',
+          borderColor: 'var(--color-accent)',
+        }}>
+          <Ott state="waiting" size={60} />
+          <p style={{ fontWeight: 700, marginTop: 'var(--space-3)', fontSize: '14px' }}>
+            Analyze your resume first to get personalized job matches
+          </p>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+            We'll recommend jobs based on your skills and experience
+          </p>
+        </Card>
+      )}
 
       {/* Search form */}
       <form onSubmit={handleSearch} style={{
@@ -147,8 +251,8 @@ export default function Jobs() {
         </Card>
       )}
 
-      {/* Empty state */}
-      {!searched && !loading && (
+      {/* Empty state — only show if no recommendations either */}
+      {!searched && !loading && !hasAnalysis && recommended.length === 0 && !recLoading && (
         <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
           <Ott state="waiting" size={80} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
@@ -188,100 +292,13 @@ export default function Jobs() {
       {/* Job cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {jobs.map((job) => (
-          <Card key={job.id + job.title} style={{ animationDelay: '60ms' }}>
-            {/* Header row */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              marginBottom: 'var(--space-2)',
-            }}>
-              <div style={{ flex: 1, minWidth: 0, marginRight: 'var(--space-2)' }}>
-                <p style={{ fontWeight: 700, lineHeight: 1.3 }}>{job.title}</p>
-                <p style={{
-                  color: 'var(--color-text-secondary)',
-                  fontSize: '13px',
-                  marginTop: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-1)',
-                }}>
-                  <Building2 size={13} />
-                  {job.department || job.company}
-                </p>
-              </div>
-              <Badge variant="info">Federal</Badge>
-            </div>
-
-            {/* Meta row */}
-            <div style={{
-              display: 'flex',
-              gap: 'var(--space-4)',
-              flexWrap: 'wrap',
-              color: 'var(--color-text-muted)',
-              fontSize: '13px',
-              marginBottom: 'var(--space-3)',
-            }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                <MapPin size={14} /> {job.location}
-              </span>
-              {job.posted && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                  <Clock size={14} /> {job.posted}
-                </span>
-              )}
-              {formatSalary(job.salary_min, job.salary_max) && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                  <DollarSign size={14} /> {formatSalary(job.salary_min, job.salary_max)}
-                </span>
-              )}
-            </div>
-
-            {/* Closing date */}
-            {job.closing && (
-              <p style={{
-                fontSize: '12px',
-                color: 'var(--color-warning)',
-                fontWeight: 600,
-                marginBottom: 'var(--space-3)',
-              }}>
-                Closes {job.closing}
-              </p>
-            )}
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              <Button
-                variant="ghost"
-                style={{ padding: '8px 14px', minHeight: '36px', fontSize: '13px' }}
-                onClick={() => handleSave(job)}
-                disabled={savedIds.has(job.id)}
-              >
-                <Bookmark size={14} style={savedIds.has(job.id) ? { fill: 'var(--color-accent)' } : {}} />
-                {savedIds.has(job.id) ? 'Saved' : 'Save'}
-              </Button>
-              {(job.apply_url || job.url) && (
-                <a
-                  href={job.apply_url || job.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-1)',
-                    padding: '8px 14px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    fontFamily: "'Nunito', sans-serif",
-                    color: 'var(--color-accent)',
-                    textDecoration: 'none',
-                  }}
-                >
-                  <ExternalLink size={14} /> View posting
-                </a>
-              )}
-            </div>
-          </Card>
+          <JobCard
+            key={job.id + job.title}
+            job={job}
+            savedIds={savedIds}
+            onSave={handleSave}
+            formatSalary={formatSalary}
+          />
         ))}
       </div>
 
@@ -294,5 +311,113 @@ export default function Jobs() {
         </div>
       )}
     </ScreenWrapper>
+  );
+}
+
+
+function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, holtScore }) {
+  return (
+    <Card>
+      {/* Header row */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 'var(--space-2)',
+      }}>
+        <div style={{ flex: 1, minWidth: 0, marginRight: 'var(--space-2)' }}>
+          <p style={{ fontWeight: 700, lineHeight: 1.3 }}>{job.title}</p>
+          <p style={{
+            color: 'var(--color-text-secondary)',
+            fontSize: '13px',
+            marginTop: '2px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-1)',
+          }}>
+            <Building2 size={13} />
+            {job.department || job.company}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--space-1)', flexShrink: 0 }}>
+          {recommended && <Badge variant="success">Recommended</Badge>}
+          {holtScore != null && (
+            <Badge variant={holtScore >= 70 ? 'success' : holtScore >= 40 ? 'warning' : 'danger'}>
+              {holtScore}% Holt
+            </Badge>
+          )}
+          {!recommended && holtScore == null && <Badge variant="info">Federal</Badge>}
+        </div>
+      </div>
+
+      {/* Meta row */}
+      <div style={{
+        display: 'flex',
+        gap: 'var(--space-4)',
+        flexWrap: 'wrap',
+        color: 'var(--color-text-muted)',
+        fontSize: '13px',
+        marginBottom: 'var(--space-3)',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+          <MapPin size={14} /> {job.location}
+        </span>
+        {job.posted && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <Clock size={14} /> {job.posted}
+          </span>
+        )}
+        {formatSalary(job.salary_min, job.salary_max) && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <DollarSign size={14} /> {formatSalary(job.salary_min, job.salary_max)}
+          </span>
+        )}
+      </div>
+
+      {/* Closing date */}
+      {job.closing && (
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--color-warning)',
+          fontWeight: 600,
+          marginBottom: 'var(--space-3)',
+        }}>
+          Closes {job.closing}
+        </p>
+      )}
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <Button
+          variant="ghost"
+          style={{ padding: '8px 14px', minHeight: '36px', fontSize: '13px' }}
+          onClick={() => onSave(job)}
+          disabled={savedIds.has(job.id)}
+        >
+          <Bookmark size={14} style={savedIds.has(job.id) ? { fill: 'var(--color-accent)' } : {}} />
+          {savedIds.has(job.id) ? 'Saved' : 'Save'}
+        </Button>
+        {(job.apply_url || job.url) && (
+          <a
+            href={job.apply_url || job.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 'var(--space-1)',
+              padding: '8px 14px',
+              fontSize: '13px',
+              fontWeight: 600,
+              fontFamily: "'Nunito', sans-serif",
+              color: 'var(--color-accent)',
+              textDecoration: 'none',
+            }}
+          >
+            <ExternalLink size={14} /> View posting
+          </a>
+        )}
+      </div>
+    </Card>
   );
 }
