@@ -11,7 +11,9 @@ import {
   createApplication,
   updateApplication,
   deleteApplication,
+  checkBadges,
 } from '../services/api';
+import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 
 const STAGES = ['Saved', 'Applied', 'Responded', 'Interview', 'Offer', 'Closed'];
 
@@ -30,6 +32,7 @@ export default function Tracker() {
   const [activeStage, setActiveStage] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
+  const [celebratingBadge, setCelebratingBadge] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -52,6 +55,12 @@ export default function Tracker() {
       const app = await createApplication(formData);
       setApplications((prev) => [app, ...prev]);
       setShowForm(false);
+
+      // Check for badges
+      const badgeResult = await checkBadges();
+      if (badgeResult.newly_earned?.length > 0) {
+        setCelebratingBadge(badgeResult.newly_earned[0]);
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -63,7 +72,12 @@ export default function Tracker() {
       setApplications((prev) =>
         prev.map((a) => (a.id === app.id ? updated : a))
       );
-      if (newStatus === 'Interview') {
+
+      // Check for badges (covers momentum badge for Interview)
+      const badgeResult = await checkBadges();
+      if (badgeResult.newly_earned?.length > 0) {
+        setCelebratingBadge(badgeResult.newly_earned[0]);
+      } else if (newStatus === 'Interview') {
         setCelebrating(true);
         setTimeout(() => setCelebrating(false), 2500);
       }
@@ -214,6 +228,14 @@ export default function Tracker() {
         <AddApplicationModal
           onSubmit={handleCreate}
           onClose={() => setShowForm(false)}
+        />
+      )}
+
+      {/* Milestone celebration */}
+      {celebratingBadge && (
+        <MilestoneCelebration
+          badgeKey={celebratingBadge}
+          onClose={() => setCelebratingBadge(null)}
         />
       )}
     </ScreenWrapper>

@@ -6,13 +6,15 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
 import { Upload as UploadIcon } from 'lucide-react';
-import { uploadResume, analyzeResume } from '../services/api';
+import { uploadResume, analyzeResume, checkBadges } from '../services/api';
+import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 
 export default function Upload() {
   const [file, setFile] = useState(null);
   const [jobText, setJobText] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
+  const [celebratingBadge, setCelebratingBadge] = useState(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -50,6 +52,16 @@ export default function Upload() {
     try {
       const { text: resumeText } = await uploadResume(file);
       const result = await analyzeResume(resumeText, jobText);
+
+      // Check for newly earned badges
+      const badgeResult = await checkBadges();
+      if (badgeResult.newly_earned?.length > 0) {
+        setCelebratingBadge(badgeResult.newly_earned[0]);
+        // Navigate after celebration
+        setTimeout(() => navigate('/results', { state: { result } }), 3500);
+        return;
+      }
+
       navigate('/results', { state: { result } });
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
@@ -156,6 +168,14 @@ export default function Upload() {
         }}>
           This usually takes about 10 seconds
         </p>
+      )}
+
+      {/* Milestone celebration */}
+      {celebratingBadge && (
+        <MilestoneCelebration
+          badgeKey={celebratingBadge}
+          onClose={() => setCelebratingBadge(null)}
+        />
       )}
     </ScreenWrapper>
   );

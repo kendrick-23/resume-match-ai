@@ -171,6 +171,25 @@ export async function searchJobs({ keyword, location, salaryMin, salaryMax, remo
    Activity / Dashboard
    ============================================ */
 
+export async function checkBadges() {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/profile/badges/check`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (!res.ok) return { newly_earned: [] };
+  return res.json();
+}
+
+export async function listBadges() {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/profile/badges`, { headers });
+
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export async function getActivity() {
   const headers = await authHeaders();
   const res = await fetch(`${API_URL}/profile/activity`, { headers });

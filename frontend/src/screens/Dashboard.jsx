@@ -6,8 +6,7 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Ott from '../components/ott/Ott';
 import { useStreak } from '../hooks/useStreak';
-import { getActivity } from '../services/api';
-import { supabase } from '../services/supabase';
+import { getActivity, listBadges } from '../services/api';
 import { FileText, ClipboardList, Search, Settings, Clock } from 'lucide-react';
 
 const BADGE_META = {
@@ -43,17 +42,8 @@ export default function Dashboard() {
 
   async function loadBadges() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${API_URL}/profile/badges`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setEarnedBadges(data.map((b) => b.badge_key));
-      }
+      const data = await listBadges();
+      setEarnedBadges(data.map((b) => b.badge_key));
     } catch {
       // Silently fail
     }

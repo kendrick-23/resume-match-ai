@@ -101,3 +101,119 @@ async def get_activity(user: dict = Depends(get_current_user)):
         "applications_today": apps_today,
         "recent": recent,
     }
+
+
+@router.get("/badges")
+async def list_badges(user: dict = Depends(get_current_user)):
+    """List all earned badges for the user."""
+    sb = _user_sb(user)
+    res = sb.table("badges") \
+        .select("*") \
+        .eq("user_id", user["user_id"]) \
+        .order("earned_at", desc=True) \
+        .execute()
+    return res.data
+
+
+@router.post("/badges/check")
+async def check_badges(user: dict = Depends(get_current_user)):
+    """Evaluate all badge conditions and award any newly earned ones.
+    Returns list of newly awarded badge keys."""
+    sb = _user_sb(user)
+    user_id = user["user_id"]
+
+    # Load existing badges
+    existing_res = sb.table("badges") \
+        .select("badge_key") \
+        .eq("user_id", user_id) \
+        .execute()
+    earned = {row["badge_key"] for row in existing_res.data}
+
+    newly_earned = []
+
+    # first_dive: first analysis run
+    if "first_dive" not in earned:
+        analyses = sb.table("analyses") \
+            .select("id", count="exact") \
+            .eq("user_id", user_id) \
+            .limit(1) \
+            .execute()
+        if analyses.count and analyses.count >= 1:
+            newly_earned.append("first_dive")
+
+    # sharp_eye: first score >= 80
+    if "sharp_eye" not in earned:
+        high_score = sb.table("analyses") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .gte("score", 80) \
+            .limit(1) \
+            .execute()
+        if high_score.data:
+            newly_earned.append("sharp_eye")
+
+    # consistent: 7-day streak
+    if "consistent" not in earned:
+        streak_data = await get_streak(user)
+        if streak_data["streak"] >= 7:
+            newly_earned.append("consistent")
+
+    # dedicated: 30-day streak
+    if "dedicated" not in earned:
+        if "consistent" in earned or "consistent" in newly_earned:
+            # Re-use streak if already calculated
+            streak_data = await get_streak(user)
+            if streak_data["streak"] >= 30:
+                newly_earned.append("dedicated")
+
+    # first_wave: first application tracked
+    if "first_wave" not in earned:
+        apps = sb.table("applications") \
+            .select("id", count="exact") \
+            .eq("user_id", user_id) \
+            .limit(1) \
+            .execute()
+        if apps.count and apps.count >= 1:
+            newly_earned.append("first_wave")
+
+    # making_moves: 10 applications tracked
+    if "making_moves" not in earned:
+        apps_10 = sb.table("applications") \
+            .select("id", count="exact") \
+            .eq("user_id", user_id) \
+            .execute()
+        if apps_10.count and apps_10.count >= 10:
+            newly_earned.append("making_moves")
+
+    # momentum: first application moved to Interview
+    if "momentum" not in earned:
+        interviews = sb.table("applications") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .eq("status", "Interview") \
+            .limit(1) \
+            .execute()
+        if interviews.data:
+            newly_earned.append("momentum")
+
+    # upgraded: resume score improved 20+ from first analysis
+    if "upgraded" not in earned:
+        all_analyses = sb.table("analyses") \
+            .select("score") \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=False) \
+            .execute()
+        if len(all_analyses.data) >= 2:
+            first_score = all_analyses.data[0]["score"]
+            best_score = max(a["score"] for a in all_analyses.data)
+            if best_score - first_score >= 20:
+                newly_earned.append("upgraded")
+
+    # Insert newly earned badges
+    for key in newly_earned:
+        sb.table("badges").insert({
+            "user_id": user_id,
+            "badge_key": key,
+        }).execute()
+
+    return {"newly_earned": newly_earned}
