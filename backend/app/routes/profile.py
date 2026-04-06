@@ -232,6 +232,14 @@ class ProfileUpdate(BaseModel):
     target_salary_min: Optional[int] = Field(default=None, ge=0)
     target_salary_max: Optional[int] = Field(default=None, ge=0)
     location: Optional[str] = Field(default=None, max_length=200)
+    schedule_preference: Optional[str] = Field(default=None, max_length=50)
+    max_commute_miles: Optional[int] = Field(default=None, ge=0, le=200)
+    degree_status: Optional[str] = Field(default=None, max_length=50)
+    work_authorization: Optional[str] = Field(default=None, max_length=50)
+    target_companies: Optional[str] = Field(default=None, max_length=1000)
+    dealbreakers: Optional[dict] = None
+    skills_extracted: Optional[list[str]] = None
+    job_seeker_status: Optional[str] = Field(default=None, max_length=50)
 
 
 @router.get("")

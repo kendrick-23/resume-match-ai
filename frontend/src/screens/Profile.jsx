@@ -33,6 +33,15 @@ export default function Profile() {
   const [targetSalaryMin, setTargetSalaryMin] = useState('');
   const [targetSalaryMax, setTargetSalaryMax] = useState('');
   const [location, setLocation] = useState('');
+  const [schedulePref, setSchedulePref] = useState('');
+  const [maxCommute, setMaxCommute] = useState(30);
+  const [degreeStatus, setDegreeStatus] = useState('');
+  const [workAuth, setWorkAuth] = useState('');
+  const [targetCompanies, setTargetCompanies] = useState('');
+  const [companyInput, setCompanyInput] = useState('');
+  const [dealbreakers, setDealbreakers] = useState({ hard_degree_required: false, below_salary: false, outside_commute: false });
+  const [jobSeekerStatus, setJobSeekerStatus] = useState('actively_hunting');
+  const [skillsExtracted, setSkillsExtracted] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [analyses, setAnalyses] = useState([]);
@@ -58,6 +67,14 @@ export default function Profile() {
       setTargetSalaryMin(data.target_salary_min?.toString() || '');
       setTargetSalaryMax(data.target_salary_max?.toString() || '');
       setLocation(data.location || '');
+      setSchedulePref(data.schedule_preference || '');
+      setMaxCommute(data.max_commute_miles ?? 30);
+      setDegreeStatus(data.degree_status || '');
+      setWorkAuth(data.work_authorization || '');
+      setTargetCompanies(data.target_companies || '');
+      setDealbreakers(data.dealbreakers || { hard_degree_required: false, below_salary: false, outside_commute: false });
+      setJobSeekerStatus(data.job_seeker_status || 'actively_hunting');
+      setSkillsExtracted(data.skills_extracted || []);
     } catch {
       // Profile will be created on first save
     }
@@ -92,6 +109,13 @@ export default function Profile() {
       if (targetSalaryMin) updates.target_salary_min = parseInt(targetSalaryMin, 10);
       if (targetSalaryMax) updates.target_salary_max = parseInt(targetSalaryMax, 10);
       if (location.trim()) updates.location = location.trim();
+      if (schedulePref) updates.schedule_preference = schedulePref;
+      updates.max_commute_miles = maxCommute;
+      if (degreeStatus) updates.degree_status = degreeStatus;
+      if (workAuth) updates.work_authorization = workAuth;
+      if (targetCompanies.trim()) updates.target_companies = targetCompanies.trim();
+      updates.dealbreakers = dealbreakers;
+      if (jobSeekerStatus) updates.job_seeker_status = jobSeekerStatus;
 
       if (Object.keys(updates).length > 0) {
         await updateProfile(updates);
@@ -227,6 +251,216 @@ export default function Profile() {
           </Button>
         </div>
       </Card>
+
+      {/* Search Preferences */}
+      <h3 style={{ marginBottom: 'var(--space-3)', marginTop: 'var(--space-5)' }}>My Search Preferences</h3>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div>
+            <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Schedule</p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              {[['monday_friday', 'M-F only'], ['any', 'Any schedule'], ['remote_only', 'Remote only']].map(([val, label]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setSchedulePref(val)}
+                  className={`tracker-stage-tab${schedulePref === val ? ' tracker-stage-tab--active' : ''}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+              Max commute: {maxCommute} miles
+            </p>
+            <input
+              type="range"
+              min={5}
+              max={50}
+              value={maxCommute}
+              onChange={(e) => setMaxCommute(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--color-accent)' }}
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Background */}
+      <h3 style={{ marginBottom: 'var(--space-3)' }}>My Background</h3>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <div>
+            <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Degree Status</p>
+            <select
+              value={degreeStatus}
+              onChange={(e) => setDegreeStatus(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px var(--space-4)',
+                fontFamily: "'Nunito', sans-serif",
+                fontSize: '15px',
+                border: '1.5px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface-raised)',
+                color: 'var(--color-text)',
+              }}
+            >
+              <option value="">Select...</option>
+              <option value="no_degree">No degree</option>
+              <option value="some_college">Some college</option>
+              <option value="associates">Associate's</option>
+              <option value="bachelors">Bachelor's</option>
+              <option value="masters">Master's+</option>
+            </select>
+          </div>
+          <div>
+            <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Work Authorization</p>
+            <select
+              value={workAuth}
+              onChange={(e) => setWorkAuth(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px var(--space-4)',
+                fontFamily: "'Nunito', sans-serif",
+                fontSize: '15px',
+                border: '1.5px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface-raised)',
+                color: 'var(--color-text)',
+              }}
+            >
+              <option value="">Select...</option>
+              <option value="us_citizen">US Citizen</option>
+              <option value="green_card">Green Card</option>
+              <option value="visa_required">Need Visa Sponsorship</option>
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      {/* Target Companies */}
+      <h3 style={{ marginBottom: 'var(--space-3)' }}>Target Companies</h3>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: targetCompanies ? 'var(--space-2)' : 0 }}>
+          {targetCompanies.split(',').filter((c) => c.trim()).map((company, i) => (
+            <span
+              key={i}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)',
+                padding: '4px 12px',
+                background: 'var(--color-accent-light)',
+                color: 'var(--color-accent-dark)',
+                borderRadius: 'var(--radius-full)',
+                fontSize: '13px',
+                fontWeight: 600,
+              }}
+            >
+              {company.trim()}
+              <button
+                onClick={() => {
+                  const arr = targetCompanies.split(',').filter((c) => c.trim());
+                  arr.splice(i, 1);
+                  setTargetCompanies(arr.join(', '));
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-accent-dark)', padding: 0, fontSize: '14px' }}
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <Input
+            placeholder="Disney, AdventHealth, Universal..."
+            value={companyInput}
+            onChange={(e) => setCompanyInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && companyInput.trim()) {
+                e.preventDefault();
+                const existing = targetCompanies.split(',').filter((c) => c.trim());
+                existing.push(companyInput.trim());
+                setTargetCompanies(existing.join(', '));
+                setCompanyInput('');
+              }
+            }}
+          />
+        </div>
+      </Card>
+
+      {/* Job Seeker Status */}
+      <h3 style={{ marginBottom: 'var(--space-3)' }}>Job Seeker Status</h3>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+          {[
+            ['actively_hunting', 'Actively Hunting'],
+            ['casually_exploring', 'Casually Exploring'],
+            ['in_interviews', 'In Interviews'],
+            ['taking_a_break', 'Taking a Break'],
+          ].map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setJobSeekerStatus(val)}
+              className={`tracker-stage-tab${jobSeekerStatus === val ? ' tracker-stage-tab--active' : ''}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      {/* Dealbreakers */}
+      <h3 style={{ marginBottom: 'var(--space-3)' }}>Dealbreakers</h3>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {[
+            ['hard_degree_required', 'Skip jobs requiring a 4-year degree'],
+            ['below_salary', 'Skip jobs below my salary minimum'],
+            ['outside_commute', 'Skip jobs outside my commute range'],
+          ].map(([key, label]) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={dealbreakers[key] || false}
+                onChange={(e) => setDealbreakers((prev) => ({ ...prev, [key]: e.target.checked }))}
+                style={{ width: '20px', height: '20px', accentColor: 'var(--color-accent)' }}
+              />
+              <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>{label}</span>
+            </label>
+          ))}
+        </div>
+      </Card>
+
+      {/* Skills from resume */}
+      {skillsExtracted.length > 0 && (
+        <>
+          <h3 style={{ marginBottom: 'var(--space-3)' }}>Your Skills (from resume)</h3>
+          <Card style={{ marginBottom: 'var(--space-5)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              {skillsExtracted.map((skill, i) => (
+                <span
+                  key={i}
+                  style={{
+                    padding: '4px 12px',
+                    background: 'var(--color-accent-light)',
+                    color: 'var(--color-accent-dark)',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
 
       {/* Score trend */}
       <div style={{ marginBottom: 'var(--space-5)' }}>
