@@ -9,9 +9,22 @@ import './Onboarding.css';
 
 export default function Onboarding() {
   const [step, setStep] = useState(0);
+
+  // Screen 1 — identity
   const [name, setName] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+
+  // Screen 2 — targeting
   const [targetRoles, setTargetRoles] = useState('');
-  const [targetSalary, setTargetSalary] = useState('');
+  const [location, setLocation] = useState('');
+  const [targetSalaryMin, setTargetSalaryMin] = useState('');
+  const [targetSalaryMax, setTargetSalaryMax] = useState('');
+
+  // Screen 3 — preferences
+  const [schedulePref, setSchedulePref] = useState('');
+  const [degreeStatus, setDegreeStatus] = useState('');
+  const [jobSeekerStatus, setJobSeekerStatus] = useState('');
+
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
@@ -20,8 +33,14 @@ export default function Onboarding() {
     try {
       const updates = {};
       if (name.trim()) updates.full_name = name.trim();
+      if (jobTitle.trim()) updates.job_title = jobTitle.trim();
       if (targetRoles.trim()) updates.target_roles = targetRoles.trim();
-      if (targetSalary) updates.target_salary_min = parseInt(targetSalary, 10);
+      if (location.trim()) updates.location = location.trim();
+      if (targetSalaryMin) updates.target_salary_min = parseInt(targetSalaryMin, 10);
+      if (targetSalaryMax) updates.target_salary_max = parseInt(targetSalaryMax, 10);
+      if (schedulePref) updates.schedule_preference = schedulePref;
+      if (degreeStatus) updates.degree_status = degreeStatus;
+      if (jobSeekerStatus) updates.job_seeker_status = jobSeekerStatus;
       if (Object.keys(updates).length > 0) {
         await updateProfile(updates);
       }
@@ -36,6 +55,7 @@ export default function Onboarding() {
   return (
     <div className="onboarding">
       <div className="onboarding__inner">
+        {/* Screen 0 — Welcome */}
         {step === 0 && (
           <div className="onboarding__screen onboarding__screen--enter">
             <div className="onboarding__ott-bounce">
@@ -55,57 +75,13 @@ export default function Onboarding() {
           </div>
         )}
 
+        {/* Screen 1 — Identity + targeting */}
         {step === 1 && (
           <div className="onboarding__screen onboarding__screen--enter">
-            <h2 className="onboarding__headline">Here's how Holt works</h2>
-
-            <div className="onboarding__steps">
-              <Card className="onboarding__step-card" style={{ animationDelay: '0ms' }}>
-                <div className="onboarding__step-icon">
-                  <Ott state="waiting" size={48} />
-                </div>
-                <div>
-                  <p className="onboarding__step-title">Upload your resume</p>
-                  <p className="onboarding__step-desc">Drop in your PDF or DOCX and a job description</p>
-                </div>
-              </Card>
-
-              <Card className="onboarding__step-card" style={{ animationDelay: '80ms' }}>
-                <div className="onboarding__step-icon">
-                  <ScoreRingMini />
-                </div>
-                <div>
-                  <p className="onboarding__step-title">Get your match score</p>
-                  <p className="onboarding__step-desc">See how well your resume fits the role</p>
-                </div>
-              </Card>
-
-              <Card className="onboarding__step-card" style={{ animationDelay: '160ms' }}>
-                <div className="onboarding__step-icon">
-                  <Ott state="celebrating" size={48} />
-                </div>
-                <div>
-                  <p className="onboarding__step-title">Download your ATS resume</p>
-                  <p className="onboarding__step-desc">Optimized to pass applicant tracking systems</p>
-                </div>
-              </Card>
-            </div>
-
-            <Button full onClick={() => setStep(2)}>
-              Got it &rarr;
-            </Button>
-            <button className="onboarding__skip" onClick={() => setStep(2)}>
-              Skip
-            </button>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="onboarding__screen onboarding__screen--enter">
             <Ott state="encouraging" size={100} />
-            <h2 className="onboarding__headline">Let's set you up</h2>
+            <h2 className="onboarding__headline">Tell Ott about yourself</h2>
             <p className="onboarding__subtext">
-              Tell Ott what you're looking for so he can find your best matches
+              This helps Ott find jobs that actually match you
             </p>
 
             <div className="onboarding__fields">
@@ -119,22 +95,127 @@ export default function Onboarding() {
               <input
                 className="onboarding__input"
                 type="text"
+                placeholder="Current job title (e.g. Assistant General Manager)"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+              />
+              <input
+                className="onboarding__input"
+                type="text"
                 placeholder="Target roles (e.g. Operations Manager, HR Coordinator)"
                 value={targetRoles}
                 onChange={(e) => setTargetRoles(e.target.value)}
               />
               <input
                 className="onboarding__input"
-                type="number"
-                placeholder="Target salary (e.g. 75000)"
-                value={targetSalary}
-                onChange={(e) => setTargetSalary(e.target.value)}
+                type="text"
+                placeholder="Location (e.g. Casselberry, FL)"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
               />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <input
+                  className="onboarding__input"
+                  type="number"
+                  placeholder="Min salary (e.g. 75000)"
+                  value={targetSalaryMin}
+                  onChange={(e) => setTargetSalaryMin(e.target.value)}
+                />
+                <input
+                  className="onboarding__input"
+                  type="number"
+                  placeholder="Max salary (e.g. 85000)"
+                  value={targetSalaryMax}
+                  onChange={(e) => setTargetSalaryMax(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <Button full onClick={() => setStep(2)}>
+              Almost done &rarr;
+            </Button>
+          </div>
+        )}
+
+        {/* Screen 2 — Preferences */}
+        {step === 2 && (
+          <div className="onboarding__screen onboarding__screen--enter">
+            <Ott state="idle" size={80} />
+            <h2 className="onboarding__headline">Your preferences</h2>
+            <p className="onboarding__subtext">
+              Ott uses these to filter out jobs that aren't a fit
+            </p>
+
+            <div className="onboarding__fields">
+              {/* Schedule preference */}
+              <div className="onboarding__field-group">
+                <label className="onboarding__label">Schedule preference</label>
+                <div className="onboarding__pills">
+                  {[
+                    ['monday_friday', 'M-F only'],
+                    ['any', 'Any schedule'],
+                    ['remote_only', 'Remote only'],
+                  ].map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`onboarding__pill ${schedulePref === val ? 'onboarding__pill--active' : ''}`}
+                      onClick={() => setSchedulePref(val)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Degree status */}
+              <div className="onboarding__field-group">
+                <label className="onboarding__label">Highest education</label>
+                <select
+                  className="onboarding__input onboarding__select"
+                  value={degreeStatus}
+                  onChange={(e) => setDegreeStatus(e.target.value)}
+                >
+                  <option value="">Select...</option>
+                  <option value="no_degree">No degree</option>
+                  <option value="high_school">High school / GED</option>
+                  <option value="some_college">Some college</option>
+                  <option value="associates">Associate's degree</option>
+                  <option value="bachelors">Bachelor's degree</option>
+                  <option value="masters">Master's degree</option>
+                  <option value="doctorate">Doctorate / professional</option>
+                </select>
+              </div>
+
+              {/* Job seeker status */}
+              <div className="onboarding__field-group">
+                <label className="onboarding__label">Where are you in your search?</label>
+                <div className="onboarding__pills">
+                  {[
+                    ['actively_hunting', 'Actively searching'],
+                    ['casually_looking', 'Casually looking'],
+                    ['open_to_offers', 'Open to offers'],
+                    ['employed_exploring', 'Employed, exploring'],
+                  ].map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`onboarding__pill ${jobSeekerStatus === val ? 'onboarding__pill--active' : ''}`}
+                      onClick={() => setJobSeekerStatus(val)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <Button full onClick={handleFinish} disabled={saving}>
               {saving ? 'Saving...' : 'Start my search \u2192'}
             </Button>
+            <button className="onboarding__skip" onClick={handleFinish} disabled={saving}>
+              I'll fill this in later
+            </button>
           </div>
         )}
 
