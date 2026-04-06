@@ -358,6 +358,7 @@ Return ONLY the tips as a JSON array of strings. No other text."""
             "coaching_tips": coaching_tips,
             "company_name": final_company,
             "role_name": final_role,
+            "job_description_text": body.job_description,
         }}
     except HTTPException:
         raise

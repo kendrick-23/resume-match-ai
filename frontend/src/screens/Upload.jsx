@@ -79,11 +79,11 @@ export default function Upload() {
       if (badgeResult.newly_earned?.length > 0) {
         setCelebratingBadge(badgeResult.newly_earned[0]);
         // Navigate after celebration
-        setTimeout(() => navigate('/results', { state: { result } }), 3500);
+        setTimeout(() => navigate('/results', { state: { result: { ...result, resume_filename: file.name } } }), 3500);
         return;
       }
 
-      navigate('/results', { state: { result } });
+      navigate('/results', { state: { result: { ...result, resume_filename: file.name } } });
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {

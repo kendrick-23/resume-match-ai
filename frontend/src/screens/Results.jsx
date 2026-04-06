@@ -7,7 +7,7 @@ import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
-import { Copy, Download, ClipboardList, Search } from 'lucide-react';
+import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import './Results.css';
 
@@ -114,6 +114,78 @@ function StickyPillNav({ activePill, onPillClick }) {
   );
 }
 
+function JobContextCard({ result }) {
+  const [expanded, setExpanded] = useState(false);
+  const roleName = result.role_name;
+  const companyName = result.company_name;
+  const jobText = result.job_description_text;
+  const filename = result.resume_filename;
+
+  return (
+    <Card style={{ marginBottom: 'var(--space-4)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+        <FileText size={18} style={{ color: 'var(--color-accent)', flexShrink: 0, marginTop: '2px' }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontWeight: 700, fontSize: '15px', lineHeight: 1.3 }}>
+            {roleName || <span style={{ color: 'var(--color-text-muted)' }}>Role not detected</span>}
+          </p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginTop: '2px' }}>
+            {companyName || <span style={{ color: 'var(--color-text-muted)' }}>Company not detected</span>}
+          </p>
+          {filename && (
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+              {filename}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {jobText && (
+        <>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1)',
+              marginTop: 'var(--space-3)',
+              padding: 0,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--color-accent)',
+              fontFamily: "'Nunito', sans-serif",
+              fontWeight: 600,
+              fontSize: '13px',
+            }}
+          >
+            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {expanded ? 'Hide job description' : 'View job description'}
+          </button>
+
+          {expanded && (
+            <div style={{
+              marginTop: 'var(--space-2)',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              padding: 'var(--space-3)',
+              background: 'var(--color-bg)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)',
+              fontSize: '13px',
+              lineHeight: 1.6,
+              color: 'var(--color-text-secondary)',
+              whiteSpace: 'pre-wrap',
+            }}>
+              {jobText}
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -189,6 +261,7 @@ export default function Results() {
           created_at: latest.created_at,
           analysis_id: latest.id,
           coaching_tips: latest.coaching_tips,
+          job_description_text: latest.job_description_text,
         });
         if (latest.generated_resume_md) {
           setResumeMd(latest.generated_resume_md);
@@ -268,6 +341,9 @@ export default function Results() {
         </Card>
       ) : (
         <>
+          {/* Job context card */}
+          <JobContextCard result={result} />
+
           {/* Score card — always at top */}
           <Card style={{ textAlign: 'center', marginBottom: 0, padding: 'var(--space-5)' }}>
             <Ott state={ottState} size={80} />
@@ -604,6 +680,7 @@ export default function Results() {
                         created_at: a.created_at,
                         analysis_id: a.id,
                         coaching_tips: a.coaching_tips,
+                        job_description_text: a.job_description_text,
                       });
                       setResumeMd(a.generated_resume_md || null);
                       setResumeError('');
