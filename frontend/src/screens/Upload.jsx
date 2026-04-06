@@ -6,7 +6,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Ott from '../components/ott/Ott';
-import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, ExternalLink } from 'lucide-react';
+import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, Info } from 'lucide-react';
 import EmptyStateUpload from '../components/ui/EmptyStateUpload';
 import { uploadResume, analyzeResume, checkBadges } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
@@ -266,17 +266,20 @@ export default function Upload() {
                   >
                     <UploadIcon size={16} style={{ color: 'var(--color-accent)' }} />
                     <p className="linkedin-dropzone__label">
-                      Download your LinkedIn profile as PDF, then upload it
+                      Upload your LinkedIn profile as PDF
                     </p>
-                    <a
-                      href="https://www.linkedin.com/help/linkedin/answer/a1426950"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="linkedin-dropzone__help"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      How to download <ExternalLink size={11} />
-                    </a>
+                    <p style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 'var(--space-1)',
+                      fontSize: '12px',
+                      color: 'var(--color-text-muted)',
+                      lineHeight: 1.4,
+                      marginTop: 'var(--space-1)',
+                    }}>
+                      <Info size={13} style={{ flexShrink: 0, marginTop: '1px' }} />
+                      On desktop: go to your LinkedIn profile &rarr; More &rarr; Save to PDF. Not available on mobile.
+                    </p>
                   </div>
                 )}
 

@@ -111,20 +111,6 @@
   line-height: 1.4;
 }
 
-.linkedin-dropzone__help {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-accent);
-  text-decoration: none;
-}
-
-.linkedin-dropzone__help:hover {
-  text-decoration: underline;
-}
-
 /* File selected state */
 .linkedin-file-selected {
   display: flex;
