@@ -306,9 +306,14 @@ export default function Profile() {
               >
                 <div>
                   <p style={{ fontWeight: 600, fontSize: '14px' }}>
-                    {a.role_name || a.company_name || 'Analysis'}
+                    {a.role_name || 'Resume Analysis'}
                   </p>
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                  {a.company_name && (
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+                      {a.company_name}
+                    </p>
+                  )}
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>
                     {new Date(a.created_at).toLocaleDateString()}
                   </p>
                 </div>
