@@ -41,6 +41,7 @@ def calculate_holt_score(
     job_salary_max = job.get("salary_max")
 
     dealbreaker_triggered = False
+    degree_warning = False
 
     # --- 1. Skills Match (35%) ---
     skills = [s.lower() for s in resume_skills] if resume_skills else []
@@ -62,6 +63,41 @@ def calculate_holt_score(
             if role in job_title:
                 skills_match = min(100, skills_match + 15)
                 break
+
+    # Domain mismatch detection
+    domain_requirements = {
+        "nurse": ["nursing", "rn", "bsn", "clinical", "patient care"],
+        "engineer": ["engineering degree", "pe license", "technical engineering"],
+        "attorney": ["law degree", "jd", "bar exam", "legal practice"],
+        "physician": ["medical degree", "md", "do", "clinical medicine"],
+        "pharmacist": ["pharmacy degree", "pharmd", "rph"],
+        "pilot": ["faa", "flight hours", "atp", "commercial pilot"],
+        "teacher": ["teaching certificate", "education degree"],
+        "social worker": ["msw", "lcsw", "social work license"],
+    }
+
+    domain_penalty_applied = False
+    skills_str = " ".join(skills).lower()
+    degree = (profile.get("degree_status") or "").lower()
+
+    for domain_kw, required_signals in domain_requirements.items():
+        if domain_kw in job_title:
+            has_background = any(sig in skills_str or sig in degree for sig in required_signals)
+            if not has_background:
+                skills_match = max(0, skills_match - 40)
+                degree_warning = True
+                domain_penalty_applied = True
+            break
+
+    # Operations/management bonus
+    ops_signals = ["operations", "manager", "general manager", "agm",
+                   "assistant manager", "branch manager", "operations coordinator",
+                   "compliance", "program manager"]
+    ops_match = any(sig in job_title or sig in job_desc for sig in ops_signals)
+    ops_user = any(kw in skills_str for kw in ["operations", "management", "leadership",
+                                                "compliance", "training", "scheduling"])
+    if ops_match and ops_user and not domain_penalty_applied:
+        skills_match = min(100, skills_match + 10)
 
     # --- 2. Salary Alignment (20%) ---
     if target_salary_min and job_salary_max:
@@ -141,7 +177,6 @@ def calculate_holt_score(
     ]
 
     degree_flag = "none"
-    degree_warning = False
 
     for p in degree_required_patterns:
         if re.search(p, job_desc):
@@ -169,7 +204,9 @@ def calculate_holt_score(
     total_score = max(0, min(100, total_score))
 
     # Coaching label
-    if total_score >= 70:
+    if domain_penalty_applied:
+        coaching_label = "Different specialization"
+    elif total_score >= 70:
         coaching_label = "Strong match"
     elif total_score >= 50:
         coaching_label = "Within Reach"
