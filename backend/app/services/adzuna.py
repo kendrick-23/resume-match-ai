@@ -3,8 +3,6 @@ import os
 from typing import Optional
 
 ADZUNA_BASE_URL = "https://api.adzuna.com/v1/api/jobs/us/search"
-ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "")
-ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY", "")
 
 
 async def search_adzuna_jobs(
@@ -14,13 +12,17 @@ async def search_adzuna_jobs(
     results_per_page: int = 10,
 ) -> dict:
     """Query the Adzuna US Jobs API and return normalized results."""
-    if not ADZUNA_APP_ID or not ADZUNA_APP_KEY:
+    # Read at call time so load_dotenv() has already run
+    app_id = os.environ.get("ADZUNA_APP_ID", "")
+    app_key = os.environ.get("ADZUNA_APP_KEY", "")
+
+    if not app_id or not app_key:
         print("[Adzuna] Warning: ADZUNA_APP_ID or ADZUNA_APP_KEY not set — skipping")
         return {"total": 0, "jobs": []}
 
     params: dict = {
-        "app_id": ADZUNA_APP_ID,
-        "app_key": ADZUNA_APP_KEY,
+        "app_id": app_id,
+        "app_key": app_key,
         "what": keywords,
         "results_per_page": results_per_page,
         "content-type": "application/json",
@@ -35,7 +37,7 @@ async def search_adzuna_jobs(
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(url, params=params)
             if resp.status_code != 200:
-                print(f"[Adzuna] Non-200 response: {resp.status_code}")
+                print(f"[Adzuna] Non-200 response: {resp.status_code} — {resp.text[:200]}")
                 return {"total": 0, "jobs": []}
             data = resp.json()
     except Exception as exc:
