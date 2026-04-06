@@ -85,6 +85,18 @@ def _normalize(raw: dict) -> dict:
         pos_uri = matched.get("PositionURI", "")
         apply_url = matched.get("ApplyURI", [""])[0] if matched.get("ApplyURI") else pos_uri
 
+        # Extract description from QualificationSummary + MajorDuties
+        qual_summary = matched.get("QualificationSummary", "")
+        user_area = matched.get("UserArea", {}).get("Details", {})
+        major_duties = user_area.get("MajorDuties", [])
+        if isinstance(major_duties, list):
+            major_duties = " ".join(major_duties)
+        description = f"{qual_summary} {major_duties}".strip()
+
+        # Remote detection
+        telework = user_area.get("TeleworkEligible", "")
+        is_remote = telework == "True" or "remote" in location_str.lower()
+
         jobs.append({
             "id": matched.get("PositionID", ""),
             "title": matched.get("PositionTitle", ""),
@@ -98,6 +110,8 @@ def _normalize(raw: dict) -> dict:
             "closing": matched.get("PositionEndDate", "")[:10],
             "url": pos_uri,
             "apply_url": apply_url,
+            "description": description,
+            "is_remote": is_remote,
             "source": "usajobs",
         })
 

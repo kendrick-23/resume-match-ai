@@ -37,13 +37,19 @@ def _score_jobs(jobs: list, user: dict) -> list:
             .execute()
 
         resume_skills = profile.get("skills_extracted") or []
+        if isinstance(resume_skills, str):
+            resume_skills = json.loads(resume_skills)
         analysis_gaps = []
         if analysis_res.data:
             latest = analysis_res.data[0]
             raw_gaps = latest.get("gaps", "[]")
             analysis_gaps = json.loads(raw_gaps) if isinstance(raw_gaps, str) else raw_gaps or []
+    except Exception as exc:
+        print(f"[HoltScore] Profile/analysis fetch failed: {exc}")
+        profile, resume_skills, analysis_gaps = {}, [], []
 
-        for job in jobs:
+    for job in jobs:
+        try:
             score_data = calculate_holt_score(job, profile, resume_skills, analysis_gaps)
             job["holt_score"] = score_data["total_score"]
             job["holt_breakdown"] = score_data["breakdown"]
@@ -51,9 +57,17 @@ def _score_jobs(jobs: list, user: dict) -> list:
             job["degree_warning"] = score_data["degree_warning"]
             job["dealbreaker_triggered"] = score_data["dealbreaker_triggered"]
             job["is_target_company"] = score_data["is_target_company"]
-    except Exception as exc:
-        print(f"[HoltScore] Scoring failed: {exc}")
-        # Return jobs unscored rather than failing
+        except Exception as exc:
+            print(f"[HoltScore] Scoring failed for job {job.get('id', '?')}: {exc}")
+            job["holt_score"] = 50
+            job["holt_breakdown"] = {
+                "skills_match": 50, "salary_alignment": 50, "schedule_fit": 50,
+                "experience_match": 50, "location_fit": 50, "degree_flag": "none",
+            }
+            job["coaching_label"] = "Within Reach"
+            job["degree_warning"] = False
+            job["dealbreaker_triggered"] = False
+            job["is_target_company"] = False
 
     return jobs
 
