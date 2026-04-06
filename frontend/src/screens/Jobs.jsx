@@ -15,21 +15,25 @@ export default function Jobs() {
   const toast = useToast();
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('');
-  const [jobs, setJobs] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [error, setError] = useState('');
-  const [savedIds, setSavedIds] = useState(new Set());
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [savedIds, setSavedIds] = useState(new Set());
 
-  // Private sector (Adzuna)
-  const [showPrivate, setShowPrivate] = useState(false);
-  const [adzunaJobs, setAdzunaJobs] = useState([]);
-  const [adzunaTotal, setAdzunaTotal] = useState(0);
-  const [adzunaLoading, setAdzunaLoading] = useState(false);
-  const [adzunaSearched, setAdzunaSearched] = useState(false);
+  // Tab state
+  const [activeTab, setActiveTab] = useState('federal');
+
+  // Federal (USAJobs) state
+  const [fedJobs, setFedJobs] = useState([]);
+  const [fedTotal, setFedTotal] = useState(0);
+  const [fedPage, setFedPage] = useState(1);
+  const [fedLoading, setFedLoading] = useState(false);
+  const [fedSearched, setFedSearched] = useState(false);
+  const [fedError, setFedError] = useState('');
+
+  // Private (Adzuna) state
+  const [pvtJobs, setPvtJobs] = useState([]);
+  const [pvtTotal, setPvtTotal] = useState(0);
+  const [pvtLoading, setPvtLoading] = useState(false);
+  const [pvtSearched, setPvtSearched] = useState(false);
 
   // Smart feed state
   const [recommended, setRecommended] = useState([]);
@@ -72,8 +76,7 @@ export default function Jobs() {
 
       const allText = [...strengths, ...gaps, roleName].join(' ').toLowerCase();
       const words = allText.split(/[\s,;.()]+/).filter((w) => w.length > 3);
-      const uniqueWords = [...new Set(words)];
-      setAnalysisKeywords(uniqueWords);
+      setAnalysisKeywords([...new Set(words)]);
 
       const searchKeyword = roleName
         ? roleName.split(/\s+/).slice(0, 3).join(' ')
@@ -109,86 +112,77 @@ export default function Jobs() {
     }
   }
 
-  async function handleSearch(e) {
-    e?.preventDefault();
-    if (!keyword.trim()) return;
-
-    setLoading(true);
-    setError('');
-    setPage(1);
-
+  // --- Federal search ---
+  async function searchFederal(kw, loc, page = 1) {
+    setFedLoading(true);
+    setFedError('');
     try {
       const data = await searchJobs({
-        keyword: keyword.trim(),
-        location: location.trim() || undefined,
+        keyword: kw,
+        location: loc || undefined,
         remote: remoteOnly || undefined,
-        page: 1,
+        page,
       });
-      setJobs(data.jobs);
-      setTotal(data.total);
-      setSearched(true);
+      if (page === 1) {
+        setFedJobs(data.jobs);
+      } else {
+        setFedJobs((prev) => [...prev, ...data.jobs]);
+      }
+      setFedTotal(data.total);
+      setFedPage(page);
+      setFedSearched(true);
     } catch (err) {
-      setError(err.message);
+      setFedError(err.message);
     } finally {
-      setLoading(false);
-    }
-
-    // Also search Adzuna if private sector is toggled on
-    if (showPrivate) {
-      loadAdzuna(keyword.trim(), location.trim());
+      setFedLoading(false);
     }
   }
 
-  async function loadAdzuna(kw, loc) {
-    const searchKw = kw || analysisRoleName || keyword.trim();
+  // --- Private search ---
+  async function searchPrivate(kw, loc) {
+    const searchKw = kw || analysisRoleName;
     if (!searchKw) return;
-
-    setAdzunaLoading(true);
+    setPvtLoading(true);
     try {
       const data = await searchAdzunaJobs({
         keyword: searchKw,
         location: loc || userLocation || undefined,
         page: 1,
       });
-      setAdzunaJobs(data.jobs || []);
-      setAdzunaTotal(data.total || 0);
-      setAdzunaSearched(true);
+      setPvtJobs(data.jobs || []);
+      setPvtTotal(data.total || 0);
+      setPvtSearched(true);
     } catch {
-      setAdzunaJobs([]);
-      setAdzunaTotal(0);
-      setAdzunaSearched(true);
+      setPvtJobs([]);
+      setPvtTotal(0);
+      setPvtSearched(true);
     } finally {
-      setAdzunaLoading(false);
+      setPvtLoading(false);
     }
   }
 
-  // When toggling private sector on, auto-search if we have keywords
-  function handleTogglePrivate() {
-    const next = !showPrivate;
-    setShowPrivate(next);
-    if (next && !adzunaSearched) {
+  async function handleSearch(e) {
+    e?.preventDefault();
+    if (!keyword.trim()) return;
+    const kw = keyword.trim();
+    const loc = location.trim();
+
+    // Search both sources, cache results
+    searchFederal(kw, loc, 1);
+    searchPrivate(kw, loc);
+  }
+
+  function handleLoadMoreFed() {
+    searchFederal(keyword.trim(), location.trim(), fedPage + 1);
+  }
+
+  function handleTabSwitch(tab) {
+    setActiveTab(tab);
+    // If switching to private and no results yet, auto-search
+    if (tab === 'private' && !pvtSearched && !pvtLoading) {
       const kw = keyword.trim() || analysisRoleName;
       const loc = location.trim() || userLocation;
-      if (kw) loadAdzuna(kw, loc);
-    }
-  }
-
-  async function handleLoadMore() {
-    const nextPage = page + 1;
-    setLoading(true);
-    try {
-      const data = await searchJobs({
-        keyword: keyword.trim(),
-        location: location.trim() || undefined,
-        remote: remoteOnly || undefined,
-        page: nextPage,
-      });
-      setJobs((prev) => [...prev, ...data.jobs]);
-      setPage(nextPage);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      if (kw) searchPrivate(kw, loc);
     }
   }
 
@@ -216,8 +210,6 @@ export default function Jobs() {
 
   function computeHoltScore(job) {
     if (!hasAnalysis || analysisKeywords.length === 0) return null;
-
-    // Include description for Adzuna jobs (they have richer text)
     const jobText = `${job.title} ${job.department || ''} ${job.company || ''} ${job.description || ''}`.toLowerCase();
     const matches = analysisKeywords.filter((kw) => jobText.includes(kw));
     const keywordScore = Math.min(100, Math.round((matches.length / Math.min(analysisKeywords.length, 10)) * 100));
@@ -251,7 +243,6 @@ export default function Jobs() {
     return `Up to ${fmt(max)}`;
   }
 
-  // Compute Within Reach jobs from ALL sources
   function getWithinReachJobs(jobList) {
     return jobList
       .map((job) => ({ ...job, _holtScore: computeHoltScore(job) }))
@@ -259,15 +250,24 @@ export default function Jobs() {
       .sort((a, b) => b._holtScore - a._holtScore);
   }
 
-  const allVisibleJobs = [...(searched ? jobs : recommended), ...(showPrivate ? adzunaJobs : [])];
-  const withinReachJobs = getWithinReachJobs(allVisibleJobs);
+  // Active tab data
+  const isSearched = activeTab === 'federal' ? fedSearched : pvtSearched;
+  const isLoading = activeTab === 'federal' ? fedLoading : pvtLoading;
+  const activeJobs = activeTab === 'federal' ? fedJobs : pvtJobs;
+  const activeTotal = activeTab === 'federal' ? fedTotal : pvtTotal;
+  const tabLabel = activeTab === 'federal' ? 'Federal' : 'Private';
+  const withinReachJobs = getWithinReachJobs(activeJobs);
+
+  // Tab labels with counts
+  const fedLabel = fedSearched ? `Federal (${fedTotal.toLocaleString()})` : 'Federal';
+  const pvtLabel = pvtSearched ? `Private (${pvtTotal.toLocaleString()})` : 'Private';
 
   return (
     <ScreenWrapper screenName="Jobs">
       <h2 style={{ marginBottom: 'var(--space-5)' }}>Find Jobs</h2>
 
-      {/* Recommended for You section */}
-      {!recLoading && hasAnalysis && recommended.length > 0 && !searched && (
+      {/* Recommended for You — only on Federal tab before search */}
+      {activeTab === 'federal' && !recLoading && hasAnalysis && recommended.length > 0 && !fedSearched && (
         <div style={{ marginBottom: 'var(--space-6)' }}>
           <h3 style={{
             display: 'flex',
@@ -294,48 +294,8 @@ export default function Jobs() {
         </div>
       )}
 
-      {/* Within Reach section — merges all sources */}
-      {withinReachJobs.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-6)' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-3)',
-            marginBottom: 'var(--space-2)',
-          }}>
-            <Ott state="encouraging" size={48} />
-            <div>
-              <h3 style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-              }}>
-                <Target size={18} style={{ color: 'var(--color-warning)' }} />
-                Within Reach
-              </h3>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '2px' }}>
-                These roles are closer than you think. Close these gaps to hit 70%+
-              </p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {withinReachJobs.map((job) => (
-              <WithinReachCard
-                key={'wr-' + job.id + job.title}
-                job={job}
-                score={job._holtScore}
-                gaps={analysisGaps}
-                savedIds={savedIds}
-                onSave={handleSave}
-                formatSalary={formatSalary}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* No analysis — prompt to analyze first */}
-      {!recLoading && !hasAnalysis && !searched && (
+      {!recLoading && !hasAnalysis && !fedSearched && (
         <Card style={{
           textAlign: 'center',
           padding: 'var(--space-5)',
@@ -358,7 +318,7 @@ export default function Jobs() {
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--space-3)',
-        marginBottom: 'var(--space-5)',
+        marginBottom: 'var(--space-4)',
       }}>
         <Input
           placeholder="Job title, keywords..."
@@ -372,11 +332,7 @@ export default function Jobs() {
         />
 
         {/* Filter chips */}
-        <div style={{
-          display: 'flex',
-          gap: 'var(--space-2)',
-          flexWrap: 'wrap',
-        }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => setRemoteOnly(!remoteOnly)}
@@ -384,46 +340,69 @@ export default function Jobs() {
           >
             Remote only
           </button>
-          <button
-            type="button"
-            onClick={handleTogglePrivate}
-            className={`jobs-filter-chip jobs-filter-chip--private ${showPrivate ? 'jobs-filter-chip--active jobs-filter-chip--private-active' : ''}`}
-          >
-            Private sector
-          </button>
         </div>
 
-        <Button full disabled={loading || !keyword.trim()}>
-          {loading && !jobs.length ? 'Searching...' : 'Search'}
+        <Button full disabled={(fedLoading && pvtLoading) || !keyword.trim()}>
+          {fedLoading && !fedJobs.length ? 'Searching...' : 'Search'}
         </Button>
       </form>
 
-      {/* Error */}
-      {error && (
+      {/* Source tabs */}
+      {(fedSearched || pvtSearched || fedLoading || pvtLoading) && (
+        <div className="jobs-tabs" style={{ marginBottom: 'var(--space-4)' }}>
+          <button
+            className={`jobs-tabs__tab ${activeTab === 'federal' ? 'jobs-tabs__tab--active' : ''}`}
+            onClick={() => handleTabSwitch('federal')}
+          >
+            {fedLabel}
+            {fedLoading && <span className="jobs-tabs__loading" />}
+          </button>
+          <button
+            className={`jobs-tabs__tab ${activeTab === 'private' ? 'jobs-tabs__tab--active' : ''}`}
+            onClick={() => handleTabSwitch('private')}
+          >
+            {pvtLabel}
+            {pvtLoading && <span className="jobs-tabs__loading" />}
+          </button>
+        </div>
+      )}
+
+      {/* Error — federal only */}
+      {activeTab === 'federal' && fedError && (
         <Card style={{ background: 'var(--color-danger-light)', marginBottom: 'var(--space-4)' }}>
-          <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{error}</p>
+          <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{fedError}</p>
         </Card>
       )}
 
-      {/* Empty state — only show if no recommendations either */}
-      {!searched && !loading && !hasAnalysis && recommended.length === 0 && !recLoading && (
+      {/* Empty state — before any search */}
+      {!fedSearched && !fedLoading && !hasAnalysis && recommended.length === 0 && !recLoading && (
         <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
           <Ott state="waiting" size={80} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
             Search for jobs to get started
           </p>
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-1)' }}>
-            Results from USAJobs federal job listings
+            Results from federal and private sector listings
           </p>
         </Card>
       )}
 
-      {/* No results */}
-      {searched && !loading && jobs.length === 0 && (
+      {/* Loading state for active tab */}
+      {isLoading && activeJobs.length === 0 && (
+        <Card style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
+          <Ott state="thinking" size={60} />
+          <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '13px' }}>
+            Searching {tabLabel.toLowerCase()} jobs...
+          </p>
+        </Card>
+      )}
+
+      {/* No results for active tab */}
+      {isSearched && !isLoading && activeJobs.length === 0 && (
         <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
           <Ott state="coaching" size={80} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
-            No federal jobs found
+            No {tabLabel.toLowerCase()} jobs found
           </p>
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-1)' }}>
             Try different keywords or a broader location
@@ -431,21 +410,61 @@ export default function Jobs() {
         </Card>
       )}
 
-      {/* Federal results header */}
-      {searched && jobs.length > 0 && (
+      {/* Within Reach — scoped to active tab */}
+      {withinReachJobs.length > 0 && (
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            marginBottom: 'var(--space-2)',
+          }}>
+            <Ott state="encouraging" size={48} />
+            <div>
+              <h3 style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+              }}>
+                <Target size={18} style={{ color: 'var(--color-warning)' }} />
+                Within Reach — {tabLabel}
+              </h3>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '2px' }}>
+                These roles are closer than you think. Close these gaps to hit 70%+
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            {withinReachJobs.map((job) => (
+              <WithinReachCard
+                key={'wr-' + job.id + job.title}
+                job={job}
+                score={job._holtScore}
+                gaps={analysisGaps}
+                savedIds={savedIds}
+                onSave={handleSave}
+                formatSalary={formatSalary}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Results count */}
+      {isSearched && !isLoading && activeJobs.length > 0 && (
         <p style={{
           fontWeight: 600,
           color: 'var(--color-text-secondary)',
           fontSize: '13px',
           marginBottom: 'var(--space-3)',
         }}>
-          {total.toLocaleString()} federal jobs found
+          {activeTotal.toLocaleString()} {tabLabel.toLowerCase()} jobs found
         </p>
       )}
 
-      {/* Federal job cards */}
+      {/* Job cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        {jobs.map((job) => (
+        {activeJobs.map((job) => (
           <JobCard
             key={job.id + job.title}
             job={job}
@@ -457,73 +476,12 @@ export default function Jobs() {
         ))}
       </div>
 
-      {/* Load more federal */}
-      {searched && jobs.length > 0 && jobs.length < total && (
+      {/* Load more — federal only */}
+      {activeTab === 'federal' && fedSearched && fedJobs.length > 0 && fedJobs.length < fedTotal && (
         <div style={{ marginTop: 'var(--space-5)', textAlign: 'center' }}>
-          <Button variant="secondary" onClick={handleLoadMore} disabled={loading}>
-            {loading ? 'Loading...' : 'Load more jobs'}
+          <Button variant="secondary" onClick={handleLoadMoreFed} disabled={fedLoading}>
+            {fedLoading ? 'Loading...' : 'Load more jobs'}
           </Button>
-        </div>
-      )}
-
-      {/* Private sector results */}
-      {showPrivate && (
-        <div style={{ marginTop: 'var(--space-6)' }}>
-          <h3 style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            marginBottom: 'var(--space-3)',
-          }}>
-            <Building2 size={18} style={{ color: 'var(--color-info)' }} />
-            Private Sector
-          </h3>
-
-          {adzunaLoading && (
-            <Card style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
-              <Ott state="thinking" size={60} />
-              <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '13px' }}>
-                Searching private sector jobs...
-              </p>
-            </Card>
-          )}
-
-          {!adzunaLoading && adzunaSearched && adzunaJobs.length === 0 && (
-            <Card style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
-              <Ott state="coaching" size={60} />
-              <p style={{ fontWeight: 700, marginTop: 'var(--space-2)' }}>
-                No private sector results found
-              </p>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
-                Try different keywords
-              </p>
-            </Card>
-          )}
-
-          {!adzunaLoading && adzunaJobs.length > 0 && (
-            <>
-              <p style={{
-                fontWeight: 600,
-                color: 'var(--color-text-secondary)',
-                fontSize: '13px',
-                marginBottom: 'var(--space-3)',
-              }}>
-                {adzunaTotal.toLocaleString()} private sector jobs found
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {adzunaJobs.map((job) => (
-                  <JobCard
-                    key={job.id + job.title}
-                    job={job}
-                    savedIds={savedIds}
-                    onSave={handleSave}
-                    formatSalary={formatSalary}
-                    holtScore={computeHoltScore(job)}
-                  />
-                ))}
-              </div>
-            </>
-          )}
         </div>
       )}
     </ScreenWrapper>
@@ -542,7 +500,6 @@ function SourceBadge({ source }) {
 function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, holtScore }) {
   return (
     <Card>
-      {/* Header row */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -574,7 +531,6 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
         </div>
       </div>
 
-      {/* Meta row */}
       <div style={{
         display: 'flex',
         gap: 'var(--space-4)',
@@ -598,7 +554,6 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
         )}
       </div>
 
-      {/* Closing date */}
       {job.closing && (
         <p style={{
           fontSize: '12px',
@@ -610,7 +565,6 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
         </p>
       )}
 
-      {/* Actions */}
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <Button
           variant="ghost"
@@ -650,7 +604,6 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
 function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
   const [expanded, setExpanded] = useState(false);
   const delta = 70 - score;
-
   const topGaps = gaps.slice(0, 3);
 
   const coachLabel = delta <= 5
@@ -661,7 +614,6 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
 
   return (
     <Card className="within-reach-card">
-      {/* Header row */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -688,7 +640,6 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
         </div>
       </div>
 
-      {/* Meta row */}
       <div style={{
         display: 'flex',
         gap: 'var(--space-4)',
@@ -707,17 +658,10 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
         )}
       </div>
 
-      {/* Progress bar + gap delta */}
       <div className="within-reach-progress">
         <div className="within-reach-progress__bar">
-          <div
-            className="within-reach-progress__fill"
-            style={{ width: `${score}%` }}
-          />
-          <div
-            className="within-reach-progress__target"
-            style={{ left: '70%' }}
-          />
+          <div className="within-reach-progress__fill" style={{ width: `${score}%` }} />
+          <div className="within-reach-progress__target" style={{ left: '70%' }} />
         </div>
         <div className="within-reach-progress__labels">
           <span className="within-reach-progress__score">{score}%</span>
@@ -725,7 +669,6 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
         </div>
       </div>
 
-      {/* Coaching label */}
       <p style={{
         fontWeight: 600,
         fontSize: '13px',
@@ -735,7 +678,6 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
         {coachLabel}
       </p>
 
-      {/* Gap hints */}
       {topGaps.length > 0 && (
         <div style={{ marginBottom: 'var(--space-3)' }}>
           {topGaps.map((gap, i) => (
@@ -753,7 +695,6 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
         </div>
       )}
 
-      {/* Expand toggle for more detail */}
       {gaps.length > 3 && (
         <button
           className="within-reach-expand"
@@ -781,7 +722,6 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
         </div>
       )}
 
-      {/* Actions */}
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         <Button
           variant="ghost"

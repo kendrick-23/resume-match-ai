@@ -99,15 +99,65 @@
   color: var(--color-accent-dark);
 }
 
-.jobs-filter-chip--private-active {
-  border-color: var(--color-info);
-  background: var(--color-info-light);
-  color: var(--color-info);
-}
-
 /* Source badge — private sector variant */
 .source-badge--private {
   background: var(--color-info-light) !important;
   color: var(--color-info) !important;
   border-color: var(--color-info) !important;
+}
+
+/* Source tabs — Federal | Private */
+.jobs-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-full);
+  padding: 3px;
+}
+
+.jobs-tabs__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.jobs-tabs__tab--active {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.jobs-tabs__tab:not(.jobs-tabs__tab--active):hover {
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+/* Tiny loading dot animation on tab */
+.jobs-tabs__loading {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  opacity: 0.5;
+  animation: tab-pulse 800ms ease-in-out infinite alternate;
+}
+
+@keyframes tab-pulse {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
 }
