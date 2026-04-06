@@ -28,11 +28,30 @@ export default function Upload() {
         ? 'encouraging'
         : 'waiting';
 
+  const ALLOWED_MIMES = new Set([
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+  ]);
+  const MAX_SIZE = 5 * 1024 * 1024;
+
+  function validateFile(f) {
+    if (!ALLOWED_MIMES.has(f.type)) {
+      setError('Only PDF and Word files are accepted');
+      return false;
+    }
+    if (f.size > MAX_SIZE) {
+      setError('That file is too large (max 5MB)');
+      return false;
+    }
+    return true;
+  }
+
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     if (selected) {
-      setFile(selected);
       setError(null);
+      if (validateFile(selected)) setFile(selected);
     }
   };
 
@@ -40,8 +59,8 @@ export default function Upload() {
     e.preventDefault();
     const dropped = e.dataTransfer.files[0];
     if (dropped) {
-      setFile(dropped);
       setError(null);
+      if (validateFile(dropped)) setFile(dropped);
     }
   };
 
