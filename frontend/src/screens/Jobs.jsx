@@ -11,15 +11,40 @@ import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
 import './Jobs.css';
 
+const STORAGE_KEY = 'holt_jobs_search';
+
+function loadSavedSearch() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSearch(data) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // sessionStorage full or unavailable
+  }
+}
+
+export function clearJobsSearch() {
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
 export default function Jobs() {
   const toast = useToast();
-  const [keyword, setKeyword] = useState('');
-  const [location, setLocation] = useState('');
-  const [remoteOnly, setRemoteOnly] = useState(false);
+
+  const saved = loadSavedSearch();
+  const [keyword, setKeyword] = useState(saved?.keyword || '');
+  const [location, setLocation] = useState(saved?.location || '');
+  const [remoteOnly, setRemoteOnly] = useState(saved?.remoteOnly || false);
   const [savedIds, setSavedIds] = useState(new Set());
 
   // Tab state
-  const [activeTab, setActiveTab] = useState('federal');
+  const [activeTab, setActiveTab] = useState(saved?.activeTab || 'federal');
 
   // Federal (USAJobs) state
   const [fedJobs, setFedJobs] = useState([]);
@@ -47,8 +72,16 @@ export default function Jobs() {
   const [analysisRoleName, setAnalysisRoleName] = useState('');
   const [userLocation, setUserLocation] = useState('');
 
+  const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword);
+
   useEffect(() => {
     loadRecommendations();
+    // Auto-trigger search if restoring from sessionStorage
+    if (saved?.keyword) {
+      searchFederal(saved.keyword, saved.location || '', 1);
+      searchPrivate(saved.keyword, saved.location || '');
+      setRestoredSearch(false);
+    }
   }, []);
 
   async function loadRecommendations() {
@@ -180,6 +213,9 @@ export default function Jobs() {
     const kw = keyword.trim();
     const loc = location.trim();
 
+    // Persist search state
+    saveSearch({ keyword: kw, location: loc, remoteOnly, activeTab });
+
     // Search both sources, cache results
     searchFederal(kw, loc, 1);
     searchPrivate(kw, loc);
@@ -191,6 +227,10 @@ export default function Jobs() {
 
   function handleTabSwitch(tab) {
     setActiveTab(tab);
+    // Persist tab choice
+    if (keyword.trim()) {
+      saveSearch({ keyword: keyword.trim(), location: location.trim(), remoteOnly, activeTab: tab });
+    }
     // If switching to private and no results yet, auto-search
     if (tab === 'private' && !pvtSearched && !pvtLoading) {
       const kw = keyword.trim() || analysisRoleName;
