@@ -5,7 +5,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, createApplication, listAnalyses, getProfile } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, createApplication, listAnalyses, getProfile } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
@@ -152,12 +152,13 @@ export default function Jobs() {
       const searchLocation = profileLocation || 'Florida';
 
       try {
-        const data = await searchJobs({
+        const data = await searchAggregatedJobs({
           keyword: searchKeyword,
           location: searchLocation,
           page: 1,
         });
-        setRecommended(data.jobs?.slice(0, 5) || []);
+        // Top 5 by Holt Score (already sorted by backend)
+        setRecommended((data.jobs || []).slice(0, 5));
       } catch (err) {
         console.warn('[Jobs] Recommendation search failed:', err.message);
       }
