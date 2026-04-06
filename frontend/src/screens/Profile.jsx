@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
@@ -7,9 +7,9 @@ import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
 import { useAuth } from '../hooks/useAuth.jsx';
-import { getProfile, updateProfile, deleteAllData, listAnalyses, listBadges } from '../services/api';
+import { getProfile, updateProfile, deleteAllData, listAnalyses, listBadges, uploadResume, analyzeResume } from '../services/api';
 import { supabase } from '../services/supabase';
-import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, TrendingUp } from 'lucide-react';
+import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, TrendingUp, Upload, ChevronDown, ChevronUp, UserCircle, X, Plus } from 'lucide-react';
 import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
 import { useToast } from '../context/ToastContext';
 
@@ -43,6 +43,14 @@ export default function Profile() {
   const [dealbreakers, setDealbreakers] = useState({ hard_degree_required: false, below_salary: false, outside_commute: false });
   const [jobSeekerStatus, setJobSeekerStatus] = useState('actively_hunting');
   const [skillsExtracted, setSkillsExtracted] = useState([]);
+  const [editingSkills, setEditingSkills] = useState(false);
+  const [skillInput, setSkillInput] = useState('');
+  const [linkedinText, setLinkedinText] = useState('');
+  const [aboutMe, setAboutMe] = useState('');
+  const [linkedinOpen, setLinkedinOpen] = useState(false);
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeAnalyzing, setResumeAnalyzing] = useState(false);
+  const resumeInputRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -78,6 +86,8 @@ export default function Profile() {
       setDealbreakers(data.dealbreakers || { hard_degree_required: false, below_salary: false, outside_commute: false });
       setJobSeekerStatus(data.job_seeker_status || 'actively_hunting');
       setSkillsExtracted(data.skills_extracted || []);
+      setLinkedinText(data.linkedin_text || '');
+      setAboutMe(data.about_me || '');
     } catch {
       // Profile will be created on first save
     }
@@ -119,6 +129,8 @@ export default function Profile() {
       if (targetCompanies.trim()) updates.target_companies = targetCompanies.trim();
       if (Object.values(dealbreakers).some(Boolean)) updates.dealbreakers = dealbreakers;
       if (jobSeekerStatus) updates.job_seeker_status = jobSeekerStatus;
+      if (linkedinText.trim()) updates.linkedin_text = linkedinText.trim();
+      if (aboutMe.trim()) updates.about_me = aboutMe.trim();
 
       if (Object.keys(updates).length > 0) {
         await updateProfile(updates);
@@ -131,6 +143,37 @@ export default function Profile() {
       toast.error('Save failed — try again');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleResumeUpload() {
+    if (!resumeFile) return;
+    setResumeAnalyzing(true);
+    try {
+      const { text } = await uploadResume(resumeFile);
+      await analyzeResume(text, 'General job analysis for skills extraction', '', '', linkedinText);
+      // Refresh profile to get updated skills
+      const refreshed = await getProfile();
+      setSkillsExtracted(refreshed.skills_extracted || []);
+      toast.success('Resume analyzed — your matches just got smarter');
+      setResumeFile(null);
+      // Also refresh analyses
+      const data = await listAnalyses();
+      setAnalyses(data);
+    } catch (err) {
+      toast.error(err.message || 'Resume analysis failed — try again');
+    } finally {
+      setResumeAnalyzing(false);
+    }
+  }
+
+  async function handleSaveSkills() {
+    try {
+      await updateProfile({ skills_extracted: skillsExtracted });
+      setEditingSkills(false);
+      toast.success('Skills updated');
+    } catch {
+      toast.error('Failed to save skills');
     }
   }
 
@@ -208,6 +251,120 @@ export default function Profile() {
         </p>
       </div>
 
+      {/* My Resume section */}
+      <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resume</h3>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        {analyses.length > 0 ? (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <FileText size={18} style={{ color: 'var(--color-accent)' }} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 600, fontSize: '14px' }}>
+                  {analyses[0].role_name || 'Resume analyzed'}
+                </p>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                  Last analyzed: {new Date(analyses[0].created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge variant={analyses[0].score >= 70 ? 'success' : analyses[0].score >= 40 ? 'warning' : 'danger'}>
+                {analyses[0].score}%
+              </Badge>
+            </div>
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <input
+                ref={resumeInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc"
+                onChange={(e) => e.target.files[0] && setResumeFile(e.target.files[0])}
+                style={{ display: 'none' }}
+              />
+              {resumeFile ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <p style={{ fontSize: '13px', flex: 1 }}>{resumeFile.name}</p>
+                  <Button
+                    variant="primary"
+                    style={{ padding: '8px 16px', minHeight: '36px', fontSize: '13px' }}
+                    onClick={handleResumeUpload}
+                    disabled={resumeAnalyzing}
+                  >
+                    {resumeAnalyzing ? 'Analyzing...' : 'Analyze'}
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="ghost" onClick={() => resumeInputRef.current?.click()}>
+                  <Upload size={14} /> Update resume
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 'var(--space-3) 0' }}>
+            <input
+              ref={resumeInputRef}
+              type="file"
+              accept=".pdf,.docx,.doc"
+              onChange={(e) => e.target.files[0] && setResumeFile(e.target.files[0])}
+              style={{ display: 'none' }}
+            />
+            <Ott state="waiting" size={48} />
+            <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
+              Upload your resume to power your job matches
+            </p>
+            {resumeFile ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                <p style={{ fontSize: '13px' }}>{resumeFile.name}</p>
+                <Button
+                  style={{ padding: '8px 16px', minHeight: '36px', fontSize: '13px' }}
+                  onClick={handleResumeUpload}
+                  disabled={resumeAnalyzing}
+                >
+                  {resumeAnalyzing ? 'Analyzing...' : 'Analyze'}
+                </Button>
+              </div>
+            ) : (
+              <Button variant="secondary" onClick={() => resumeInputRef.current?.click()} style={{ marginTop: 'var(--space-2)' }}>
+                <Upload size={14} /> Upload Resume
+              </Button>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* LinkedIn section */}
+      <div style={{ marginBottom: 'var(--space-5)' }}>
+        <button
+          onClick={() => setLinkedinOpen(!linkedinOpen)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', padding: 'var(--space-3) var(--space-4)',
+            background: 'var(--color-surface-raised)', border: '1.5px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)', cursor: 'pointer',
+            fontFamily: "'Nunito', sans-serif", color: 'var(--color-text-secondary)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <UserCircle size={18} style={{ color: 'var(--color-accent)' }} />
+            <span style={{ fontWeight: 600, fontSize: '14px' }}>LinkedIn Profile</span>
+            {linkedinText && <Badge variant="success" style={{ fontSize: '11px', padding: '2px 8px' }}>Added</Badge>}
+          </div>
+          {linkedinOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+        {linkedinOpen && (
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <Input
+              textarea
+              placeholder="Paste your LinkedIn About section, experience summary, or any profile text..."
+              value={linkedinText}
+              onChange={(e) => { setLinkedinText(e.target.value); setHasChanges(true); }}
+              style={{ minHeight: '100px' }}
+            />
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+              Helps Ott understand your full professional background
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Profile fields */}
       <Card style={{ marginBottom: 'var(--space-5)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -250,6 +407,14 @@ export default function Profile() {
             placeholder="e.g. Tampa, FL"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
+          />
+          <Input
+            textarea
+            label="About Me"
+            placeholder="Describe your background, what you're looking for, industries you're interested in..."
+            value={aboutMe}
+            onChange={(e) => { setAboutMe(e.target.value); setHasChanges(true); }}
+            style={{ minHeight: '80px' }}
           />
           <Button full onClick={handleSave} disabled={saving}>
             <Save size={16} /> {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Profile'}
@@ -457,31 +622,97 @@ export default function Profile() {
         <Save size={16} /> {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All Preferences'}
       </Button>
 
-      {/* Skills from resume */}
-      {skillsExtracted.length > 0 && (
-        <>
-          <h3 style={{ marginBottom: 'var(--space-3)' }}>Your Skills (from resume)</h3>
-          <Card style={{ marginBottom: 'var(--space-5)' }}>
+      {/* Skills — editable */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+        <h3>Your Skills</h3>
+        <Button
+          variant="ghost"
+          style={{ padding: '6px 12px', minHeight: '32px', fontSize: '13px' }}
+          onClick={() => setEditingSkills(!editingSkills)}
+        >
+          {editingSkills ? 'Done' : 'Edit skills'}
+        </Button>
+      </div>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        {skillsExtracted.length > 0 || editingSkills ? (
+          <>
             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               {skillsExtracted.map((skill, i) => (
                 <span
                   key={i}
                   style={{
-                    padding: '4px 12px',
-                    background: 'var(--color-accent-light)',
-                    color: 'var(--color-accent-dark)',
-                    borderRadius: 'var(--radius-full)',
-                    fontSize: '13px',
-                    fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)',
+                    padding: '4px 12px', background: 'var(--color-accent-light)',
+                    color: 'var(--color-accent-dark)', borderRadius: 'var(--radius-full)',
+                    fontSize: '13px', fontWeight: 600,
                   }}
                 >
                   {skill}
+                  {editingSkills && (
+                    <button
+                      onClick={() => setSkillsExtracted((prev) => prev.filter((_, j) => j !== i))}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-accent-dark)', padding: 0, fontSize: '14px' }}
+                    >
+                      &times;
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
-          </Card>
-        </>
-      )}
+            {editingSkills && (
+              <>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+                  <Input
+                    placeholder="Add a skill..."
+                    value={skillInput}
+                    onChange={(e) => setSkillInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ',') && skillInput.trim()) {
+                        e.preventDefault();
+                        if (!skillsExtracted.includes(skillInput.trim())) {
+                          setSkillsExtracted((prev) => [...prev, skillInput.trim()]);
+                        }
+                        setSkillInput('');
+                      }
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+                  {['Team leadership', 'Inventory management', 'Scheduling', 'Compliance', 'P&L management',
+                    'Staff training', 'Customer service', 'Budgeting', 'Vendor relations', 'Audit management']
+                    .filter((s) => !skillsExtracted.includes(s))
+                    .slice(0, 6)
+                    .map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setSkillsExtracted((prev) => [...prev, s])}
+                        style={{
+                          padding: '3px 10px', border: '1px dashed var(--color-border-strong)',
+                          borderRadius: 'var(--radius-full)', background: 'none', cursor: 'pointer',
+                          fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)',
+                          fontFamily: "'Nunito', sans-serif",
+                        }}
+                      >
+                        + {s}
+                      </button>
+                    ))}
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={handleSaveSkills}
+                  style={{ marginTop: 'var(--space-3)', padding: '8px 16px', minHeight: '36px', fontSize: '13px' }}
+                >
+                  Save skills
+                </Button>
+              </>
+            )}
+          </>
+        ) : (
+          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-3) 0' }}>
+            Upload and analyze a resume to see your skills inventory
+          </p>
+        )}
+      </Card>
 
       {/* Score trend */}
       <div style={{ marginBottom: 'var(--space-5)' }}>
