@@ -51,10 +51,26 @@ def calculate_holt_score(
     skills = [s.lower() for s in resume_skills] if resume_skills else []
 
     if skills:
-        matches = sum(1 for s in skills if s in job_text)
+        # Match full skill phrases AND individual words for multi-word skills
+        # e.g. "inventory management" matches "inventory controls" via "inventory"
+        matches = 0
+        for s in skills:
+            if s in job_text:
+                matches += 1  # full phrase match (strongest)
+            else:
+                # Check if any significant word from the skill appears in job text
+                words = [w for w in s.split() if len(w) > 3]
+                if words and any(w in job_text for w in words):
+                    matches += 0.6  # partial word match (weaker)
         skills_match = min(100, round((matches / min(len(skills), 12)) * 100))
     else:
-        skills_match = 50
+        # Fallback: if no skills but target_roles exist, do basic role matching
+        if target_roles:
+            role_parts = [r.strip() for r in target_roles.split(",") if r.strip()]
+            role_match = any(r in job_title for r in role_parts)
+            skills_match = 60 if role_match else 40
+        else:
+            skills_match = 50
 
     # Bonus for title matching target roles
     if target_roles:
@@ -63,6 +79,15 @@ def calculate_holt_score(
             if role in job_title:
                 skills_match = min(100, skills_match + 15)
                 break
+
+    # Operations/management role floor: ops professionals applying to ops roles
+    # should start at 65 minimum before keyword matching adjusts
+    ops_role_titles = ["manager", "director", "supervisor", "coordinator",
+                       "operations", "general manager", "agm", "assistant manager"]
+    is_ops_role = any(t in job_title for t in ops_role_titles)
+    has_ops_profile = len(skills) >= 5
+    if is_ops_role and has_ops_profile and skills_match < 65:
+        skills_match = 65
 
     # Domain mismatch detection — scan title AND first 500 chars of description
     domain_requirements = {
@@ -100,15 +125,18 @@ def calculate_holt_score(
                 domain_penalty_applied = True
             break
 
-    # Operations/management bonus
+    # Operations/management bonus — stacks with floor
     ops_signals = ["operations", "manager", "general manager", "agm",
                    "assistant manager", "branch manager", "operations coordinator",
                    "compliance", "program manager"]
     ops_match = any(sig in job_title or sig in job_desc for sig in ops_signals)
-    ops_user = any(kw in skills_str for kw in ["operations", "management", "leadership",
-                                                "compliance", "training", "scheduling"])
-    if ops_match and ops_user and not domain_penalty_applied:
-        skills_match = min(100, skills_match + 10)
+    ops_keywords = ["operations", "management", "leadership", "compliance",
+                    "training", "scheduling", "inventory", "customer service"]
+    ops_keyword_count = sum(1 for kw in ops_keywords if kw in skills_str)
+    if ops_match and ops_keyword_count >= 2 and not domain_penalty_applied:
+        # Scale bonus by how many ops keywords the user has (2-8 → +5 to +20)
+        ops_bonus = min(20, ops_keyword_count * 3)
+        skills_match = min(100, skills_match + ops_bonus)
 
     # --- 2. Salary Alignment (20%) ---
     if target_salary_min and job_salary_max:
