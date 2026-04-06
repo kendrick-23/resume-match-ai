@@ -155,10 +155,73 @@ def calculate_holt_score(
         user_parts = [p.strip() for p in user_location.split(",")]
         user_city = user_parts[0] if user_parts else ""
         user_state = user_parts[-1].strip() if len(user_parts) > 1 else ""
+        # Strip trailing country codes like "us" from job location
+        job_loc_parts = [p.strip() for p in job_location.split(",")]
+        job_city = job_loc_parts[0] if job_loc_parts else ""
+        job_state = ""
+        for part in job_loc_parts[1:]:
+            part = part.strip()
+            if part and part not in ("us", "usa", "united states"):
+                job_state = part
+                break
 
-        if user_city and user_city in job_location:
+        # State name ↔ abbreviation mapping for matching
+        state_map = {
+            "al": "alabama", "ak": "alaska", "az": "arizona", "ar": "arkansas",
+            "ca": "california", "co": "colorado", "ct": "connecticut", "de": "delaware",
+            "fl": "florida", "ga": "georgia", "hi": "hawaii", "id": "idaho",
+            "il": "illinois", "in": "indiana", "ia": "iowa", "ks": "kansas",
+            "ky": "kentucky", "la": "louisiana", "me": "maine", "md": "maryland",
+            "ma": "massachusetts", "mi": "michigan", "mn": "minnesota", "ms": "mississippi",
+            "mo": "missouri", "mt": "montana", "ne": "nebraska", "nv": "nevada",
+            "nh": "new hampshire", "nj": "new jersey", "nm": "new mexico", "ny": "new york",
+            "nc": "north carolina", "nd": "north dakota", "oh": "ohio", "ok": "oklahoma",
+            "or": "oregon", "pa": "pennsylvania", "ri": "rhode island", "sc": "south carolina",
+            "sd": "south dakota", "tn": "tennessee", "tx": "texas", "ut": "utah",
+            "vt": "vermont", "va": "virginia", "wa": "washington", "wv": "west virginia",
+            "wi": "wisconsin", "wy": "wyoming", "dc": "district of columbia",
+        }
+        reverse_map = {v: k for k, v in state_map.items()}
+
+        def normalize_state(s: str) -> str:
+            s = s.lower().strip()
+            if s in state_map:
+                return s  # already abbreviation
+            if s in reverse_map:
+                return reverse_map[s]  # full name → abbreviation
+            return s
+
+        user_st_norm = normalize_state(user_state)
+        job_st_norm = normalize_state(job_state)
+        same_state = user_st_norm and job_st_norm and user_st_norm == job_st_norm
+
+        # Metro area clusters (cities within ~30 miles of each other)
+        metro_areas = {
+            "orlando": {"orlando", "casselberry", "winter springs", "altamonte springs",
+                        "oviedo", "sanford", "kissimmee", "maitland", "longwood",
+                        "lake mary", "middleton", "apopka", "winter park", "clermont",
+                        "daytona beach", "deltona", "winter garden", "st cloud"},
+            "tampa": {"tampa", "st petersburg", "clearwater", "brandon", "lakeland",
+                      "plant city", "wesley chapel", "new port richey", "largo"},
+            "jacksonville": {"jacksonville", "orange park", "fleming island",
+                             "st augustine", "ponte vedra"},
+            "miami": {"miami", "fort lauderdale", "hollywood", "hialeah",
+                      "coral gables", "doral", "boca raton", "pompano beach"},
+        }
+
+        def in_same_metro(city1: str, city2: str) -> bool:
+            c1 = city1.lower().strip()
+            c2 = city2.lower().strip()
+            for cities in metro_areas.values():
+                if c1 in cities and c2 in cities:
+                    return True
+            return False
+
+        if user_city and user_city == job_city:
             location_fit = 100
-        elif user_state and user_state in job_location:
+        elif user_city and job_city and in_same_metro(user_city, job_city):
+            location_fit = 90
+        elif same_state:
             location_fit = 70
         else:
             location_fit = 20
