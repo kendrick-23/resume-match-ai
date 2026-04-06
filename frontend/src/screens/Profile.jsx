@@ -243,7 +243,7 @@ export default function Profile() {
           }}>
             <Ott
               state={analyses.length >= 2 && analyses[0].score >= analyses[analyses.length - 1].score ? 'celebrating' : 'encouraging'}
-              size={32}
+              size={40}
             />
             Score Trend
           </h3>

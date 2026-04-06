@@ -75,7 +75,7 @@ export default function Dashboard() {
     <ScreenWrapper screenName="Dashboard">
       {/* Ott greeting + streak */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-        <Ott state={ottState} size={100} />
+        <Ott state={ottState} size={96} />
         <h2 style={{ marginTop: 'var(--space-3)' }}>
           {streak >= 7 ? "You're crushing it!" : streak >= 3 ? 'Nice momentum!' : 'Welcome back!'}
         </h2>

@@ -463,8 +463,8 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
       {/* Interview prep questions */}
       {questionsLoading && (
         <div style={{ textAlign: 'center', marginTop: 'var(--space-3)', padding: 'var(--space-3) 0' }}>
-          <Ott state="thinking" size={40} />
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+          <Ott state="thinking" size={48} />
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
             Generating interview questions...
           </p>
         </div>
@@ -562,7 +562,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
             padding: 0,
           }}
         >
-          <Ott state="encouraging" size={20} /> Prep for this interview
+          <Ott state="encouraging" size={24} /> Prep for this interview
         </button>
       )}
     </Card>

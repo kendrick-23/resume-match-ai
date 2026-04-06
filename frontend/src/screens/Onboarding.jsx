@@ -39,7 +39,7 @@ export default function Onboarding() {
         {step === 0 && (
           <div className="onboarding__screen onboarding__screen--enter">
             <div className="onboarding__ott-bounce">
-              <Ott state="waving" size={140} />
+              <Ott state="waving" size={120} />
             </div>
             <div style={{ marginTop: 'var(--space-5)', display: 'flex', justifyContent: 'center' }}>
               <HoltWordmark size="large" />
@@ -158,13 +158,13 @@ function ScoreRingMini() {
       <circle
         cx="24" cy="24" r="18"
         fill="none"
-        stroke="var(--color-border, #E8E0D5)"
+        stroke="var(--color-border)"
         strokeWidth="4"
       />
       <circle
         cx="24" cy="24" r="18"
         fill="none"
-        stroke="var(--color-accent, #2BB5C0)"
+        stroke="var(--color-accent)"
         strokeWidth="4"
         strokeLinecap="round"
         strokeDasharray="84 113"
@@ -176,7 +176,7 @@ function ScoreRingMini() {
         fontFamily="'Nunito', sans-serif"
         fontWeight="800"
         fontSize="14"
-        fill="var(--color-text, #2D2A26)"
+        fill="var(--color-text)"
       >
         74
       </text>
