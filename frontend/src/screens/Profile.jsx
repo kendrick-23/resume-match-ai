@@ -9,7 +9,8 @@ import Ott from '../components/ott/Ott';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { getProfile, updateProfile, deleteAllData, listAnalyses, listBadges } from '../services/api';
 import { supabase } from '../services/supabase';
-import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft } from 'lucide-react';
+import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, TrendingUp } from 'lucide-react';
+import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
 
 const BADGE_META = {
   first_dive:   { emoji: '\u{1F30A}', name: 'First Dive' },
@@ -226,6 +227,58 @@ export default function Profile() {
           </Button>
         </div>
       </Card>
+
+      {/* Score trend */}
+      <div style={{ marginBottom: 'var(--space-5)' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 'var(--space-3)',
+        }}>
+          <h3 style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+          }}>
+            <Ott
+              state={analyses.length >= 2 && analyses[0].score >= analyses[analyses.length - 1].score ? 'celebrating' : 'encouraging'}
+              size={32}
+            />
+            Score Trend
+          </h3>
+          {analyses.length >= 2 && <TrendBadge analyses={analyses.slice(0, 5)} />}
+        </div>
+
+        {analyses.length >= 2 ? (
+          <Card>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginBottom: 'var(--space-2)' }}>
+              Your last {Math.min(analyses.length, 5)} analyses
+            </p>
+            <ScoreTrendChart analyses={analyses.slice(0, 5)} />
+          </Card>
+        ) : (
+          <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
+            <Ott state="encouraging" size={60} />
+            <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+              {analyses.length === 1
+                ? 'Run one more analysis to see your trend'
+                : 'Analyze a few resumes to see your progress over time'}
+            </p>
+            <p style={{
+              color: 'var(--color-text-muted)',
+              fontSize: '13px',
+              marginTop: 'var(--space-1)',
+              marginBottom: 'var(--space-4)',
+            }}>
+              Run more analyses to see your trend
+            </p>
+            <Button variant="secondary" onClick={() => navigate('/upload')}>
+              Analyze a Resume
+            </Button>
+          </Card>
+        )}
+      </div>
 
       {/* Resume vault */}
       <h3 style={{
