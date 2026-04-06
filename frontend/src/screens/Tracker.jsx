@@ -6,13 +6,15 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
-import { Plus, X, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, X, Trash2, ExternalLink, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import {
   listApplications,
   createApplication,
   updateApplication,
   deleteApplication,
   checkBadges,
+  listAnalyses,
+  generateInterviewPrep,
 } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 import { useToast } from '../context/ToastContext';
@@ -39,6 +41,9 @@ export default function Tracker() {
   const [celebrating, setCelebrating] = useState(false);
   const [celebratingBadge, setCelebratingBadge] = useState(null);
   const [error, setError] = useState(null);
+  const [interviewPrepApp, setInterviewPrepApp] = useState(null);
+  const [prepQuestions, setPrepQuestions] = useState({});
+  const [prepLoading, setPrepLoading] = useState(null);
 
   useEffect(() => {
     loadApplications();
@@ -96,9 +101,9 @@ export default function Tracker() {
       const badgeResult = await checkBadges();
       if (badgeResult.newly_earned?.length > 0) {
         setCelebratingBadge(badgeResult.newly_earned[0]);
-      } else if (newStatus === 'Interview') {
-        setCelebrating(true);
-        setTimeout(() => setCelebrating(false), 2500);
+      }
+      if (newStatus === 'Interview') {
+        setInterviewPrepApp(updated);
       }
     } catch {
       setApplications((prev) =>
@@ -128,6 +133,35 @@ export default function Tracker() {
   const stageCounts = {};
   for (const stage of STAGES) {
     stageCounts[stage] = applications.filter((a) => a.status === stage).length;
+  }
+
+  async function handleGeneratePrep(app) {
+    setPrepLoading(app.id);
+    setInterviewPrepApp(null);
+    try {
+      // Get gaps from latest analysis
+      let gaps = [];
+      try {
+        const analyses = await listAnalyses();
+        if (analyses?.length > 0) {
+          const latest = analyses[0];
+          gaps = typeof latest.gaps === 'string' ? JSON.parse(latest.gaps) : latest.gaps || [];
+        }
+      } catch {
+        // No analysis — proceed without gaps
+      }
+
+      const data = await generateInterviewPrep({
+        role: app.role,
+        company: app.company,
+        gaps,
+      });
+      setPrepQuestions((prev) => ({ ...prev, [app.id]: data.questions }));
+    } catch {
+      toast.error("Couldn't generate questions — try again");
+    } finally {
+      setPrepLoading(null);
+    }
   }
 
   const ottState = celebrating
@@ -244,6 +278,9 @@ export default function Tracker() {
               app={app}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}
+              questions={prepQuestions[app.id]}
+              questionsLoading={prepLoading === app.id}
+              onGeneratePrep={() => handleGeneratePrep(app)}
             />
           ))}
         </div>
@@ -258,6 +295,41 @@ export default function Tracker() {
         />
       )}
 
+      {/* Interview prep modal */}
+      {interviewPrepApp && (
+        <div className="milestone-overlay" onClick={() => setInterviewPrepApp(null)}>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 'var(--max-width)',
+              padding: 'var(--space-4)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Card style={{ textAlign: 'center' }}>
+              <Ott state="celebrating" size={80} />
+              <h3 style={{ marginTop: 'var(--space-3)' }}>You got an interview!</h3>
+              <p style={{
+                color: 'var(--color-text-secondary)',
+                fontSize: '14px',
+                marginTop: 'var(--space-2)',
+                marginBottom: 'var(--space-5)',
+              }}>
+                Want Ott to help you prepare? I'll generate tailored questions based on this role.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <Button full onClick={() => handleGeneratePrep(interviewPrepApp)}>
+                  Yes, prep me
+                </Button>
+                <Button variant="ghost" full onClick={() => setInterviewPrepApp(null)}>
+                  Maybe later
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
       {/* Milestone celebration */}
       {celebratingBadge && (
         <MilestoneCelebration
@@ -270,8 +342,9 @@ export default function Tracker() {
 }
 
 
-function ApplicationCard({ app, onStatusChange, onDelete }) {
+function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLoading, onGeneratePrep }) {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showQuestions, setShowQuestions] = useState(false);
 
   const currentIndex = STAGES.indexOf(app.status);
 
@@ -385,6 +458,112 @@ function ApplicationCard({ app, onStatusChange, onDelete }) {
         }}>
           {app.notes}
         </p>
+      )}
+
+      {/* Interview prep questions */}
+      {questionsLoading && (
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-3)', padding: 'var(--space-3) 0' }}>
+          <Ott state="thinking" size={40} />
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+            Generating interview questions...
+          </p>
+        </div>
+      )}
+
+      {questions && questions.length > 0 && (
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <button
+            onClick={() => setShowQuestions(!showQuestions)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--color-accent)',
+              fontFamily: "'Nunito', sans-serif",
+              fontWeight: 600,
+              fontSize: '13px',
+              padding: 0,
+            }}
+          >
+            {showQuestions ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            Interview prep ({questions.length} questions)
+          </button>
+
+          {showQuestions && (
+            <div style={{ marginTop: 'var(--space-2)' }}>
+              {questions.map((q, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 'var(--space-2)',
+                  marginBottom: 'var(--space-2)',
+                  padding: 'var(--space-2)',
+                  background: 'var(--color-bg)',
+                  borderRadius: 'var(--radius-sm)',
+                }}>
+                  <span style={{
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    color: 'var(--color-accent)',
+                    minWidth: '20px',
+                  }}>
+                    {i + 1}.
+                  </span>
+                  <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                    {q}
+                  </p>
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(questions.map((q, i) => `${i + 1}. ${q}`).join('\n\n'));
+                  // Toast would be nice here but we don't have access in this component
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--color-accent)',
+                  fontFamily: "'Nunito', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  padding: 'var(--space-1) 0',
+                }}
+              >
+                <Copy size={12} /> Copy all questions
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Generate prep button for Interview apps without questions */}
+      {app.status === 'Interview' && !questions && !questionsLoading && (
+        <button
+          onClick={onGeneratePrep}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-1)',
+            marginTop: 'var(--space-3)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--color-accent)',
+            fontFamily: "'Nunito', sans-serif",
+            fontWeight: 600,
+            fontSize: '13px',
+            padding: 0,
+          }}
+        >
+          <Ott state="encouraging" size={20} /> Prep for this interview
+        </button>
       )}
     </Card>
   );

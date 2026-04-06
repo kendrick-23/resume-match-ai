@@ -143,6 +143,61 @@ class AnalyzeRequest(BaseModel):
     linkedin_text: str = ""
 
 
+class InterviewPrepRequest(BaseModel):
+    role: str
+    company: str = ""
+    gaps: list[str] = []
+    job_description: str = ""
+
+
+@app.post("/interview-prep")
+@limiter.limit("5/hour")
+async def interview_prep(
+    request: Request,
+    body: InterviewPrepRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Generate 5 STAR-format behavioral interview questions."""
+    gaps_text = "\n".join(f"- {g}" for g in body.gaps) if body.gaps else "No specific gaps identified."
+    jd_section = f"\nJOB DESCRIPTION:\n{body.job_description[:2000]}" if body.job_description.strip() else ""
+
+    prompt = f"""You are an expert interview coach preparing a candidate for a behavioral interview.
+
+ROLE: {body.role}
+COMPANY: {body.company or 'Not specified'}
+{jd_section}
+
+CANDIDATE'S IDENTIFIED GAPS:
+{gaps_text}
+
+Generate exactly 5 behavioral interview questions in STAR format that:
+1. Are specific to this role at this company
+2. Where possible, target the candidate's identified gaps so they can prepare for tough questions
+3. Use the format: "Tell me about a time when..." or "Describe a situation where..."
+4. Cover different competency areas (leadership, problem-solving, teamwork, technical skills, adaptability)
+5. Are realistic questions an interviewer for this specific role would ask
+
+Return ONLY a JSON array of 5 question strings. No other text."""
+
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+        questions = json.loads(raw)
+        if not isinstance(questions, list):
+            questions = []
+        return {"questions": questions[:5]}
+    except Exception as e:
+        print(f"[/interview-prep] Error: {e}")
+        raise HTTPException(status_code=500, detail="Couldn't generate interview questions. Please try again.")
+
+
 def _user_sb(user: dict):
     """Per-request Supabase client with user JWT for RLS enforcement."""
     sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)

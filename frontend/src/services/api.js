@@ -166,6 +166,20 @@ export async function searchJobs({ keyword, location, salaryMin, salaryMax, remo
   return apiRequest(`${API_URL}/jobs/search?${params}`, { headers });
 }
 
+export async function generateInterviewPrep({ role, company, gaps, jobDescription }) {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/interview-prep`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({
+      role,
+      company: company || '',
+      gaps: gaps || [],
+      job_description: jobDescription || '',
+    }),
+  });
+}
+
 export async function searchAdzunaJobs({ keyword, location, page }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();
