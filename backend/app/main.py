@@ -236,6 +236,9 @@ JOB DESCRIPTION:
 
 Return your analysis in this exact format:
 
+COMPANY: [Extract the company/organization name from the job description]
+ROLE: [Extract the job title/role name from the job description]
+
 MATCH SCORE: [0-100]
 
 STRENGTHS:
@@ -257,6 +260,14 @@ SUMMARY:
             messages=[{"role": "user", "content": prompt}]
         )
         raw_result = message.content[0].text
+
+        # Extract company and role from AI response (fallback to user-provided)
+        company_match = re.search(r"COMPANY:\s*(.+)", raw_result, re.IGNORECASE)
+        role_match = re.search(r"ROLE:\s*(.+)", raw_result, re.IGNORECASE)
+        extracted_company = company_match.group(1).strip() if company_match else ""
+        extracted_role = role_match.group(1).strip() if role_match else ""
+        final_company = body.company_name or extracted_company
+        final_role = body.role_name or extracted_role
 
         # Parse score from the AI response
         score_match = re.search(r"MATCH SCORE:\s*(\d+)", raw_result, re.IGNORECASE)
@@ -280,8 +291,8 @@ SUMMARY:
         sb = _user_sb(user)
         insert_res = sb.table("analyses").insert({
             "user_id": user["user_id"],
-            "company_name": body.company_name,
-            "role_name": body.role_name,
+            "company_name": final_company,
+            "role_name": final_role,
             "score": score,
             "summary": summary,
             "strengths": json.dumps(strengths),
@@ -345,6 +356,8 @@ Return ONLY the tips as a JSON array of strings. No other text."""
             "recommendations": recommendations,
             "summary": summary,
             "coaching_tips": coaching_tips,
+            "company_name": final_company,
+            "role_name": final_role,
         }}
     except HTTPException:
         raise

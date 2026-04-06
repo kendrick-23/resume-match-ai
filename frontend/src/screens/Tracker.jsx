@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -29,16 +30,29 @@ const STAGE_VARIANT = {
 
 export default function Tracker() {
   const toast = useToast();
+  const location = useLocation();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [prefillData, setPrefillData] = useState(null);
   const [celebrating, setCelebrating] = useState(false);
   const [celebratingBadge, setCelebratingBadge] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     loadApplications();
+    // Check for prefill from Results CTA
+    if (location.state?.prefill) {
+      setPrefillData({
+        company: location.state.company || '',
+        role: location.state.role || '',
+        notes: location.state.notes || '',
+      });
+      setShowForm(true);
+      // Clear navigation state so it doesn't re-trigger
+      window.history.replaceState({}, '');
+    }
   }, []);
 
   async function loadApplications() {
@@ -239,7 +253,8 @@ export default function Tracker() {
       {showForm && (
         <AddApplicationModal
           onSubmit={handleCreate}
-          onClose={() => setShowForm(false)}
+          onClose={() => { setShowForm(false); setPrefillData(null); }}
+          prefill={prefillData}
         />
       )}
 
@@ -376,11 +391,11 @@ function ApplicationCard({ app, onStatusChange, onDelete }) {
 }
 
 
-function AddApplicationModal({ onSubmit, onClose }) {
-  const [company, setCompany] = useState('');
-  const [role, setRole] = useState('');
+function AddApplicationModal({ onSubmit, onClose, prefill }) {
+  const [company, setCompany] = useState(prefill?.company || '');
+  const [role, setRole] = useState(prefill?.role || '');
   const [url, setUrl] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(prefill?.notes || '');
   const [status, setStatus] = useState('Saved');
   const [appliedDate, setAppliedDate] = useState('');
   const [submitting, setSubmitting] = useState(false);

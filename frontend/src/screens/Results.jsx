@@ -7,7 +7,7 @@ import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
-import { Copy, Download } from 'lucide-react';
+import { Copy, Download, ClipboardList, Search } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import './Results.css';
 
@@ -558,7 +558,29 @@ export default function Results() {
 
           {/* Bottom actions */}
           <div style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <Button full onClick={() => navigate('/upload')}>Analyze Another Resume</Button>
+            {(result.company_name || result.role_name) && (
+              <Button
+                full
+                onClick={() => navigate('/tracker', {
+                  state: {
+                    prefill: true,
+                    company: result.company_name || '',
+                    role: result.role_name || '',
+                    notes: `Holt Score: ${result.score}%`,
+                  },
+                })}
+              >
+                <ClipboardList size={16} /> Log this application
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              full
+              onClick={() => navigate('/jobs')}
+            >
+              <Search size={16} /> Find similar jobs
+            </Button>
+            <Button variant="ghost" full onClick={() => navigate('/upload')}>Analyze Another Resume</Button>
           </div>
 
           {/* Past analyses */}
