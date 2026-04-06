@@ -82,10 +82,15 @@ def calculate_holt_score(
 
     # Operations/management role floor: ops professionals applying to ops roles
     # should start at 65 minimum before keyword matching adjusts
-    ops_role_titles = ["manager", "director", "supervisor", "coordinator",
-                       "operations", "general manager", "agm", "assistant manager"]
+    ops_role_titles = [
+        "manager", "director", "supervisor", "coordinator", "operations",
+        "general manager", "agm", "assistant manager", "regional manager",
+        "area manager", "district manager", "store manager", "branch manager",
+        "site manager", "facility manager", "operations manager",
+        "operations coordinator", "operations director", "operations supervisor",
+    ]
     is_ops_role = any(t in job_title for t in ops_role_titles)
-    has_ops_profile = len(skills) >= 5
+    has_ops_profile = len(skills) >= 3
     if is_ops_role and has_ops_profile and skills_match < 65:
         skills_match = 65
 
@@ -153,8 +158,9 @@ def calculate_holt_score(
     domain_penalty_applied = False
     skills_str = " ".join(skills).lower()
     degree = (profile.get("degree_status") or "").lower()
-    # Scan both title and beginning of description for domain keywords
-    domain_scan_text = f"{job_title} {job_desc[:500]}"
+    # Scan job title for domain keywords — description is too noisy
+    # (e.g., "dental offices" in description doesn't mean role requires dental degree)
+    domain_scan_text = job_title
 
     for domain in domain_requirements:
         if any(trigger in domain_scan_text for trigger in domain["triggers"]):
