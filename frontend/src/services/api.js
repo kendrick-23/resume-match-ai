@@ -166,6 +166,16 @@ export async function searchJobs({ keyword, location, salaryMin, salaryMax, remo
   return apiRequest(`${API_URL}/jobs/search?${params}`, { headers });
 }
 
+export async function searchAdzunaJobs({ keyword, location, page }) {
+  const headers = await authHeaders();
+  const params = new URLSearchParams();
+  if (keyword) params.set('keyword', keyword);
+  if (location) params.set('location', location);
+  if (page) params.set('page', page);
+
+  return apiRequest(`${API_URL}/jobs/adzuna?${params}`, { headers });
+}
+
 /* ============================================
    Activity / Dashboard
    ============================================ */

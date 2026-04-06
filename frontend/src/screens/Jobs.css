@@ -77,3 +77,37 @@
 .within-reach-expand:hover {
   color: var(--color-text-secondary);
 }
+
+/* Filter chips */
+.jobs-filter-chip {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.jobs-filter-chip--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+  color: var(--color-accent-dark);
+}
+
+.jobs-filter-chip--private-active {
+  border-color: var(--color-info);
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+
+/* Source badge — private sector variant */
+.source-badge--private {
+  background: var(--color-info-light) !important;
+  color: var(--color-info) !important;
+  border-color: var(--color-info) !important;
+}
