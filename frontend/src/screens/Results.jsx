@@ -7,7 +7,7 @@ import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
-import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import './Results.css';
 
@@ -111,6 +111,76 @@ function StickyPillNav({ activePill, onPillClick }) {
         </button>
       ))}
     </div>
+  );
+}
+
+const SUB_SCORE_LABELS = [
+  { key: 'skills_match', label: 'Skills match' },
+  { key: 'seniority_fit', label: 'Seniority fit' },
+  { key: 'salary_alignment', label: 'Salary alignment' },
+  { key: 'growth_potential', label: 'Growth potential' },
+];
+
+function ScoreBreakdown({ result }) {
+  const hasSubScores = SUB_SCORE_LABELS.some((s) => result[s.key] != null);
+  if (!hasSubScores) return null;
+
+  return (
+    <Card style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-2)',
+        marginBottom: 'var(--space-3)',
+      }}>
+        <BarChart3 size={16} style={{ color: 'var(--color-accent)' }} />
+        <p style={{ fontWeight: 700, fontSize: '14px' }}>Score Breakdown</p>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {SUB_SCORE_LABELS.map((s, i) => {
+          const value = result[s.key] ?? 0;
+          const barColor = value >= 70
+            ? 'var(--color-success)'
+            : value >= 50
+              ? 'var(--color-warning)'
+              : 'var(--color-accent)';
+          return (
+            <div key={s.key}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '4px',
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                  {s.label}
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-text)' }}>
+                  {value}
+                </span>
+              </div>
+              <div style={{
+                height: '6px',
+                background: 'var(--color-border)',
+                borderRadius: 'var(--radius-full)',
+                overflow: 'hidden',
+              }}>
+                <div
+                  className="score-breakdown-bar"
+                  style={{
+                    height: '100%',
+                    borderRadius: 'var(--radius-full)',
+                    background: barColor,
+                    width: `${value}%`,
+                    animationDelay: `${i * 80}ms`,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -262,6 +332,10 @@ export default function Results() {
           analysis_id: latest.id,
           coaching_tips: latest.coaching_tips,
           job_description_text: latest.job_description_text,
+          skills_match: latest.skills_match,
+          seniority_fit: latest.seniority_fit,
+          salary_alignment: latest.salary_alignment,
+          growth_potential: latest.growth_potential,
         });
         if (latest.generated_resume_md) {
           setResumeMd(latest.generated_resume_md);
@@ -364,6 +438,9 @@ export default function Results() {
               </p>
             )}
           </Card>
+
+          {/* Score breakdown */}
+          <ScoreBreakdown result={result} />
 
           {/* Sticky pill navigation */}
           <StickyPillNav activePill={activePill} onPillClick={handlePillClick} />

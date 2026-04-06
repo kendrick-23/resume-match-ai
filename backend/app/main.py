@@ -241,6 +241,12 @@ ROLE: [Extract the job title/role name from the job description]
 
 MATCH SCORE: [0-100]
 
+SUB-SCORES:
+SKILLS_MATCH: [0-100 how well the candidate's technical skills and experience match the job requirements]
+SENIORITY_FIT: [0-100 how well the candidate's level and years of experience match the role's seniority expectations]
+SALARY_ALIGNMENT: [0-100 based on role type, location, and any salary info — how well the role likely aligns with reasonable expectations for this candidate's level. If no salary info available, use 70]
+GROWTH_POTENTIAL: [0-100 how much this role could advance the candidate's career trajectory based on their background]
+
 STRENGTHS:
 - [List what the candidate does well relative to this role]
 
@@ -273,6 +279,16 @@ SUMMARY:
         score_match = re.search(r"MATCH SCORE:\s*(\d+)", raw_result, re.IGNORECASE)
         score = int(score_match.group(1)) if score_match else 0
 
+        # Parse sub-scores
+        def parse_sub_score(name: str, default: int = 50) -> int:
+            m = re.search(rf"{name}:\s*(\d+)", raw_result, re.IGNORECASE)
+            return int(m.group(1)) if m else default
+
+        skills_match = parse_sub_score("SKILLS_MATCH")
+        seniority_fit = parse_sub_score("SENIORITY_FIT")
+        salary_alignment = parse_sub_score("SALARY_ALIGNMENT", 70)
+        growth_potential = parse_sub_score("GROWTH_POTENTIAL")
+
         # Parse sections
         def parse_section(text: str, section: str) -> list[str]:
             pattern = rf"{section}:\s*\n([\s\S]*?)(?=\n(?:STRENGTHS|GAPS|RECOMMENDATIONS|SUMMARY):|$)"
@@ -289,7 +305,7 @@ SUMMARY:
 
         # Save analysis to Supabase (include original inputs for resume generation)
         sb = _user_sb(user)
-        insert_res = sb.table("analyses").insert({
+        insert_data = {
             "user_id": user["user_id"],
             "company_name": final_company,
             "role_name": final_role,
@@ -300,7 +316,18 @@ SUMMARY:
             "recommendations": json.dumps(recommendations),
             "resume_text": body.resume,
             "job_description_text": body.job_description,
-        }).execute()
+            "skills_match": skills_match,
+            "seniority_fit": seniority_fit,
+            "salary_alignment": salary_alignment,
+            "growth_potential": growth_potential,
+        }
+        try:
+            insert_res = sb.table("analyses").insert(insert_data).execute()
+        except Exception:
+            # Sub-score columns may not exist yet — retry without them
+            for col in ("skills_match", "seniority_fit", "salary_alignment", "growth_potential"):
+                insert_data.pop(col, None)
+            insert_res = sb.table("analyses").insert(insert_data).execute()
 
         analysis_id = insert_res.data[0]["id"] if insert_res.data else None
 
@@ -359,6 +386,10 @@ Return ONLY the tips as a JSON array of strings. No other text."""
             "company_name": final_company,
             "role_name": final_role,
             "job_description_text": body.job_description,
+            "skills_match": skills_match,
+            "seniority_fit": seniority_fit,
+            "salary_alignment": salary_alignment,
+            "growth_potential": growth_potential,
         }}
     except HTTPException:
         raise

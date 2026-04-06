@@ -63,3 +63,18 @@
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
+
+/* Score breakdown bars */
+.score-breakdown-bar {
+  animation: breakdown-fill 400ms ease-out both;
+}
+
+@keyframes breakdown-fill {
+  from { width: 0 !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-breakdown-bar {
+    animation: none;
+  }
+}
