@@ -2,42 +2,81 @@ import { supabase } from './supabase';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+class OfflineError extends Error {
+  constructor() {
+    super("You're offline — check your connection");
+    this.name = 'OfflineError';
+  }
+}
+
 async function authHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) return {};
   return { Authorization: `Bearer ${session.access_token}` };
 }
 
+async function fetchWithRetry(url, options = {}, retries = 1) {
+  if (!navigator.onLine) throw new OfflineError();
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+
+      // 401 — session expired, force sign out
+      if (res.status === 401) {
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+        throw new Error('Session expired — please sign in again');
+      }
+
+      // Don't retry client errors (4xx)
+      if (!res.ok && res.status < 500) return res;
+
+      // Retry server errors (5xx) if we have attempts left
+      if (!res.ok && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+
+      return res;
+    } catch (err) {
+      if (err.name === 'OfflineError' || err.message.includes('Session expired')) throw err;
+      if (attempt === retries) throw err;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+}
+
+async function apiRequest(url, options = {}) {
+  const res = await fetchWithRetry(url, options);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Something went wrong');
+  }
+  return res.json();
+}
+
 /**
  * Upload a resume file and extract text via the backend.
- * Returns { text, filename }.
  */
 export async function uploadResume(file) {
   const headers = await authHeaders();
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_URL}/upload-resume`, {
+  return apiRequest(`${API_URL}/upload-resume`, {
     method: 'POST',
     headers,
     body: formData,
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to upload resume');
-  }
-
-  return res.json();
 }
 
 /**
  * Send extracted resume text + job description for AI analysis.
- * Returns parsed { score, strengths, gaps, recommendations, summary }.
  */
 export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '', linkedinText = '') {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/analyze`, {
+  const res = await fetchWithRetry(`${API_URL}/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({
@@ -55,7 +94,6 @@ export async function analyzeResume(resumeText, jobDescription, companyName = ''
   }
 
   const data = await res.json();
-  // Use server-parsed data if available, fall back to client parsing
   if (data.parsed) {
     return { ...data.parsed, analysis_id: data.analysis_id };
   }
@@ -68,24 +106,12 @@ export async function analyzeResume(resumeText, jobDescription, companyName = ''
 
 export async function listAnalyses() {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/analyses`, { headers });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to load analyses');
-  }
-  return res.json();
+  return apiRequest(`${API_URL}/analyses`, { headers });
 }
 
 export async function getAnalysis(id) {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/analyses/${id}`, { headers });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to load analysis');
-  }
-  return res.json();
+  return apiRequest(`${API_URL}/analyses/${id}`, { headers });
 }
 
 /* ============================================
@@ -94,57 +120,33 @@ export async function getAnalysis(id) {
 
 export async function listApplications() {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/applications`, { headers });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to load applications');
-  }
-  return res.json();
+  return apiRequest(`${API_URL}/applications`, { headers });
 }
 
 export async function createApplication(data) {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/applications`, {
+  return apiRequest(`${API_URL}/applications`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(data),
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to create application');
-  }
-  return res.json();
 }
 
 export async function updateApplication(id, data) {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/applications/${id}`, {
+  return apiRequest(`${API_URL}/applications/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(data),
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to update application');
-  }
-  return res.json();
 }
 
 export async function deleteApplication(id) {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/applications/${id}`, {
+  return apiRequest(`${API_URL}/applications/${id}`, {
     method: 'DELETE',
     headers,
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to delete application');
-  }
-  return res.json();
 }
 
 /* ============================================
@@ -161,13 +163,7 @@ export async function searchJobs({ keyword, location, salaryMin, salaryMax, remo
   if (remote) params.set('remote', 'true');
   if (page) params.set('page', page);
 
-  const res = await fetch(`${API_URL}/jobs/search?${params}`, { headers });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Job search failed');
-  }
-  return res.json();
+  return apiRequest(`${API_URL}/jobs/search?${params}`, { headers });
 }
 
 /* ============================================
@@ -176,21 +172,23 @@ export async function searchJobs({ keyword, location, salaryMin, salaryMax, remo
 
 export async function checkBadges() {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/profile/badges/check`, {
-    method: 'POST',
-    headers,
-  });
-
-  if (!res.ok) return { newly_earned: [] };
-  return res.json();
+  try {
+    return await apiRequest(`${API_URL}/profile/badges/check`, {
+      method: 'POST',
+      headers,
+    });
+  } catch {
+    return { newly_earned: [] };
+  }
 }
 
 export async function listBadges() {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/profile/badges`, { headers });
-
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    return await apiRequest(`${API_URL}/profile/badges`, { headers });
+  } catch {
+    return [];
+  }
 }
 
 /* ============================================
@@ -199,53 +197,29 @@ export async function listBadges() {
 
 export async function getProfile() {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/profile`, { headers });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to load profile');
-  }
-  return res.json();
+  return apiRequest(`${API_URL}/profile`, { headers });
 }
 
 export async function updateProfile(data) {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/profile`, {
+  return apiRequest(`${API_URL}/profile`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(data),
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to update profile');
-  }
-  return res.json();
 }
 
 export async function deleteAllData() {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/profile/data`, {
+  return apiRequest(`${API_URL}/profile/data`, {
     method: 'DELETE',
     headers,
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to delete data');
-  }
-  return res.json();
 }
 
 export async function getActivity() {
   const headers = await authHeaders();
-  const res = await fetch(`${API_URL}/profile/activity`, { headers });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to load activity');
-  }
-  return res.json();
+  return apiRequest(`${API_URL}/profile/activity`, { headers });
 }
 
 /**
