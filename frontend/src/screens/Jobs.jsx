@@ -246,41 +246,86 @@ export default function Jobs() {
     try {
       const profile = await getProfile();
       const roles = (profile.target_roles || '').split(',').map((r) => r.trim()).filter(Boolean);
-      const skills = Array.isArray(profile.skills_extracted)
-        ? profile.skills_extracted.slice(0, 5)
-        : [];
-      const aboutMe = (profile.about_me || '').split(/\s+/).slice(0, 8).join(' ');
-
-      // Build keyword: target roles first, then top skills, then about_me snippet
-      const parts = [...roles.slice(0, 2), ...skills.slice(0, 3)];
-      if (!parts.length && aboutMe) parts.push(aboutMe);
-      const kw = parts.join(' ').trim() || 'manager';
+      const skills = Array.isArray(profile.skills_extracted) ? profile.skills_extracted : [];
       const loc = (profile.location || '').trim() || 'Florida';
 
-      setKeyword(kw);
-      setLocation(loc);
-      saveSearch({ keyword: kw, location: loc, remoteOnly, activeTab });
-
-      // Search federal (USAJobs) + private (aggregated: Indeed, Glassdoor, Google, ZipRecruiter, Adzuna)
-      searchFederal(kw, loc, 1);
-
-      // Use aggregated endpoint for private tab to cover all 5 private sources
-      setPvtLoading(true);
-      try {
-        const data = await searchAggregatedJobs({ keyword: kw, location: loc, page: 1 });
-        setPvtJobs(data.jobs || []);
-        setPvtTotal(data.total || 0);
-        setPvtSearched(true);
-      } catch {
-        setPvtJobs([]);
-        setPvtTotal(0);
-        setPvtSearched(true);
-      } finally {
-        setPvtLoading(false);
+      // Build up to 3 search queries: one per target role, plus a skills-based query
+      const queries = [];
+      for (const role of roles.slice(0, 2)) {
+        queries.push(role);
       }
+      // Third query: top skills as a phrase (e.g. "Operations Management Leadership")
+      const skillPhrase = skills.slice(0, 3).join(' ').trim();
+      if (skillPhrase && !queries.includes(skillPhrase)) {
+        queries.push(skillPhrase);
+      }
+      // Fallback if no roles or skills
+      if (queries.length === 0) queries.push('manager');
+
+      // Do NOT pre-fill keyword box — profile search is separate from manual search
+      setLocation(loc);
+
+      // Run parallel federal searches (one per query)
+      setFedLoading(true);
+      setFedError('');
+      const fedPromises = queries.map((q) =>
+        searchJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
+      );
+
+      // Run parallel aggregated searches for private tab
+      setPvtLoading(true);
+      const pvtPromises = queries.map((q) =>
+        searchAggregatedJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
+      );
+
+      const [fedResults, pvtResults] = await Promise.all([
+        Promise.all(fedPromises),
+        Promise.all(pvtPromises),
+      ]);
+
+      // Merge and deduplicate federal results
+      const fedSeen = new Set();
+      const fedMerged = [];
+      for (const res of fedResults) {
+        for (const job of (res.jobs || [])) {
+          const key = `${(job.title || '').toLowerCase()}|${(job.company || job.department || '').toLowerCase()}`;
+          if (!fedSeen.has(key)) {
+            fedSeen.add(key);
+            fedMerged.push(job);
+          }
+        }
+      }
+      fedMerged.sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0));
+      setFedJobs(fedMerged);
+      setFedTotal(fedMerged.length);
+      setFedPage(1);
+      setFedSearched(true);
+      setFedLoading(false);
+
+      // Merge and deduplicate private results
+      const pvtSeen = new Set();
+      const pvtMerged = [];
+      for (const res of pvtResults) {
+        for (const job of (res.jobs || [])) {
+          const key = `${(job.title || '').toLowerCase()}|${(job.company || '').toLowerCase()}`;
+          if (!pvtSeen.has(key)) {
+            pvtSeen.add(key);
+            pvtMerged.push(job);
+          }
+        }
+      }
+      pvtMerged.sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0));
+      setPvtJobs(pvtMerged);
+      setPvtTotal(pvtMerged.length);
+      setPvtPage(1);
+      setPvtSearched(true);
+      setPvtLoading(false);
+
+      saveSearch({ keyword: '', location: loc, remoteOnly, activeTab });
     } catch (err) {
       toast.error('Could not load your profile — try keyword search instead');
-      console.warn('[Jobs] Profile match failed:', err.message);
+      setFedLoading(false);
+      setPvtLoading(false);
     } finally {
       setProfileMatchLoading(false);
     }
