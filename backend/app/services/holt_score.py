@@ -10,6 +10,7 @@ Dimensions:
   degree_flag       (qualitative — affects coaching label, not score)
 """
 
+import json
 import re
 from typing import Optional
 
@@ -28,7 +29,8 @@ def calculate_holt_score(
     target_salary_max = profile.get("target_salary_max")
     schedule_pref = profile.get("schedule_preference") or "any"
     user_location = (profile.get("location") or "").lower()
-    dealbreakers = profile.get("dealbreakers") or {}
+    raw_db = profile.get("dealbreakers") or {}
+    dealbreakers = json.loads(raw_db) if isinstance(raw_db, str) else raw_db
     target_companies = [c.strip().lower() for c in (profile.get("target_companies") or "").split(",") if c.strip()]
 
     job_title = (job.get("title") or "").lower()
@@ -44,15 +46,13 @@ def calculate_holt_score(
     degree_warning = False
 
     # --- 1. Skills Match (35%) ---
+    # Only use positive skills (skills_extracted) — never analysis_gaps.
+    # Gaps represent what the user LACKS, so matching them would inflate scores.
     skills = [s.lower() for s in resume_skills] if resume_skills else []
-    gap_words = []
-    for g in (analysis_gaps or []):
-        gap_words.extend(w.lower() for w in re.split(r"[\s,;.()]+", g) if len(w) > 3)
 
-    all_skill_terms = list(set(skills + gap_words))
-    if all_skill_terms:
-        matches = sum(1 for s in all_skill_terms if s in job_text)
-        skills_match = min(100, round((matches / min(len(all_skill_terms), 12)) * 100))
+    if skills:
+        matches = sum(1 for s in skills if s in job_text)
+        skills_match = min(100, round((matches / min(len(skills), 12)) * 100))
     else:
         skills_match = 50
 
