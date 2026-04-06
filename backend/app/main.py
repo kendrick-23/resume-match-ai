@@ -431,6 +431,32 @@ Return ONLY the tips as a JSON array of strings. No other text."""
             print(f"[Ott coaching] Failed: {exc}")
             coaching_tips = []
 
+        # Extract skills from resume and save to profile (async, non-blocking)
+        extracted_skills = []
+        try:
+            skills_prompt = f"""Extract all skills from this resume text as a JSON array of strings. Include: technical skills, tools, certifications, soft skills relevant to operations/management, and any domain expertise. Be specific — 'inventory management' not just 'management'. Return ONLY valid JSON array, no other text.
+
+Resume: {body.resume[:3000]}"""
+
+            skills_msg = anthropic_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                messages=[{"role": "user", "content": skills_prompt}]
+            )
+            skills_raw = skills_msg.content[0].text.strip()
+            if skills_raw.startswith("```"):
+                skills_raw = re.sub(r"^```(?:json)?\s*", "", skills_raw)
+                skills_raw = re.sub(r"\s*```$", "", skills_raw)
+            extracted_skills = json.loads(skills_raw)
+            if isinstance(extracted_skills, list):
+                # Save to profile
+                sb.table("profiles").upsert({
+                    "id": user["user_id"],
+                    "skills_extracted": extracted_skills,
+                }).execute()
+        except Exception as exc:
+            print(f"[Skills extraction] Failed: {exc}")
+
         return {"result": raw_result, "analysis_id": analysis_id, "parsed": {
             "score": score,
             "strengths": strengths,
@@ -445,6 +471,7 @@ Return ONLY the tips as a JSON array of strings. No other text."""
             "seniority_fit": seniority_fit,
             "salary_alignment": salary_alignment,
             "growth_potential": growth_potential,
+            "skills_extracted": extracted_skills,
         }}
     except HTTPException:
         raise
