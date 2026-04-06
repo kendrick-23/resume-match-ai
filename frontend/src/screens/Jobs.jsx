@@ -78,9 +78,11 @@ export default function Jobs() {
   const [sortBy, setSortBy] = useState('score');
   const [showFilters, setShowFilters] = useState(false);
   const [filterPostedWithin, setFilterPostedWithin] = useState('any');
+  const [filterDegree, setFilterDegree] = useState('all');
   const [showDealbreakers, setShowDealbreakers] = useState(true);
 
   const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword);
+  const [profileMatchLoading, setProfileMatchLoading] = useState(false);
 
   useEffect(() => {
     loadRecommendations();
@@ -237,6 +239,51 @@ export default function Jobs() {
     searchPrivate(kw, loc);
   }
 
+  async function handleProfileMatch() {
+    setProfileMatchLoading(true);
+    try {
+      const profile = await getProfile();
+      const roles = (profile.target_roles || '').split(',').map((r) => r.trim()).filter(Boolean);
+      const skills = Array.isArray(profile.skills_extracted)
+        ? profile.skills_extracted.slice(0, 5)
+        : [];
+      const aboutMe = (profile.about_me || '').split(/\s+/).slice(0, 8).join(' ');
+
+      // Build keyword: target roles first, then top skills, then about_me snippet
+      const parts = [...roles.slice(0, 2), ...skills.slice(0, 3)];
+      if (!parts.length && aboutMe) parts.push(aboutMe);
+      const kw = parts.join(' ').trim() || 'manager';
+      const loc = (profile.location || '').trim() || 'Florida';
+
+      setKeyword(kw);
+      setLocation(loc);
+      saveSearch({ keyword: kw, location: loc, remoteOnly, activeTab });
+
+      // Search federal (USAJobs) + private (aggregated: Indeed, Glassdoor, Google, ZipRecruiter, Adzuna)
+      searchFederal(kw, loc, 1);
+
+      // Use aggregated endpoint for private tab to cover all 5 private sources
+      setPvtLoading(true);
+      try {
+        const data = await searchAggregatedJobs({ keyword: kw, location: loc, page: 1 });
+        setPvtJobs(data.jobs || []);
+        setPvtTotal(data.total || 0);
+        setPvtSearched(true);
+      } catch {
+        setPvtJobs([]);
+        setPvtTotal(0);
+        setPvtSearched(true);
+      } finally {
+        setPvtLoading(false);
+      }
+    } catch (err) {
+      toast.error('Could not load your profile — try keyword search instead');
+      console.warn('[Jobs] Profile match failed:', err.message);
+    } finally {
+      setProfileMatchLoading(false);
+    }
+  }
+
   function handleLoadMoreFed() {
     searchFederal(keyword.trim(), location.trim(), fedPage + 1);
   }
@@ -309,6 +356,12 @@ export default function Jobs() {
         if (filterPostedWithin === '24h' && diffH > 24) return false;
         if (filterPostedWithin === '3d' && diffH > 72) return false;
         if (filterPostedWithin === '7d' && diffH > 168) return false;
+      }
+      // Degree filter
+      if (filterDegree !== 'all') {
+        const flag = job.holt_breakdown?.degree_flag || 'none';
+        if (filterDegree === 'no_degree' && flag === 'required') return false;
+        if (filterDegree === 'preferred_only' && flag === 'required') return false;
       }
       return true;
     });
@@ -388,6 +441,31 @@ export default function Jobs() {
           </p>
         </Card>
       )}
+
+      {/* Profile match button */}
+      <Button
+        full
+        onClick={handleProfileMatch}
+        disabled={profileMatchLoading || (fedLoading && pvtLoading)}
+        style={{ marginBottom: 0 }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+          <Ott state="idle" size={24} />
+          {profileMatchLoading ? 'Finding your matches...' : 'Find jobs that fit me'}
+        </span>
+      </Button>
+
+      {/* Divider */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-3)',
+        margin: 'var(--space-3) 0',
+      }}>
+        <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+        <span style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>or</span>
+        <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+      </div>
 
       {/* Search form */}
       <form onSubmit={handleSearch} style={{
@@ -479,6 +557,24 @@ export default function Jobs() {
                     key={val}
                     className={`jobs-filter-chip ${filterPostedWithin === val ? 'jobs-filter-chip--active' : ''}`}
                     onClick={() => setFilterPostedWithin(val)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Degree filter */}
+            <div>
+              <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+                Degree requirement
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {[['all', 'Show all'], ['no_degree', 'No degree mentioned'], ['preferred_only', 'Preferred only']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    className={`jobs-filter-chip ${filterDegree === val ? 'jobs-filter-chip--active' : ''}`}
+                    onClick={() => setFilterDegree(val)}
                   >
                     {label}
                   </button>
@@ -581,6 +677,25 @@ export default function Jobs() {
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Degree filter coaching note */}
+      {filterDegree !== 'all' && isSearched && !isLoading && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          padding: 'var(--space-3)',
+          background: 'var(--color-accent-light)',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: 'var(--space-3)',
+          fontSize: '13px',
+          color: 'var(--color-accent-dark)',
+          fontWeight: 600,
+        }}>
+          <Ott state="encouraging" size={32} />
+          Showing jobs with no degree requirement — your experience speaks louder than a diploma
         </div>
       )}
 
