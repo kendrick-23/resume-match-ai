@@ -1,0 +1,79 @@
+/* ============================================
+   Jobs — Within Reach card styles
+   ============================================ */
+
+/* Amber left border accent for Within Reach cards */
+.within-reach-card {
+  border-left: 3px solid var(--color-warning);
+}
+
+/* Progress bar */
+.within-reach-progress {
+  margin-bottom: var(--space-2);
+}
+
+.within-reach-progress__bar {
+  position: relative;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: visible;
+}
+
+.within-reach-progress__fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+  transition: width 400ms ease-out;
+}
+
+.within-reach-progress__target {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  background: var(--color-accent);
+  border-radius: 1px;
+  opacity: 0.6;
+}
+
+.within-reach-progress__labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+}
+
+.within-reach-progress__score {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--color-warning);
+}
+
+.within-reach-progress__delta {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--color-accent);
+}
+
+/* Expand toggle */
+.within-reach-expand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-warning);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--transition-fast);
+}
+
+.within-reach-expand:hover {
+  color: var(--color-text-secondary);
+}

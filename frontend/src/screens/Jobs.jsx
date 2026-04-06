@@ -6,9 +6,10 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { searchJobs, createApplication, listAnalyses, getProfile } from '../services/api';
-import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles } from 'lucide-react';
+import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
+import './Jobs.css';
 
 export default function Jobs() {
   const toast = useToast();
@@ -30,6 +31,7 @@ export default function Jobs() {
 
   // Holt score data
   const [analysisKeywords, setAnalysisKeywords] = useState([]);
+  const [analysisGaps, setAnalysisGaps] = useState([]);
   const [salaryTarget, setSalaryTarget] = useState({ min: null, max: null });
 
   useEffect(() => {
@@ -56,6 +58,8 @@ export default function Jobs() {
       const gaps = typeof latest.gaps === 'string'
         ? JSON.parse(latest.gaps)
         : latest.gaps || [];
+
+      setAnalysisGaps(gaps);
 
       // Extract keywords for Holt score matching
       const allText = [...strengths, ...gaps, roleName].join(' ').toLowerCase();
@@ -91,7 +95,6 @@ export default function Jobs() {
         setRecommended(data.jobs?.slice(0, 5) || []);
       } catch (err) {
         console.warn('[Jobs] Recommendation search failed:', err.message);
-        // Analysis data is still set — Holt scores will work on manual searches
       }
     } catch (err) {
       console.warn('[Jobs] Failed to load analyses:', err.message);
@@ -169,15 +172,12 @@ export default function Jobs() {
   function computeHoltScore(job) {
     if (!hasAnalysis || analysisKeywords.length === 0) return null;
 
-    // 1. Keyword match (60%)
     const jobText = `${job.title} ${job.department || ''} ${job.company || ''}`.toLowerCase();
     const matches = analysisKeywords.filter((kw) => jobText.includes(kw));
     const keywordScore = Math.min(100, Math.round((matches.length / Math.min(analysisKeywords.length, 10)) * 100));
 
-    // 2. Salary fit (25%)
-    let salaryScore = 50; // default unknown
+    let salaryScore = 50;
     if (salaryTarget.min && job.salary_min && job.salary_max) {
-      // Check if job salary range overlaps with target
       const targetMax = salaryTarget.max || salaryTarget.min * 1.5;
       if (job.salary_max >= salaryTarget.min && job.salary_min <= targetMax) {
         salaryScore = 100;
@@ -186,8 +186,6 @@ export default function Jobs() {
       }
     }
 
-    // 3. Schedule fit (15%) — USAJobs titles don't usually indicate shift work
-    // Default to 50 (unknown) unless title suggests shift/weekend
     let scheduleScore = 50;
     const titleLower = job.title.toLowerCase();
     if (titleLower.includes('shift') || titleLower.includes('weekend') || titleLower.includes('night')) {
@@ -206,6 +204,18 @@ export default function Jobs() {
     if (min) return `From ${fmt(min)}`;
     return `Up to ${fmt(max)}`;
   }
+
+  // Compute Within Reach jobs from current visible jobs
+  function getWithinReachJobs(jobList) {
+    return jobList
+      .map((job) => ({ ...job, _holtScore: computeHoltScore(job) }))
+      .filter((job) => job._holtScore != null && job._holtScore >= 50 && job._holtScore <= 69)
+      .sort((a, b) => b._holtScore - a._holtScore);
+  }
+
+  const withinReachRec = !searched ? getWithinReachJobs(recommended) : [];
+  const withinReachSearch = searched ? getWithinReachJobs(jobs) : [];
+  const withinReachJobs = withinReachRec.length > 0 ? withinReachRec : withinReachSearch;
 
   return (
     <ScreenWrapper screenName="Jobs">
@@ -233,6 +243,46 @@ export default function Jobs() {
                 formatSalary={formatSalary}
                 recommended
                 holtScore={computeHoltScore(job)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Within Reach section */}
+      {withinReachJobs.length > 0 && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            marginBottom: 'var(--space-2)',
+          }}>
+            <Ott state="encouraging" size={48} />
+            <div>
+              <h3 style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+              }}>
+                <Target size={18} style={{ color: 'var(--color-warning)' }} />
+                Within Reach
+              </h3>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '2px' }}>
+                These roles are closer than you think. Close these gaps to hit 70%+
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            {withinReachJobs.map((job) => (
+              <WithinReachCard
+                key={'wr-' + job.id + job.title}
+                job={job}
+                score={job._holtScore}
+                gaps={analysisGaps}
+                savedIds={savedIds}
+                onSave={handleSave}
+                formatSalary={formatSalary}
               />
             ))}
           </div>
@@ -451,6 +501,176 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <Button
+          variant="ghost"
+          style={{ padding: '8px 14px', minHeight: '36px', fontSize: '13px' }}
+          onClick={() => onSave(job)}
+          disabled={savedIds.has(job.id)}
+        >
+          <Bookmark size={14} style={savedIds.has(job.id) ? { fill: 'var(--color-accent)' } : {}} />
+          {savedIds.has(job.id) ? 'Saved' : 'Save'}
+        </Button>
+        {(job.apply_url || job.url) && (
+          <a
+            href={job.apply_url || job.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 'var(--space-1)',
+              padding: '8px 14px',
+              fontSize: '13px',
+              fontWeight: 600,
+              fontFamily: "'Nunito', sans-serif",
+              color: 'var(--color-accent)',
+              textDecoration: 'none',
+            }}
+          >
+            <ExternalLink size={14} /> View posting
+          </a>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+
+function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
+  const [expanded, setExpanded] = useState(false);
+  const delta = 70 - score;
+
+  // Pick up to 3 gaps to show as coaching hints
+  const topGaps = gaps.slice(0, 3);
+
+  // Coaching label based on proximity
+  const coachLabel = delta <= 5
+    ? "You're almost there"
+    : delta <= 12
+      ? 'One skill away'
+      : 'Strong foundation';
+
+  return (
+    <Card className="within-reach-card">
+      {/* Header row */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 'var(--space-2)',
+      }}>
+        <div style={{ flex: 1, minWidth: 0, marginRight: 'var(--space-2)' }}>
+          <p style={{ fontWeight: 700, lineHeight: 1.3 }}>{job.title}</p>
+          <p style={{
+            color: 'var(--color-text-secondary)',
+            fontSize: '13px',
+            marginTop: '2px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-1)',
+          }}>
+            <Building2 size={13} />
+            {job.department || job.company}
+          </p>
+        </div>
+        <Badge variant="warning">{score}% Holt</Badge>
+      </div>
+
+      {/* Meta row */}
+      <div style={{
+        display: 'flex',
+        gap: 'var(--space-4)',
+        flexWrap: 'wrap',
+        color: 'var(--color-text-muted)',
+        fontSize: '13px',
+        marginBottom: 'var(--space-3)',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+          <MapPin size={14} /> {job.location}
+        </span>
+        {formatSalary(job.salary_min, job.salary_max) && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <DollarSign size={14} /> {formatSalary(job.salary_min, job.salary_max)}
+          </span>
+        )}
+      </div>
+
+      {/* Progress bar + gap delta */}
+      <div className="within-reach-progress">
+        <div className="within-reach-progress__bar">
+          <div
+            className="within-reach-progress__fill"
+            style={{ width: `${score}%` }}
+          />
+          <div
+            className="within-reach-progress__target"
+            style={{ left: '70%' }}
+          />
+        </div>
+        <div className="within-reach-progress__labels">
+          <span className="within-reach-progress__score">{score}%</span>
+          <span className="within-reach-progress__delta">+{delta}% to 70%</span>
+        </div>
+      </div>
+
+      {/* Coaching label */}
+      <p style={{
+        fontWeight: 600,
+        fontSize: '13px',
+        color: 'var(--color-warning)',
+        marginBottom: 'var(--space-2)',
+      }}>
+        {coachLabel}
+      </p>
+
+      {/* Gap hints */}
+      {topGaps.length > 0 && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          {topGaps.map((gap, i) => (
+            <p key={i} style={{
+              fontSize: '12px',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 1.4,
+              paddingLeft: 'var(--space-3)',
+              borderLeft: '2px solid var(--color-warning)',
+              marginBottom: i < topGaps.length - 1 ? 'var(--space-2)' : 0,
+            }}>
+              {gap}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Expand toggle for more detail */}
+      {gaps.length > 3 && (
+        <button
+          className="within-reach-expand"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {expanded ? 'Show less' : `How to get there \u2192`}
+        </button>
+      )}
+
+      {expanded && gaps.length > 3 && (
+        <div style={{ marginTop: 'var(--space-2)' }}>
+          {gaps.slice(3).map((gap, i) => (
+            <p key={i} style={{
+              fontSize: '12px',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 1.4,
+              paddingLeft: 'var(--space-3)',
+              borderLeft: '2px solid var(--color-warning)',
+              marginBottom: 'var(--space-2)',
+            }}>
+              {gap}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         <Button
           variant="ghost"
           style={{ padding: '8px 14px', minHeight: '36px', fontSize: '13px' }}
