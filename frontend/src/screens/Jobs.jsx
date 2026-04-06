@@ -57,6 +57,7 @@ export default function Jobs() {
   // Private (Adzuna) state
   const [pvtJobs, setPvtJobs] = useState([]);
   const [pvtTotal, setPvtTotal] = useState(0);
+  const [pvtPage, setPvtPage] = useState(1);
   const [pvtLoading, setPvtLoading] = useState(false);
   const [pvtSearched, setPvtSearched] = useState(false);
 
@@ -196,7 +197,7 @@ export default function Jobs() {
   }
 
   // --- Private search ---
-  async function searchPrivate(kw, loc) {
+  async function searchPrivate(kw, loc, page = 1) {
     const searchKw = kw || analysisRoleName;
     if (!searchKw) return;
     setPvtLoading(true);
@@ -204,14 +205,18 @@ export default function Jobs() {
       const data = await searchAdzunaJobs({
         keyword: searchKw,
         location: loc || userLocation || undefined,
-        page: 1,
+        page,
       });
-      setPvtJobs(data.jobs || []);
+      if (page === 1) {
+        setPvtJobs(data.jobs || []);
+      } else {
+        setPvtJobs((prev) => [...prev, ...(data.jobs || [])]);
+      }
       setPvtTotal(data.total || 0);
+      setPvtPage(page);
       setPvtSearched(true);
     } catch {
-      setPvtJobs([]);
-      setPvtTotal(0);
+      if (page === 1) { setPvtJobs([]); setPvtTotal(0); }
       setPvtSearched(true);
     } finally {
       setPvtLoading(false);
@@ -234,6 +239,10 @@ export default function Jobs() {
 
   function handleLoadMoreFed() {
     searchFederal(keyword.trim(), location.trim(), fedPage + 1);
+  }
+
+  function handleLoadMorePvt() {
+    searchPrivate(keyword.trim(), location.trim(), pvtPage + 1);
   }
 
   function handleTabSwitch(tab) {
@@ -325,8 +334,9 @@ export default function Jobs() {
   );
 
   // Tab labels with counts
-  const fedLabel = fedSearched ? `Federal (${fedTotal.toLocaleString()})` : 'Federal';
-  const pvtLabel = pvtSearched ? `Private (${pvtTotal.toLocaleString()})` : 'Private';
+  const fmtCount = (n) => n > 1000 ? '1,000+' : n.toLocaleString();
+  const fedLabel = fedSearched ? `Federal (${fmtCount(fedTotal)})` : 'Federal';
+  const pvtLabel = pvtSearched ? `Private (${fmtCount(pvtTotal)})` : 'Private';
 
   return (
     <ScreenWrapper screenName="Jobs">
@@ -582,7 +592,7 @@ export default function Jobs() {
           fontSize: '13px',
           marginBottom: 'var(--space-3)',
         }}>
-          {activeTotal.toLocaleString()} {tabLabel.toLowerCase()} jobs found
+          {activeTotal > 1000 ? '1,000+' : activeTotal.toLocaleString()} {tabLabel.toLowerCase()} jobs found
         </p>
       )}
 
@@ -602,11 +612,18 @@ export default function Jobs() {
         ))}
       </div>
 
-      {/* Load more — federal only */}
+      {/* Load more */}
       {activeTab === 'federal' && fedSearched && fedJobs.length > 0 && fedJobs.length < fedTotal && (
         <div style={{ marginTop: 'var(--space-5)', textAlign: 'center' }}>
           <Button variant="secondary" onClick={handleLoadMoreFed} disabled={fedLoading}>
-            {fedLoading ? 'Loading...' : 'Load more jobs'}
+            {fedLoading ? 'Loading...' : 'Load more federal jobs'}
+          </Button>
+        </div>
+      )}
+      {activeTab === 'private' && pvtSearched && pvtJobs.length > 0 && pvtJobs.length < pvtTotal && (
+        <div style={{ marginTop: 'var(--space-5)', textAlign: 'center' }}>
+          <Button variant="secondary" onClick={handleLoadMorePvt} disabled={pvtLoading}>
+            {pvtLoading ? 'Loading...' : 'Load more private jobs'}
           </Button>
         </div>
       )}
