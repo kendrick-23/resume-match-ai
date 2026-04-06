@@ -6,7 +6,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { searchJobs, searchAdzunaJobs, createApplication, listAnalyses, getProfile } from '../services/api';
-import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target } from 'lucide-react';
+import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
 import './Jobs.css';
@@ -71,6 +71,13 @@ export default function Jobs() {
   const [salaryTarget, setSalaryTarget] = useState({ min: null, max: null });
   const [analysisRoleName, setAnalysisRoleName] = useState('');
   const [userLocation, setUserLocation] = useState('');
+  const [targetCompanies, setTargetCompanies] = useState([]);
+
+  // Sort and filter
+  const [sortBy, setSortBy] = useState('score');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterPostedWithin, setFilterPostedWithin] = useState('any');
+  const [showDealbreakers, setShowDealbreakers] = useState(true);
 
   const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword);
 
@@ -98,6 +105,9 @@ export default function Jobs() {
           min: profile.target_salary_min || null,
           max: profile.target_salary_max || null,
         });
+        setTargetCompanies(
+          (profile.target_companies || '').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
+        );
       } catch {
         // No profile yet
       }
@@ -261,33 +271,6 @@ export default function Jobs() {
     }
   }
 
-  function computeHoltScore(job) {
-    if (!hasAnalysis || analysisKeywords.length === 0) return null;
-    const jobText = `${job.title} ${job.department || ''} ${job.company || ''} ${job.description || ''}`.toLowerCase();
-    const matches = analysisKeywords.filter((kw) => jobText.includes(kw));
-    const keywordScore = Math.min(100, Math.round((matches.length / Math.min(analysisKeywords.length, 10)) * 100));
-
-    let salaryScore = 50;
-    if (salaryTarget.min && job.salary_min && job.salary_max) {
-      const targetMax = salaryTarget.max || salaryTarget.min * 1.5;
-      if (job.salary_max >= salaryTarget.min && job.salary_min <= targetMax) {
-        salaryScore = 100;
-      } else if (job.salary_max < salaryTarget.min) {
-        salaryScore = 0;
-      }
-    }
-
-    let scheduleScore = 50;
-    const titleLower = job.title.toLowerCase();
-    if (titleLower.includes('shift') || titleLower.includes('weekend') || titleLower.includes('night')) {
-      scheduleScore = 0;
-    } else if (titleLower.includes('manager') || titleLower.includes('specialist') || titleLower.includes('analyst') || titleLower.includes('program')) {
-      scheduleScore = 100;
-    }
-
-    return Math.round(keywordScore * 0.6 + salaryScore * 0.25 + scheduleScore * 0.15);
-  }
-
   function formatSalary(min, max) {
     if (!min && !max) return null;
     const fmt = (n) => '$' + n.toLocaleString();
@@ -296,20 +279,49 @@ export default function Jobs() {
     return `Up to ${fmt(max)}`;
   }
 
-  function getWithinReachJobs(jobList) {
-    return jobList
-      .map((job) => ({ ...job, _holtScore: computeHoltScore(job) }))
-      .filter((job) => job._holtScore != null && job._holtScore >= 50 && job._holtScore <= 69)
-      .sort((a, b) => b._holtScore - a._holtScore);
+  function sortJobs(jobList) {
+    const sorted = [...jobList];
+    switch (sortBy) {
+      case 'score': return sorted.sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0));
+      case 'newest': return sorted.sort((a, b) => (b.posted || '').localeCompare(a.posted || ''));
+      case 'salary_high': return sorted.sort((a, b) => (b.salary_max ?? 0) - (a.salary_max ?? 0));
+      case 'salary_low': return sorted.sort((a, b) => (a.salary_min ?? Infinity) - (b.salary_min ?? Infinity));
+      default: return sorted;
+    }
+  }
+
+  function filterJobs(jobList) {
+    return jobList.filter((job) => {
+      if (filterPostedWithin !== 'any' && job.posted) {
+        const posted = new Date(job.posted);
+        const now = new Date();
+        const diffH = (now - posted) / 3600000;
+        if (filterPostedWithin === '24h' && diffH > 24) return false;
+        if (filterPostedWithin === '3d' && diffH > 72) return false;
+        if (filterPostedWithin === '7d' && diffH > 168) return false;
+      }
+      return true;
+    });
   }
 
   // Active tab data
   const isSearched = activeTab === 'federal' ? fedSearched : pvtSearched;
   const isLoading = activeTab === 'federal' ? fedLoading : pvtLoading;
-  const activeJobs = activeTab === 'federal' ? fedJobs : pvtJobs;
+  const rawJobs = activeTab === 'federal' ? fedJobs : pvtJobs;
   const activeTotal = activeTab === 'federal' ? fedTotal : pvtTotal;
   const tabLabel = activeTab === 'federal' ? 'Federal' : 'Private';
-  const withinReachJobs = getWithinReachJobs(activeJobs);
+
+  // Apply filters then sort — target companies always first within sort
+  const filteredJobs = filterJobs(rawJobs);
+  const sortedJobs = sortJobs(filteredJobs);
+  const activeJobs = [
+    ...sortedJobs.filter((j) => j.is_target_company),
+    ...sortedJobs.filter((j) => !j.is_target_company),
+  ];
+
+  const withinReachJobs = activeJobs.filter(
+    (j) => j.holt_score != null && j.holt_score >= 50 && j.holt_score <= 69
+  );
 
   // Tab labels with counts
   const fedLabel = fedSearched ? `Federal (${fedTotal.toLocaleString()})` : 'Federal';
@@ -340,7 +352,7 @@ export default function Jobs() {
                 onSave={handleSave}
                 formatSalary={formatSalary}
                 recommended
-                holtScore={computeHoltScore(job)}
+                holtScore={job.holt_score}
               />
             ))}
           </div>
@@ -420,6 +432,64 @@ export default function Jobs() {
         </div>
       )}
 
+      {/* Sort + Filter controls */}
+      {(fedSearched || pvtSearched) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="jobs-sort-select"
+          >
+            <option value="score">Best match</option>
+            <option value="newest">Newest first</option>
+            <option value="salary_high">Salary: high to low</option>
+            <option value="salary_low">Salary: low to high</option>
+          </select>
+
+          <button
+            className={`jobs-filter-chip ${showFilters ? 'jobs-filter-chip--active' : ''}`}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <SlidersHorizontal size={14} /> Filters
+          </button>
+        </div>
+      )}
+
+      {showFilters && (
+        <Card style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div>
+              <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+                Posted within
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {[['any', 'Any time'], ['24h', '24 hours'], ['3d', '3 days'], ['7d', '1 week']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    className={`jobs-filter-chip ${filterPostedWithin === val ? 'jobs-filter-chip--active' : ''}`}
+                    onClick={() => setFilterPostedWithin(val)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showDealbreakers}
+                onChange={(e) => setShowDealbreakers(e.target.checked)}
+                style={{ width: '18px', height: '18px', accentColor: 'var(--color-accent)' }}
+              />
+              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                Show dealbreaker jobs (dimmed)
+              </span>
+            </label>
+          </div>
+        </Card>
+      )}
+
       {/* Error — federal only */}
       {activeTab === 'federal' && fedError && (
         <Card style={{ background: 'var(--color-danger-light)', marginBottom: 'var(--space-4)' }}>
@@ -492,7 +562,7 @@ export default function Jobs() {
               <WithinReachCard
                 key={'wr-' + job.id + job.title}
                 job={job}
-                score={job._holtScore}
+                score={job.holt_score}
                 gaps={analysisGaps}
                 savedIds={savedIds}
                 onSave={handleSave}
@@ -517,14 +587,16 @@ export default function Jobs() {
 
       {/* Job cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        {activeJobs.map((job) => (
+        {activeJobs
+          .filter((job) => showDealbreakers || !job.dealbreaker_triggered)
+          .map((job) => (
           <JobCard
             key={job.id + job.title}
             job={job}
             savedIds={savedIds}
             onSave={handleSave}
             formatSalary={formatSalary}
-            holtScore={computeHoltScore(job)}
+            holtScore={job.holt_score}
           />
         ))}
       </div>
@@ -551,8 +623,45 @@ function SourceBadge({ source }) {
 
 
 function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, holtScore }) {
+  const isDealbreaker = job.dealbreaker_triggered;
+  const isTarget = job.is_target_company;
+
   return (
-    <Card>
+    <Card style={isDealbreaker ? { opacity: 0.6 } : {}}>
+      {/* Target company badge */}
+      {isTarget && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-1)',
+          marginBottom: 'var(--space-2)',
+          padding: '4px 10px',
+          background: 'var(--color-warning-light)',
+          borderRadius: 'var(--radius-full)',
+          width: 'fit-content',
+          fontSize: '12px',
+          fontWeight: 700,
+          color: 'var(--color-warning)',
+        }}>
+          <Star size={12} /> Target company
+        </div>
+      )}
+
+      {/* Dealbreaker notice */}
+      {isDealbreaker && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-1)',
+          marginBottom: 'var(--space-2)',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: 'var(--color-text-muted)',
+        }}>
+          <AlertTriangle size={12} /> Outside your preferences
+        </div>
+      )}
+
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
