@@ -11,6 +11,7 @@ import { getProfile, updateProfile, deleteAllData, listAnalyses, listBadges } fr
 import { supabase } from '../services/supabase';
 import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, TrendingUp } from 'lucide-react';
 import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
+import { useToast } from '../context/ToastContext';
 
 const BADGE_META = {
   first_dive:   { emoji: '\u{1F30A}', name: 'First Dive' },
@@ -44,6 +45,8 @@ export default function Profile() {
   const [skillsExtracted, setSkillsExtracted] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const toast = useToast();
   const [analyses, setAnalyses] = useState([]);
   const [earnedBadges, setEarnedBadges] = useState([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -120,10 +123,12 @@ export default function Profile() {
       if (Object.keys(updates).length > 0) {
         await updateProfile(updates);
         setSaved(true);
+        setHasChanges(false);
+        toast.success('Profile updated');
         setTimeout(() => setSaved(false), 2000);
       }
     } catch {
-      // Handle error
+      toast.error('Save failed — try again');
     } finally {
       setSaving(false);
     }
@@ -263,7 +268,7 @@ export default function Profile() {
                 <button
                   key={val}
                   type="button"
-                  onClick={() => setSchedulePref(val)}
+                  onClick={() => { setSchedulePref(val); setHasChanges(true); }}
                   className={`tracker-stage-tab${schedulePref === val ? ' tracker-stage-tab--active' : ''}`}
                 >
                   {label}
@@ -281,7 +286,7 @@ export default function Profile() {
               min={5}
               max={50}
               value={maxCommute}
-              onChange={(e) => setMaxCommute(parseInt(e.target.value, 10))}
+              onChange={(e) => { setMaxCommute(parseInt(e.target.value, 10)); setHasChanges(true); }}
               style={{ width: '100%', accentColor: 'var(--color-accent)' }}
             />
           </div>
@@ -296,7 +301,7 @@ export default function Profile() {
             <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Degree Status</p>
             <select
               value={degreeStatus}
-              onChange={(e) => setDegreeStatus(e.target.value)}
+              onChange={(e) => { setDegreeStatus(e.target.value); setHasChanges(true); }}
               style={{
                 width: '100%',
                 padding: '12px var(--space-4)',
@@ -320,7 +325,7 @@ export default function Profile() {
             <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Work Authorization</p>
             <select
               value={workAuth}
-              onChange={(e) => setWorkAuth(e.target.value)}
+              onChange={(e) => { setWorkAuth(e.target.value); setHasChanges(true); }}
               style={{
                 width: '100%',
                 padding: '12px var(--space-4)',
@@ -405,7 +410,7 @@ export default function Profile() {
             <button
               key={val}
               type="button"
-              onClick={() => setJobSeekerStatus(val)}
+              onClick={() => { setJobSeekerStatus(val); setHasChanges(true); }}
               className={`tracker-stage-tab${jobSeekerStatus === val ? ' tracker-stage-tab--active' : ''}`}
             >
               {label}
@@ -427,7 +432,7 @@ export default function Profile() {
               <input
                 type="checkbox"
                 checked={dealbreakers[key] || false}
-                onChange={(e) => setDealbreakers((prev) => ({ ...prev, [key]: e.target.checked }))}
+                onChange={(e) => { setDealbreakers((prev) => ({ ...prev, [key]: e.target.checked })); setHasChanges(true); }}
                 style={{ width: '20px', height: '20px', accentColor: 'var(--color-accent)' }}
               />
               <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>{label}</span>
@@ -435,6 +440,22 @@ export default function Profile() {
           ))}
         </div>
       </Card>
+
+      {/* Save all preferences */}
+      {hasChanges && (
+        <p style={{
+          textAlign: 'center',
+          fontSize: '13px',
+          fontWeight: 600,
+          color: 'var(--color-warning)',
+          marginBottom: 'var(--space-2)',
+        }}>
+          Unsaved changes
+        </p>
+      )}
+      <Button full onClick={handleSave} disabled={saving} style={{ marginBottom: 'var(--space-5)' }}>
+        <Save size={16} /> {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All Preferences'}
+      </Button>
 
       {/* Skills from resume */}
       {skillsExtracted.length > 0 && (
