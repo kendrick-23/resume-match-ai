@@ -8,8 +8,10 @@ import Ott from '../components/ott/Ott';
 import { searchJobs, createApplication, listAnalyses, getProfile } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
+import { useToast } from '../context/ToastContext';
 
 export default function Jobs() {
+  const toast = useToast();
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('');
   const [jobs, setJobs] = useState([]);
@@ -144,6 +146,7 @@ export default function Jobs() {
 
   async function handleSave(job) {
     if (savedIds.has(job.id)) return;
+    setSavedIds((prev) => new Set(prev).add(job.id));
     try {
       await createApplication({
         company: job.department || job.company,
@@ -152,9 +155,14 @@ export default function Jobs() {
         url: job.url || job.apply_url,
         notes: `Source: USAJobs | Location: ${job.location}`,
       });
-      setSavedIds((prev) => new Set(prev).add(job.id));
+      toast.success('Saved to your tracker!');
     } catch {
-      // Silently fail
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+      toast.error("Couldn't save — tap to retry", { onTap: () => handleSave(job) });
     }
   }
 

@@ -9,6 +9,7 @@ import { useStreak } from '../hooks/useStreak';
 import { getActivity, listBadges } from '../services/api';
 import { FileText, ClipboardList, Search, Clock } from 'lucide-react';
 import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
+import { useToast } from '../context/ToastContext';
 
 const BADGE_META = {
   first_dive:   { emoji: '\u{1F30A}', name: 'First Dive' },
@@ -23,6 +24,7 @@ const BADGE_META = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const toast = useToast();
   const { streak } = useStreak();
   const [activity, setActivity] = useState(null);
   const [earnedBadges, setEarnedBadges] = useState([]);
@@ -37,7 +39,7 @@ export default function Dashboard() {
       const data = await getActivity();
       setActivity(data);
     } catch {
-      // Silently fail
+      toast.warning("Couldn't load your stats");
     }
   }
 
@@ -46,7 +48,7 @@ export default function Dashboard() {
       const data = await listBadges();
       setEarnedBadges(data.map((b) => b.badge_key));
     } catch {
-      // Silently fail
+      toast.warning("Couldn't load badges");
     }
   }
 

@@ -8,6 +8,7 @@ import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
 import { Copy, Download } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import './Results.css';
 
 const RING_SIZE = 140;
@@ -117,6 +118,7 @@ export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const toast = useToast();
   const [result, setResult] = useState(location.state?.result || null);
   const [pastAnalyses, setPastAnalyses] = useState([]);
   const [loading, setLoading] = useState(!location.state?.result);
@@ -526,7 +528,7 @@ export default function Results() {
                   <Button
                     variant="secondary"
                     full
-                    onClick={() => downloadResumeAsDocx(resumeMd, result.role_name, result.company_name)}
+                    onClick={() => downloadResumeAsDocx(resumeMd, result.role_name, result.company_name, (msg) => toast.error(msg))}
                   >
                     <Download size={16} /> Download as Word Doc
                   </Button>

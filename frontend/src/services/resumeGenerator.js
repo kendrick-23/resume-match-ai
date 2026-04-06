@@ -82,10 +82,17 @@ export function parseResumeMarkdown(md) {
  * Convert markdown resume to a .docx file and trigger download.
  * Dynamically imports docx + file-saver to avoid loading them on page load.
  */
-export async function downloadResumeAsDocx(md, roleName = '', companyName = '') {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx');
-  const { saveAs } = await import('file-saver');
+export async function downloadResumeAsDocx(md, roleName = '', companyName = '', onError) {
+  let Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, saveAs;
+  try {
+    ({ Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx'));
+    ({ saveAs } = await import('file-saver'));
+  } catch {
+    if (onError) onError('Download failed — try again');
+    return;
+  }
 
+  try {
   const sections = parseResumeMarkdown(md);
   const children = [];
 
@@ -196,4 +203,7 @@ export async function downloadResumeAsDocx(md, roleName = '', companyName = '') 
     .replace(/\s+/g, '_')
     + '.docx';
   saveAs(blob, fileName);
+  } catch {
+    if (onError) onError('Download failed — try again');
+  }
 }
