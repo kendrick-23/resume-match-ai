@@ -121,30 +121,30 @@ export default function Profile() {
     setSaving(true);
     setSaved(false);
     try {
-      const updates = {};
-      if (fullName.trim()) updates.full_name = fullName.trim();
-      if (jobTitle.trim()) updates.job_title = jobTitle.trim();
-      if (targetRoles.trim()) updates.target_roles = targetRoles.trim();
-      if (targetSalaryMin) updates.target_salary_min = parseInt(targetSalaryMin, 10);
-      if (targetSalaryMax) updates.target_salary_max = parseInt(targetSalaryMax, 10);
-      if (location.trim()) updates.location = location.trim();
-      if (schedulePref) updates.schedule_preference = schedulePref;
-      if (maxCommute !== 30) updates.max_commute_miles = maxCommute;
-      if (degreeStatus) updates.degree_status = degreeStatus;
-      if (workAuth) updates.work_authorization = workAuth;
-      if (targetCompanies.trim()) updates.target_companies = targetCompanies.trim();
-      if (Object.values(dealbreakers).some(Boolean)) updates.dealbreakers = dealbreakers;
-      if (jobSeekerStatus) updates.job_seeker_status = jobSeekerStatus;
-      if (linkedinText.trim()) updates.linkedin_text = linkedinText.trim();
-      if (aboutMe.trim()) updates.about_me = aboutMe.trim();
+      const updates = {
+        full_name: fullName.trim() || null,
+        job_title: jobTitle.trim() || null,
+        target_roles: targetRoles.trim() || null,
+        target_salary_min: targetSalaryMin ? parseInt(targetSalaryMin, 10) : null,
+        target_salary_max: targetSalaryMax ? parseInt(targetSalaryMax, 10) : null,
+        location: location.trim() || null,
+        schedule_preference: schedulePref || null,
+        max_commute_miles: maxCommute,
+        degree_status: degreeStatus || null,
+        work_authorization: workAuth || null,
+        target_companies: targetCompanies.trim() || null,
+        dealbreakers: dealbreakers,
+        job_seeker_status: jobSeekerStatus || null,
+        linkedin_text: linkedinText.trim() || null,
+        about_me: aboutMe.trim() || null,
+        skills_extracted: skillsExtracted,
+      };
 
-      if (Object.keys(updates).length > 0) {
-        await updateProfile(updates);
-        setSaved(true);
-        setHasChanges(false);
-        toast.success('Profile updated');
-        setTimeout(() => setSaved(false), 2000);
-      }
+      await updateProfile(updates);
+      setSaved(true);
+      setHasChanges(false);
+      toast.success('Profile updated');
+      setTimeout(() => setSaved(false), 2000);
     } catch {
       toast.error('Save failed — try again');
     } finally {
@@ -378,19 +378,19 @@ export default function Profile() {
             label="Name"
             placeholder="Your name"
             value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            onChange={(e) => { setFullName(e.target.value); setHasChanges(true); }}
           />
           <Input
             label="Job Title"
             placeholder="e.g. Operations Manager"
             value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
+            onChange={(e) => { setJobTitle(e.target.value); setHasChanges(true); }}
           />
           <Input
             label="Target Roles"
             placeholder="e.g. Program Manager, Operations Lead"
             value={targetRoles}
-            onChange={(e) => setTargetRoles(e.target.value)}
+            onChange={(e) => { setTargetRoles(e.target.value); setHasChanges(true); }}
           />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <Input
@@ -398,21 +398,21 @@ export default function Profile() {
               type="number"
               placeholder="e.g. 80000"
               value={targetSalaryMin}
-              onChange={(e) => setTargetSalaryMin(e.target.value)}
+              onChange={(e) => { setTargetSalaryMin(e.target.value); setHasChanges(true); }}
             />
             <Input
               label="Max Salary"
               type="number"
               placeholder="e.g. 120000"
               value={targetSalaryMax}
-              onChange={(e) => setTargetSalaryMax(e.target.value)}
+              onChange={(e) => { setTargetSalaryMax(e.target.value); setHasChanges(true); }}
             />
           </div>
           <Input
             label="Location"
             placeholder="e.g. Tampa, FL"
             value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            onChange={(e) => { setLocation(e.target.value); setHasChanges(true); }}
           />
           <Input
             textarea
@@ -422,9 +422,6 @@ export default function Profile() {
             onChange={(e) => { setAboutMe(e.target.value); setHasChanges(true); }}
             style={{ minHeight: '80px' }}
           />
-          <Button full onClick={handleSave} disabled={saving}>
-            <Save size={16} /> {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Profile'}
-          </Button>
         </div>
       </Card>
 
@@ -612,21 +609,7 @@ export default function Profile() {
         </div>
       </Card>
 
-      {/* Save all preferences */}
-      {hasChanges && (
-        <p style={{
-          textAlign: 'center',
-          fontSize: '13px',
-          fontWeight: 600,
-          color: 'var(--color-warning)',
-          marginBottom: 'var(--space-2)',
-        }}>
-          Unsaved changes
-        </p>
-      )}
-      <Button full onClick={handleSave} disabled={saving} style={{ marginBottom: 'var(--space-5)' }}>
-        <Save size={16} /> {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All Preferences'}
-      </Button>
+      {/* Spacer before skills — sticky save footer handles saving now */}
 
       {/* Skills — editable */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
@@ -656,7 +639,7 @@ export default function Profile() {
                   {skill}
                   {editingSkills && (
                     <button
-                      onClick={() => setSkillsExtracted((prev) => prev.filter((_, j) => j !== i))}
+                      onClick={() => { setSkillsExtracted((prev) => prev.filter((_, j) => j !== i)); setHasChanges(true); }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-accent-dark)', padding: 0, fontSize: '14px' }}
                     >
                       &times;
@@ -676,7 +659,7 @@ export default function Profile() {
                       if ((e.key === 'Enter' || e.key === ',') && skillInput.trim()) {
                         e.preventDefault();
                         if (!skillsExtracted.includes(skillInput.trim())) {
-                          setSkillsExtracted((prev) => [...prev, skillInput.trim()]);
+                          setSkillsExtracted((prev) => [...prev, skillInput.trim()]); setHasChanges(true);
                         }
                         setSkillInput('');
                       }
@@ -691,7 +674,7 @@ export default function Profile() {
                     .map((s) => (
                       <button
                         key={s}
-                        onClick={() => setSkillsExtracted((prev) => [...prev, s])}
+                        onClick={() => { setSkillsExtracted((prev) => [...prev, s]); setHasChanges(true); }}
                         style={{
                           padding: '3px 10px', border: '1px dashed var(--color-border-strong)',
                           borderRadius: 'var(--radius-full)', background: 'none', cursor: 'pointer',
@@ -703,13 +686,7 @@ export default function Profile() {
                       </button>
                     ))}
                 </div>
-                <Button
-                  variant="secondary"
-                  onClick={handleSaveSkills}
-                  style={{ marginTop: 'var(--space-3)', padding: '8px 16px', minHeight: '36px', fontSize: '13px' }}
-                >
-                  Save skills
-                </Button>
+                {/* Skills saved via the sticky footer along with all other fields */}
               </>
             )}
           </>
@@ -723,7 +700,7 @@ export default function Profile() {
                 .map((s) => (
                   <button
                     key={s}
-                    onClick={() => { setSkillsExtracted((prev) => [...prev, s]); setEditingSkills(true); }}
+                    onClick={() => { setSkillsExtracted((prev) => [...prev, s]); setEditingSkills(true); setHasChanges(true); }}
                     style={{
                       padding: '3px 10px', border: '1px dashed var(--color-border-strong)',
                       borderRadius: 'var(--radius-full)', background: 'none', cursor: 'pointer',
@@ -957,6 +934,30 @@ export default function Profile() {
           </Button>
         )}
       </div>
+      {/* Sticky save footer */}
+      {hasChanges && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'var(--bottom-nav-height)',
+          left: 0,
+          right: 0,
+          background: 'var(--color-surface-raised)',
+          borderTop: '1.5px solid var(--color-border)',
+          padding: 'var(--space-3) var(--space-4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--space-4)',
+          zIndex: 100,
+        }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)' }}>
+            Unsaved changes
+          </span>
+          <Button onClick={handleSave} disabled={saving} style={{ minWidth: '140px' }}>
+            <Save size={14} /> {saving ? 'Saving...' : 'Save all changes'}
+          </Button>
+        </div>
+      )}
     </ScreenWrapper>
   );
 }
