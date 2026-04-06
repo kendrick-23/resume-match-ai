@@ -134,7 +134,8 @@ Important formatting rules:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[/generate-resume] Error: {e}")
+        raise HTTPException(status_code=500, detail="Something went wrong generating your resume. Please try again.")
 
 
 @router.get("/generate-resume/{analysis_id}")

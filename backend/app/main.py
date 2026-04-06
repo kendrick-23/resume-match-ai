@@ -349,4 +349,5 @@ Return ONLY the tips as a JSON array of strings. No other text."""
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[/analyze] Error: {e}")
+        raise HTTPException(status_code=500, detail="Something went wrong during analysis. Please try again.")
