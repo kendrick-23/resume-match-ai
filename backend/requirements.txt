@@ -9,3 +9,4 @@ supabase
 PyJWT
 httpx
 slowapi
+python-jobspy

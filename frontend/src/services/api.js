@@ -180,6 +180,16 @@ export async function generateInterviewPrep({ role, company, gaps, jobDescriptio
   });
 }
 
+export async function searchAggregatedJobs({ keyword, location, page }) {
+  const headers = await authHeaders();
+  const params = new URLSearchParams();
+  if (keyword) params.set('keyword', keyword);
+  if (location) params.set('location', location);
+  if (page) params.set('page', page);
+
+  return apiRequest(`${API_URL}/jobs/aggregated?${params}`, { headers });
+}
+
 export async function searchAdzunaJobs({ keyword, location, page }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();
