@@ -623,8 +623,10 @@ function SourceBadge({ source }) {
 
 
 function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, holtScore }) {
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const isDealbreaker = job.dealbreaker_triggered;
   const isTarget = job.is_target_company;
+  const breakdown = job.holt_breakdown;
 
   return (
     <Card style={isDealbreaker ? { opacity: 0.6 } : {}}>
@@ -715,6 +717,52 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
           </span>
         )}
       </div>
+
+      {/* Score breakdown toggle */}
+      {breakdown && holtScore != null && (
+        <>
+          <button
+            onClick={() => setShowBreakdown(!showBreakdown)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
+              fontWeight: 600, fontSize: '12px', marginBottom: 'var(--space-2)',
+            }}
+          >
+            {showBreakdown ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            {job.coaching_label || 'Score breakdown'}
+          </button>
+          {showBreakdown && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-1) var(--space-4)',
+              fontSize: '12px', marginBottom: 'var(--space-3)',
+              padding: 'var(--space-2)', background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)',
+            }}>
+              {[
+                ['Skills', breakdown.skills_match],
+                ['Salary', breakdown.salary_alignment],
+                ['Schedule', breakdown.schedule_fit],
+                ['Experience', breakdown.experience_match],
+                ['Location', breakdown.location_fit],
+              ].map(([label, val]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+                  <span style={{
+                    fontWeight: 700,
+                    color: val >= 70 ? 'var(--color-success)' : val >= 50 ? 'var(--color-warning)' : 'var(--color-accent)',
+                  }}>{val}</span>
+                </div>
+              ))}
+              {breakdown.degree_flag !== 'none' && (
+                <div style={{ gridColumn: '1 / -1', color: 'var(--color-warning)', fontWeight: 600 }}>
+                  Degree: {breakdown.degree_flag}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {job.closing && (
         <p style={{

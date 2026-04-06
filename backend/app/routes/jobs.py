@@ -68,6 +68,7 @@ async def search_jobs(
     salary_max: Optional[int] = Query(default=None, ge=0),
     remote: Optional[bool] = Query(default=None),
     page: int = Query(default=1, ge=1),
+    user: dict = Depends(get_current_user),
 ):
     """Search for jobs via USAJobs API."""
     try:
@@ -79,6 +80,7 @@ async def search_jobs(
             remote=remote,
             page=page,
         )
+        results["jobs"] = _score_jobs(results.get("jobs", []), user)
         return results
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"USAJobs API error: {str(e)}")
