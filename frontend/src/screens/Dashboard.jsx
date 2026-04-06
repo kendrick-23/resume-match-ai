@@ -27,7 +27,9 @@ export default function Dashboard() {
   const toast = useToast();
   const { streak } = useStreak();
   const [activity, setActivity] = useState(null);
+  const [activityError, setActivityError] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState([]);
+  const [badgesError, setBadgesError] = useState(false);
 
   useEffect(() => {
     loadActivity();
@@ -35,20 +37,22 @@ export default function Dashboard() {
   }, []);
 
   async function loadActivity() {
+    setActivityError(false);
     try {
       const data = await getActivity();
       setActivity(data);
     } catch {
-      toast.warning("Couldn't load your stats");
+      setActivityError(true);
     }
   }
 
   async function loadBadges() {
+    setBadgesError(false);
     try {
       const data = await listBadges();
       setEarnedBadges(data.map((b) => b.badge_key));
     } catch {
-      toast.warning("Couldn't load badges");
+      setBadgesError(true);
     }
   }
 
@@ -102,29 +106,41 @@ export default function Dashboard() {
       </Card>
 
       {/* Today's summary */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 'var(--space-3)',
-        marginBottom: 'var(--space-6)',
-      }}>
-        <Card>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
-            Analyses today
+      {activityError ? (
+        <Card style={{ textAlign: 'center', marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
+          <Ott state="coaching" size={48} />
+          <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
+            Couldn't load your stats
           </p>
-          <p style={{ fontWeight: 800, fontSize: '24px' }}>
-            {activity?.analyses_today ?? 0}
-          </p>
+          <Button variant="ghost" onClick={loadActivity} style={{ marginTop: 'var(--space-2)' }}>
+            Tap to retry
+          </Button>
         </Card>
-        <Card>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
-            Applications logged
-          </p>
-          <p style={{ fontWeight: 800, fontSize: '24px' }}>
-            {activity?.applications_today ?? 0}
-          </p>
-        </Card>
-      </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 'var(--space-3)',
+          marginBottom: 'var(--space-6)',
+        }}>
+          <Card>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
+              Analyses today
+            </p>
+            <p style={{ fontWeight: 800, fontSize: '24px' }}>
+              {activity?.analyses_today ?? 0}
+            </p>
+          </Card>
+          <Card>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
+              Applications logged
+            </p>
+            <p style={{ fontWeight: 800, fontSize: '24px' }}>
+              {activity?.applications_today ?? 0}
+            </p>
+          </Card>
+        </div>
+      )}
 
       {/* Quick action cards */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Quick actions</h3>
@@ -195,20 +211,29 @@ export default function Dashboard() {
 
       {/* Badge shelf */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Milestones</h3>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-        {Object.entries(BADGE_META).map(([key, meta]) => {
-          const earned = earnedBadges.includes(key);
-          return (
-            <Badge
-              key={key}
-              variant={earned ? 'success' : 'info'}
-              style={earned ? {} : { opacity: 0.5 }}
-            >
-              {meta.emoji} {meta.name}{earned ? '' : ' — Locked'}
-            </Badge>
-          );
-        })}
-      </div>
+      {badgesError ? (
+        <Card style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Couldn't load badges</p>
+          <Button variant="ghost" onClick={loadBadges} style={{ marginTop: 'var(--space-2)' }}>
+            Tap to retry
+          </Button>
+        </Card>
+      ) : (
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+          {Object.entries(BADGE_META).map(([key, meta]) => {
+            const earned = earnedBadges.includes(key);
+            return (
+              <Badge
+                key={key}
+                variant={earned ? 'success' : 'info'}
+                style={earned ? {} : { opacity: 0.5 }}
+              >
+                {meta.emoji} {meta.name}{earned ? '' : ' \u2014 Locked'}
+              </Badge>
+            );
+          })}
+        </div>
+      )}
     </ScreenWrapper>
   );
 }

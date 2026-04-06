@@ -83,9 +83,15 @@ export default function Profile() {
       setDegreeStatus(data.degree_status || '');
       setWorkAuth(data.work_authorization || '');
       setTargetCompanies(data.target_companies || '');
-      setDealbreakers(data.dealbreakers || { hard_degree_required: false, below_salary: false, outside_commute: false });
+      // Handle dealbreakers — may come as JSON string from old data or dict from JSONB
+      let db = data.dealbreakers;
+      if (typeof db === 'string') { try { db = JSON.parse(db); } catch { db = null; } }
+      setDealbreakers(db || { hard_degree_required: false, below_salary: false, outside_commute: false });
       setJobSeekerStatus(data.job_seeker_status || 'actively_hunting');
-      setSkillsExtracted(data.skills_extracted || []);
+      // Handle skills_extracted — may come as JSON string or array
+      let sk = data.skills_extracted;
+      if (typeof sk === 'string') { try { sk = JSON.parse(sk); } catch { sk = []; } }
+      setSkillsExtracted(sk || []);
       setLinkedinText(data.linkedin_text || '');
       setAboutMe(data.about_me || '');
     } catch {
@@ -708,9 +714,28 @@ export default function Profile() {
             )}
           </>
         ) : (
-          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-3) 0' }}>
-            Upload and analyze a resume to see your skills inventory
-          </p>
+          <div style={{ textAlign: 'center', padding: 'var(--space-3) 0' }}>
+            <p style={{ color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
+              Add skills to improve your job matches
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {['Team leadership', 'Inventory management', 'Scheduling', 'Compliance', 'Customer service', 'Budgeting']
+                .map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setSkillsExtracted((prev) => [...prev, s]); setEditingSkills(true); }}
+                    style={{
+                      padding: '3px 10px', border: '1px dashed var(--color-border-strong)',
+                      borderRadius: 'var(--radius-full)', background: 'none', cursor: 'pointer',
+                      fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)',
+                      fontFamily: "'Nunito', sans-serif",
+                    }}
+                  >
+                    + {s}
+                  </button>
+                ))}
+            </div>
+          </div>
         )}
       </Card>
 

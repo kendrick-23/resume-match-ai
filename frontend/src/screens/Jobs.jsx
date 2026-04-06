@@ -64,6 +64,7 @@ export default function Jobs() {
   // Smart feed state
   const [recommended, setRecommended] = useState([]);
   const [recLoading, setRecLoading] = useState(true);
+  const [recError, setRecError] = useState(false);
   const [hasAnalysis, setHasAnalysis] = useState(false);
 
   // Holt score data
@@ -95,6 +96,7 @@ export default function Jobs() {
   }, []);
 
   async function loadRecommendations() {
+    setRecError(false);
     try {
       // Load profile first for target roles + location
       let profileTargetRoles = '';
@@ -162,11 +164,11 @@ export default function Jobs() {
         });
         // Top 5 by Holt Score (already sorted by backend)
         setRecommended((data.jobs || []).slice(0, 5));
-      } catch (err) {
-        console.warn('[Jobs] Recommendation search failed:', err.message);
+      } catch {
+        setRecError(true);
       }
-    } catch (err) {
-      console.warn('[Jobs] Failed to load analyses:', err.message);
+    } catch {
+      setRecError(true);
     } finally {
       setRecLoading(false);
     }
@@ -423,8 +425,25 @@ export default function Jobs() {
         </div>
       )}
 
+      {/* Recommendations error state */}
+      {recError && !recLoading && !fedSearched && !pvtSearched && (
+        <Card style={{
+          textAlign: 'center',
+          padding: 'var(--space-5)',
+          marginBottom: 'var(--space-5)',
+        }}>
+          <Ott state="coaching" size={64} />
+          <p style={{ fontWeight: 700, marginTop: 'var(--space-3)', fontSize: '14px' }}>
+            Couldn't load recommendations
+          </p>
+          <Button variant="ghost" onClick={loadRecommendations} style={{ marginTop: 'var(--space-2)' }}>
+            Tap to retry
+          </Button>
+        </Card>
+      )}
+
       {/* No analysis — prompt to analyze first */}
-      {!recLoading && !hasAnalysis && !fedSearched && (
+      {!recLoading && !recError && !hasAnalysis && !fedSearched && (
         <Card style={{
           textAlign: 'center',
           padding: 'var(--space-5)',
