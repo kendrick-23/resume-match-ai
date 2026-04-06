@@ -90,25 +90,65 @@ def calculate_holt_score(
         skills_match = 65
 
     # Domain mismatch detection — scan title AND first 500 chars of description
-    domain_requirements = {
-        "nurse": ["nursing", "rn", "bsn", "lpn", "clinical", "patient care", "bedside"],
-        "psychologist": ["psychology degree", "doctoral", "phd", "psyd",
-                         "clinical psychology", "licensure", "lcsw", "mental health"],
-        "therapist": ["therapy license", "lmft", "lpc", "clinical hours",
-                      "supervised practice"],
-        "physician": ["medical degree", "md", "do", "residency", "clinical",
-                      "board certified"],
-        "pharmacist": ["pharmacy degree", "pharmd", "rph", "dispensing"],
-        "engineer": ["engineering degree", "pe license", "p.e.", "licensed engineer"],
-        "attorney": ["law degree", "jd", "bar exam", "admitted to bar", "esquire"],
-        "pilot": ["faa", "flight hours", "atp", "commercial pilot certificate"],
-        "teacher": ["teaching certificate", "education degree", "state certification",
-                    "classroom"],
-        "social worker": ["msw", "lcsw", "social work license", "field placement"],
-        "accountant": ["cpa", "accounting degree", "cma", "audit", "gaap"],
-        "dentist": ["dds", "dmd", "dental degree", "dental license"],
-        "veterinarian": ["dvm", "veterinary degree", "veterinary license"],
-    }
+    # Each domain maps trigger words (title/desc) → required background signals
+    domain_requirements = [
+        {
+            "triggers": ["nurse", "nursing degree", "nursing license"],
+            "signals": ["nursing", "rn", "bsn", "lpn", "clinical", "patient care", "bedside"],
+        },
+        {
+            "triggers": ["psychologist", "psychology", "psychological"],
+            "signals": ["psychology degree", "doctoral", "phd", "psyd",
+                        "clinical psychology", "licensure", "mental health"],
+        },
+        {
+            "triggers": ["therapist", "therapy"],
+            "signals": ["therapy license", "lmft", "lpc", "clinical hours",
+                        "supervised practice", "counseling"],
+        },
+        {
+            "triggers": ["physician", "medicine", "medical degree"],
+            "signals": ["medical degree", "md", "do", "residency", "clinical",
+                        "board certified"],
+        },
+        {
+            "triggers": ["pharmacist", "pharmacy", "pharmaceutical"],
+            "signals": ["pharmacy degree", "pharmd", "rph", "dispensing"],
+        },
+        {
+            "triggers": ["engineer", "engineering degree"],
+            "signals": ["engineering degree", "pe license", "p.e.", "licensed engineer"],
+        },
+        {
+            "triggers": ["attorney", "law degree", "legal degree"],
+            "signals": ["law degree", "jd", "bar exam", "admitted to bar", "esquire"],
+        },
+        {
+            "triggers": ["pilot"],
+            "signals": ["faa", "flight hours", "atp", "commercial pilot certificate"],
+        },
+        {
+            "triggers": ["teacher", "teaching"],
+            "signals": ["teaching certificate", "education degree", "state certification",
+                        "classroom"],
+        },
+        {
+            "triggers": ["social worker"],
+            "signals": ["msw", "lcsw", "social work license", "field placement"],
+        },
+        {
+            "triggers": ["accountant", "accounting"],
+            "signals": ["cpa", "accounting degree", "cma", "gaap"],
+        },
+        {
+            "triggers": ["dentist", "dental"],
+            "signals": ["dds", "dmd", "dental degree", "dental license"],
+        },
+        {
+            "triggers": ["veterinarian", "veterinary"],
+            "signals": ["dvm", "veterinary degree", "veterinary license"],
+        },
+    ]
 
     domain_penalty_applied = False
     skills_str = " ".join(skills).lower()
@@ -116,9 +156,11 @@ def calculate_holt_score(
     # Scan both title and beginning of description for domain keywords
     domain_scan_text = f"{job_title} {job_desc[:500]}"
 
-    for domain_kw, required_signals in domain_requirements.items():
-        if domain_kw in domain_scan_text:
-            has_background = any(sig in skills_str or sig in degree for sig in required_signals)
+    for domain in domain_requirements:
+        if any(trigger in domain_scan_text for trigger in domain["triggers"]):
+            has_background = any(
+                sig in skills_str or sig in degree for sig in domain["signals"]
+            )
             if not has_background:
                 skills_match = max(0, skills_match - 40)
                 degree_warning = True
