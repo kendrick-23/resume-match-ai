@@ -14,6 +14,7 @@ import {
   checkBadges,
 } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
+import { useToast } from '../context/ToastContext';
 
 const STAGES = ['Saved', 'Applied', 'Responded', 'Interview', 'Offer', 'Closed'];
 
@@ -27,6 +28,7 @@ const STAGE_VARIANT = {
 };
 
 export default function Tracker() {
+  const toast = useToast();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState(null);
@@ -67,13 +69,16 @@ export default function Tracker() {
   }
 
   async function handleStatusChange(app, newStatus) {
+    const prevStatus = app.status;
+    setApplications((prev) =>
+      prev.map((a) => (a.id === app.id ? { ...a, status: newStatus } : a))
+    );
     try {
       const updated = await updateApplication(app.id, { status: newStatus });
       setApplications((prev) =>
         prev.map((a) => (a.id === app.id ? updated : a))
       );
 
-      // Check for badges (covers momentum badge for Interview)
       const badgeResult = await checkBadges();
       if (badgeResult.newly_earned?.length > 0) {
         setCelebratingBadge(badgeResult.newly_earned[0]);
@@ -81,17 +86,24 @@ export default function Tracker() {
         setCelebrating(true);
         setTimeout(() => setCelebrating(false), 2500);
       }
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      setApplications((prev) =>
+        prev.map((a) => (a.id === app.id ? { ...a, status: prevStatus } : a))
+      );
+      toast.error('Status update failed — reverted');
     }
   }
 
   async function handleDelete(id) {
+    const snapshot = applications.find((a) => a.id === id);
+    setApplications((prev) => prev.filter((a) => a.id !== id));
     try {
       await deleteApplication(id);
-      setApplications((prev) => prev.filter((a) => a.id !== id));
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      if (snapshot) {
+        setApplications((prev) => [snapshot, ...prev]);
+      }
+      toast.error("Couldn't delete — restored to your list");
     }
   }
 
