@@ -80,7 +80,9 @@ async def search_jobs(
             remote=remote,
             page=page,
         )
-        results["jobs"] = _score_jobs(results.get("jobs", []), user)
+        scored = _score_jobs(results.get("jobs", []), user)
+        scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
+        results["jobs"] = scored
         return results
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"USAJobs API error: {str(e)}")
@@ -102,7 +104,9 @@ async def search_adzuna(
             location=location,
             page=page,
         )
-        results["jobs"] = _score_jobs(results.get("jobs", []), user)
+        scored = _score_jobs(results.get("jobs", []), user)
+        scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
+        results["jobs"] = scored
         return results
     except Exception as e:
         print(f"[/jobs/adzuna] Error: {e}")
