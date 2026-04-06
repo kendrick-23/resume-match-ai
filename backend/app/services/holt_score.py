@@ -216,6 +216,38 @@ def calculate_holt_score(
     # Target company check
     is_target_company = job_company in target_companies if target_companies else False
 
+    # --- Job-specific gaps ---
+    # Extract skills/experience the job requires that the user doesn't have
+    job_specific_gaps = []
+    if job_desc and skills:
+        # Find requirement phrases in the job description
+        req_patterns = [
+            r"(?:required|must have|experience with|knowledge of|proficiency in|"
+            r"familiar with|expertise in|skilled in|ability to use)\s*:?\s*([^.;\n]{3,60})",
+        ]
+        required_terms = set()
+        for pat in req_patterns:
+            for m in re.finditer(pat, job_desc):
+                phrase = m.group(1).strip().lower()
+                # Split compound requirements (e.g. "Excel, QuickBooks, and SAP")
+                for term in re.split(r"[,;&/]|\band\b", phrase):
+                    term = term.strip()
+                    if 3 <= len(term) <= 40:
+                        required_terms.add(term)
+
+        # Also extract capitalized tool/system names from description
+        for m in re.finditer(r"\b([A-Z][a-zA-Z+#]{2,15})\b", job.get("description") or ""):
+            word = m.group(1).lower()
+            if word not in {"the", "this", "that", "with", "from", "have", "will", "must", "can"}:
+                required_terms.add(word)
+
+        skills_lower = set(skills)
+        for term in required_terms:
+            if not any(s in term or term in s for s in skills_lower):
+                job_specific_gaps.append(f"This role wants {term} \u2014 not in your skills yet")
+                if len(job_specific_gaps) >= 3:
+                    break
+
     return {
         "total_score": total_score,
         "breakdown": {
@@ -225,6 +257,7 @@ def calculate_holt_score(
             "experience_match": experience_match,
             "location_fit": location_fit,
             "degree_flag": degree_flag,
+            "job_specific_gaps": job_specific_gaps,
         },
         "coaching_label": coaching_label,
         "degree_warning": degree_warning,

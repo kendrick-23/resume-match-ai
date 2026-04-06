@@ -744,7 +744,6 @@ export default function Jobs() {
                 key={'wr-' + job.id + job.title}
                 job={job}
                 score={job.holt_score}
-                gaps={analysisGaps}
                 savedIds={savedIds}
                 onSave={handleSave}
                 formatSalary={formatSalary}
@@ -1018,10 +1017,10 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
 }
 
 
-function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
+function WithinReachCard({ job, score, savedIds, onSave, formatSalary }) {
   const [expanded, setExpanded] = useState(false);
   const delta = 70 - score;
-  const topGaps = gaps.slice(0, 3);
+  const jobGaps = job.holt_breakdown?.job_specific_gaps || [];
 
   const coachLabel = delta <= 5
     ? "You're almost there"
@@ -1095,48 +1094,30 @@ function WithinReachCard({ job, score, gaps, savedIds, onSave, formatSalary }) {
         {coachLabel}
       </p>
 
-      {topGaps.length > 0 && (
+      {jobGaps.length > 0 ? (
         <div style={{ marginBottom: 'var(--space-3)' }}>
-          {topGaps.map((gap, i) => (
+          {jobGaps.map((gap, i) => (
             <p key={i} style={{
               fontSize: '12px',
               color: 'var(--color-text-secondary)',
               lineHeight: 1.4,
               paddingLeft: 'var(--space-3)',
               borderLeft: '2px solid var(--color-warning)',
-              marginBottom: i < topGaps.length - 1 ? 'var(--space-2)' : 0,
+              marginBottom: i < jobGaps.length - 1 ? 'var(--space-2)' : 0,
             }}>
               {gap}
             </p>
           ))}
         </div>
-      )}
-
-      {gaps.length > 3 && (
-        <button
-          className="within-reach-expand"
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          {expanded ? 'Show less' : 'How to get there \u2192'}
-        </button>
-      )}
-
-      {expanded && gaps.length > 3 && (
-        <div style={{ marginTop: 'var(--space-2)' }}>
-          {gaps.slice(3).map((gap, i) => (
-            <p key={i} style={{
-              fontSize: '12px',
-              color: 'var(--color-text-secondary)',
-              lineHeight: 1.4,
-              paddingLeft: 'var(--space-3)',
-              borderLeft: '2px solid var(--color-warning)',
-              marginBottom: 'var(--space-2)',
-            }}>
-              {gap}
-            </p>
-          ))}
-        </div>
+      ) : (
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--color-text-muted)',
+          marginBottom: 'var(--space-3)',
+          fontStyle: 'italic',
+        }}>
+          Close your skills gap to reach 70%
+        </p>
       )}
 
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
