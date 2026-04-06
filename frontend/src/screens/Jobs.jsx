@@ -53,6 +53,22 @@ export default function Jobs() {
 
   async function loadRecommendations() {
     try {
+      // Load profile first for target roles + location
+      let profileTargetRoles = '';
+      let profileLocation = '';
+      try {
+        const profile = await getProfile();
+        profileTargetRoles = profile.target_roles || '';
+        profileLocation = profile.location || '';
+        setUserLocation(profileLocation);
+        setSalaryTarget({
+          min: profile.target_salary_min || null,
+          max: profile.target_salary_max || null,
+        });
+      } catch {
+        // No profile yet
+      }
+
       const analyses = await listAnalyses();
       if (!analyses || analyses.length === 0) {
         setHasAnalysis(false);
@@ -78,27 +94,24 @@ export default function Jobs() {
       const words = allText.split(/[\s,;.()]+/).filter((w) => w.length > 3);
       setAnalysisKeywords([...new Set(words)]);
 
-      const searchKeyword = roleName
-        ? roleName.split(/\s+/).slice(0, 3).join(' ')
-        : 'analyst';
-
-      let profileLocation = '';
-      try {
-        const profile = await getProfile();
-        profileLocation = profile.location || '';
-        setUserLocation(profileLocation);
-        setSalaryTarget({
-          min: profile.target_salary_min || null,
-          max: profile.target_salary_max || null,
-        });
-      } catch {
-        // No profile yet
+      // Use profile target_roles as primary search signal, fallback to analysis role
+      let searchKeyword = '';
+      if (profileTargetRoles.trim()) {
+        const roles = profileTargetRoles.split(',').map((r) => r.trim()).filter(Boolean);
+        searchKeyword = roles.slice(0, 2).join(' ');
       }
+      if (!searchKeyword) {
+        searchKeyword = roleName
+          ? roleName.split(/\s+/).slice(0, 3).join(' ')
+          : 'analyst';
+      }
+
+      const searchLocation = profileLocation || 'Florida';
 
       try {
         const data = await searchJobs({
           keyword: searchKeyword,
-          location: profileLocation || undefined,
+          location: searchLocation,
           page: 1,
         });
         setRecommended(data.jobs?.slice(0, 5) || []);
