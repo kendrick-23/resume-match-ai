@@ -44,7 +44,7 @@ export default function Jobs() {
   const [savedIds, setSavedIds] = useState(new Set());
 
   // Tab state
-  const [activeTab, setActiveTab] = useState(saved?.activeTab || 'federal');
+  const [activeTab, setActiveTab] = useState(saved?.activeTab || 'private');
 
   // Federal (USAJobs) state
   const [fedJobs, setFedJobs] = useState([]);
@@ -503,21 +503,31 @@ export default function Jobs() {
 
       {/* Source tabs */}
       {(fedSearched || pvtSearched || fedLoading || pvtLoading) && (
-        <div className="jobs-tabs" style={{ marginBottom: 'var(--space-4)' }}>
-          <button
-            className={`jobs-tabs__tab ${activeTab === 'federal' ? 'jobs-tabs__tab--active' : ''}`}
-            onClick={() => handleTabSwitch('federal')}
-          >
-            {fedLabel}
-            {fedLoading && <span className="jobs-tabs__loading" />}
-          </button>
-          <button
-            className={`jobs-tabs__tab ${activeTab === 'private' ? 'jobs-tabs__tab--active' : ''}`}
-            onClick={() => handleTabSwitch('private')}
-          >
-            {pvtLabel}
-            {pvtLoading && <span className="jobs-tabs__loading" />}
-          </button>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <div className="jobs-tabs">
+            <button
+              className={`jobs-tabs__tab ${activeTab === 'federal' ? 'jobs-tabs__tab--active' : ''}`}
+              onClick={() => handleTabSwitch('federal')}
+            >
+              {fedLabel}
+              {fedLoading && <span className="jobs-tabs__loading" />}
+            </button>
+            <button
+              className={`jobs-tabs__tab ${activeTab === 'private' ? 'jobs-tabs__tab--active' : ''}`}
+              onClick={() => handleTabSwitch('private')}
+            >
+              {pvtLabel}
+              {pvtLoading && <span className="jobs-tabs__loading" />}
+            </button>
+          </div>
+          <p style={{
+            textAlign: 'center',
+            fontSize: '11px',
+            color: 'var(--color-text-muted)',
+            marginTop: 'var(--space-1)',
+          }}>
+            Federal = government jobs &middot; Private = Indeed, Glassdoor, ZipRecruiter &amp; more
+          </p>
         </div>
       )}
 
