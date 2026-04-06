@@ -240,6 +240,8 @@ class ProfileUpdate(BaseModel):
     dealbreakers: Optional[dict] = None
     skills_extracted: Optional[list[str]] = None
     job_seeker_status: Optional[str] = Field(default=None, max_length=50)
+    linkedin_text: Optional[str] = Field(default=None, max_length=10000)
+    about_me: Optional[str] = Field(default=None, max_length=5000)
 
 
 @router.get("")
@@ -270,18 +272,37 @@ async def update_profile(
     user: dict = Depends(get_current_user),
 ):
     """Update the user's profile fields."""
+    import json as _json
+
     updates = body.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
+
+    # Ensure dealbreakers is proper JSON for Supabase jsonb
+    if "dealbreakers" in updates and isinstance(updates["dealbreakers"], dict):
+        updates["dealbreakers"] = _json.dumps(updates["dealbreakers"])
 
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     sb = _user_sb(user)
 
-    # Upsert — create if not exists, update if exists
-    res = sb.table("profiles") \
-        .upsert({"id": user["user_id"], **updates}) \
-        .execute()
+    # Try upsert with all fields; fallback to base fields if new columns don't exist
+    enriched_fields = {
+        "schedule_preference", "max_commute_miles", "degree_status",
+        "work_authorization", "target_companies", "dealbreakers",
+        "skills_extracted", "job_seeker_status", "linkedin_text", "about_me",
+    }
+
+    try:
+        res = sb.table("profiles") \
+            .upsert({"id": user["user_id"], **updates}) \
+            .execute()
+    except Exception:
+        # Strip enriched fields that may not exist in the DB yet
+        base_updates = {k: v for k, v in updates.items() if k not in enriched_fields}
+        res = sb.table("profiles") \
+            .upsert({"id": user["user_id"], **base_updates}) \
+            .execute()
 
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to update profile")

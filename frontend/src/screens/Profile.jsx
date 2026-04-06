@@ -113,11 +113,11 @@ export default function Profile() {
       if (targetSalaryMax) updates.target_salary_max = parseInt(targetSalaryMax, 10);
       if (location.trim()) updates.location = location.trim();
       if (schedulePref) updates.schedule_preference = schedulePref;
-      updates.max_commute_miles = maxCommute;
+      if (maxCommute !== 30) updates.max_commute_miles = maxCommute;
       if (degreeStatus) updates.degree_status = degreeStatus;
       if (workAuth) updates.work_authorization = workAuth;
       if (targetCompanies.trim()) updates.target_companies = targetCompanies.trim();
-      updates.dealbreakers = dealbreakers;
+      if (Object.values(dealbreakers).some(Boolean)) updates.dealbreakers = dealbreakers;
       if (jobSeekerStatus) updates.job_seeker_status = jobSeekerStatus;
 
       if (Object.keys(updates).length > 0) {
