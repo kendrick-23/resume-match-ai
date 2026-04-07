@@ -15,6 +15,63 @@ import re
 from typing import Optional
 
 
+# Hospitality / retail / food-service vocabulary → corporate operations vocabulary.
+# Holt's primary user (Nicole) is pivoting from F&B / retail ops into corporate
+# roles whose JDs use a different vocabulary for the same skills. The literal
+# substring matcher in the skills section can't bridge this gap on its own,
+# so before matching we expand each candidate skill through this map. Each
+# entry is matched against the lowercased skill text as a substring; on hit,
+# the corporate-equivalent phrases are appended to the candidate's match set.
+HOSPITALITY_BRIDGE: dict[str, list[str]] = {
+    "f&b": ["operations", "food service", "food and beverage operations"],
+    "food and beverage": ["operations", "food service", "food and beverage operations"],
+    "food service": ["operations", "food service operations"],
+    "guest experience": ["customer experience", "client relations", "client experience"],
+    "guest service": ["customer service", "client services"],
+    "front of house": ["customer-facing", "service operations", "client-facing operations"],
+    "back of house": ["operations", "back office operations"],
+    "scheduling": ["workforce planning", "resource allocation", "labor planning", "staff scheduling"],
+    "payroll": ["compensation", "hris", "payroll processing", "payroll administration"],
+    "compliance": ["regulatory compliance", "policy", "policy compliance", "audit", "regulatory adherence"],
+    "vendor": ["vendor management", "supplier", "procurement", "supplier management"],
+    "vendor relations": ["vendor management", "procurement", "supplier management"],
+    "staff training": ["l&d", "learning and development", "employee development", "onboarding"],
+    "training": ["learning and development", "employee development", "l&d"],
+    "assistant general manager": ["operations manager", "assistant director of operations", "operations lead"],
+    "agm": ["operations manager", "assistant director of operations"],
+    "general manager": ["operations director", "site director", "operations manager"],
+    "shift lead": ["team lead", "operations supervisor"],
+    "inventory": ["inventory management", "stock control", "supply chain"],
+    "customer service": ["client services", "customer experience", "client relations"],
+    "hiring": ["talent acquisition", "recruiting", "recruitment"],
+    "onboarding": ["employee onboarding", "new hire orientation", "l&d"],
+}
+
+
+def _expand_skills_with_bridge(skills: list[str]) -> list[str]:
+    """Expand a candidate's skills through HOSPITALITY_BRIDGE so the substring
+    matcher can bridge hospitality vocabulary to corporate JD vocabulary.
+
+    The original skills are always preserved; bridge additions are appended.
+    Deduped while preserving order so deterministic test results are easy.
+    """
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for s in skills:
+        s_low = s.lower().strip()
+        if s_low and s_low not in seen:
+            expanded.append(s_low)
+            seen.add(s_low)
+        for source_term, corporate_terms in HOSPITALITY_BRIDGE.items():
+            if source_term in s_low:
+                for c in corporate_terms:
+                    c_low = c.lower()
+                    if c_low not in seen:
+                        expanded.append(c_low)
+                        seen.add(c_low)
+    return expanded
+
+
 def calculate_holt_score(
     job: dict,
     user_profile: dict,
@@ -51,14 +108,21 @@ def calculate_holt_score(
     skills = [s.lower() for s in resume_skills] if resume_skills else []
 
     if skills:
-        # Match full skill phrases AND individual words for multi-word skills
-        # e.g. "inventory management" matches "inventory controls" via "inventory"
-        matches = 0
-        for s in skills:
+        # Expand candidate skills via HOSPITALITY_BRIDGE so hospitality / retail
+        # vocabulary can match corporate-language JDs ("guest experience" →
+        # "customer experience", "f&b" → "operations", etc.). Original skills
+        # are always preserved; the bridge only ADDS additional match terms.
+        match_terms = _expand_skills_with_bridge(skills)
+
+        # Match full phrases AND significant individual words. Denominator stays
+        # tied to the ORIGINAL skill count so the bridge can only improve the
+        # score, never dilute it.
+        matches = 0.0
+        for s in match_terms:
             if s in job_text:
                 matches += 1  # full phrase match (strongest)
             else:
-                # Check if any significant word from the skill appears in job text
+                # Check if any significant word from the term appears in job text
                 words = [w for w in s.split() if len(w) > 3]
                 if words and any(w in job_text for w in words):
                     matches += 0.6  # partial word match (weaker)
