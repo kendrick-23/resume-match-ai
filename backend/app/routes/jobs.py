@@ -10,6 +10,7 @@ from app.services.usajobs import search_usajobs
 from app.services.adzuna import search_adzuna_jobs
 from app.services.jobspy_service import search_jobspy
 from app.services.holt_score import calculate_holt_score
+from app.services.enrich import enrich_jobs_batch
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -23,8 +24,15 @@ def _user_sb(user: dict):
     return sb
 
 
-def _score_jobs(jobs: list, user: dict) -> list:
-    """Score a list of jobs using the 6-dimension Holt Score engine."""
+async def _score_jobs(jobs: list, user: dict) -> list:
+    """Enrich sparse descriptions then score using the 6-dimension Holt Score engine."""
+    # Step 1: Enrich sparse job descriptions with Claude Haiku
+    try:
+        await enrich_jobs_batch(jobs)
+    except Exception as exc:
+        print(f"[Enrich] Batch enrichment failed: {exc}")
+
+    # Step 2: Fetch profile and analysis data
     try:
         sb = _user_sb(user)
         profile_res = sb.table("profiles").select("*").eq("id", user["user_id"]).execute()
@@ -48,6 +56,7 @@ def _score_jobs(jobs: list, user: dict) -> list:
         print(f"[HoltScore] Profile/analysis fetch failed: {exc}")
         profile, resume_skills, analysis_gaps = {}, [], []
 
+    # Step 3: Score each job
     for job in jobs:
         try:
             score_data = calculate_holt_score(job, profile, resume_skills, analysis_gaps)
@@ -94,7 +103,7 @@ async def search_jobs(
             remote=remote,
             page=page,
         )
-        scored = _score_jobs(results.get("jobs", []), user)
+        scored = await _score_jobs(results.get("jobs", []), user)
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
         return results
@@ -118,7 +127,7 @@ async def search_adzuna(
             location=location,
             page=page,
         )
-        scored = _score_jobs(results.get("jobs", []), user)
+        scored = await _score_jobs(results.get("jobs", []), user)
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
         return results
@@ -165,7 +174,7 @@ async def search_aggregated(
                 unique_jobs.append(job)
 
         # Score all jobs
-        unique_jobs = _score_jobs(unique_jobs, user)
+        unique_jobs = await _score_jobs(unique_jobs, user)
 
         # Sort by Holt Score descending (best matches first)
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
