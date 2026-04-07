@@ -247,21 +247,51 @@ class ProfileUpdate(BaseModel):
 @router.get("")
 @limiter.limit("100/hour")
 async def get_profile(request: Request, user: dict = Depends(get_current_user)):
-    """Get the user's profile. Creates one if it doesn't exist."""
+    """Get the user's profile. Creates one if it doesn't exist.
+
+    Always returns the full profile row. Never returns an empty object —
+    raises 500 if the row cannot be created or fetched.
+    """
     sb = _user_sb(user)
+    user_id = user["user_id"]
+
+    # First attempt: SELECT existing row
     res = sb.table("profiles") \
         .select("*") \
-        .eq("id", user["user_id"]) \
+        .eq("id", user_id) \
         .execute()
 
     if res.data:
         return res.data[0]
 
-    # Auto-create empty profile
-    new = sb.table("profiles").insert({
-        "id": user["user_id"],
-    }).execute()
-    return new.data[0] if new.data else {}
+    # No row exists — try to auto-create. On race / unique violation,
+    # fall back to SELECT (another request created it concurrently).
+    try:
+        sb.table("profiles").insert({"id": user_id}).execute()
+    except Exception as e:
+        # Unique violation (23505) means a concurrent request beat us — fine.
+        # Any other error is a real failure and should surface.
+        msg = str(e).lower()
+        if "duplicate" not in msg and "23505" not in msg and "unique" not in msg:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create profile",
+            )
+
+    # Re-SELECT to return the full, canonical row (whether we inserted it
+    # or a concurrent request did). Never trust insert().data alone.
+    refetch = sb.table("profiles") \
+        .select("*") \
+        .eq("id", user_id) \
+        .execute()
+
+    if not refetch.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Profile row missing after auto-create",
+        )
+
+    return refetch.data[0]
 
 
 @router.patch("")
