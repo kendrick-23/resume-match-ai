@@ -33,29 +33,37 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     except Exception as exc:
         print(f"[Enrich] Batch enrichment failed: {exc}")
 
-    # Step 2: Fetch profile and analysis data
+    # Step 2: Fetch profile data
+    profile = {}
     try:
         sb = _user_sb(user)
         profile_res = sb.table("profiles").select("*").eq("id", user["user_id"]).execute()
         profile = profile_res.data[0] if profile_res.data else {}
+    except Exception as exc:
+        print(f"[HoltScore] Profile fetch failed: {exc}")
 
+    resume_skills = profile.get("skills_extracted") or []
+    if isinstance(resume_skills, str):
+        try:
+            resume_skills = json.loads(resume_skills)
+        except (json.JSONDecodeError, TypeError):
+            resume_skills = []
+
+    # Step 2b: Fetch analysis data (separate so analysis failure doesn't wipe profile)
+    analysis_gaps = []
+    try:
+        sb = _user_sb(user)
         analysis_res = sb.table("analyses").select("strengths,gaps,skills_match") \
             .eq("user_id", user["user_id"]) \
             .order("created_at", desc=True) \
             .limit(1) \
             .execute()
-
-        resume_skills = profile.get("skills_extracted") or []
-        if isinstance(resume_skills, str):
-            resume_skills = json.loads(resume_skills)
-        analysis_gaps = []
         if analysis_res.data:
             latest = analysis_res.data[0]
             raw_gaps = latest.get("gaps", "[]")
             analysis_gaps = json.loads(raw_gaps) if isinstance(raw_gaps, str) else raw_gaps or []
     except Exception as exc:
-        print(f"[HoltScore] Profile/analysis fetch failed: {exc}")
-        profile, resume_skills, analysis_gaps = {}, [], []
+        print(f"[HoltScore] Analysis fetch failed: {exc}")
 
     # Step 3: Score each job
     for job in jobs:

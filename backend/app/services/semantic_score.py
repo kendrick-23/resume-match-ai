@@ -23,6 +23,57 @@ _semaphore = asyncio.Semaphore(5)
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
 
+def _build_candidate_section(profile: dict) -> str:
+    """Build the candidate section of the prompt from profile data, omitting empty fields."""
+    lines = []
+
+    job_title = profile.get("job_title")
+    if job_title:
+        lines.append(f"- Current role: {job_title}")
+
+    target_roles = profile.get("target_roles")
+    if target_roles:
+        lines.append(f"- Target roles: {target_roles}")
+
+    skills = profile.get("skills_extracted") or []
+    if isinstance(skills, str):
+        try:
+            skills = json.loads(skills)
+        except (json.JSONDecodeError, TypeError):
+            skills = []
+    if skills:
+        lines.append(f"- Key skills: {', '.join(skills[:15])}")
+
+    salary_min = profile.get("target_salary_min")
+    salary_max = profile.get("target_salary_max")
+    if salary_min and salary_max:
+        lines.append(f"- Target salary: ${salary_min:,}-${salary_max:,}")
+    elif salary_min:
+        lines.append(f"- Minimum salary: ${salary_min:,}")
+
+    location = profile.get("location")
+    if location:
+        lines.append(f"- Location: {location}")
+
+    schedule = profile.get("schedule_preference")
+    if schedule:
+        schedule_labels = {
+            "monday_friday": "Monday-Friday only",
+            "remote_only": "Remote only",
+            "any": "Any schedule",
+        }
+        lines.append(f"- Schedule preference: {schedule_labels.get(schedule, schedule)}")
+
+    about_me = profile.get("about_me")
+    if about_me:
+        lines.append(f"- Background: {about_me[:200]}")
+
+    if not lines:
+        return "- No profile data available"
+
+    return "\n".join(lines)
+
+
 async def semantic_rescore(job: dict, profile: dict) -> Optional[dict]:
     """
     Ask Claude Haiku to score how well this candidate matches this job.
@@ -42,38 +93,31 @@ async def semantic_rescore(job: dict, profile: dict) -> Optional[dict]:
     if not api_key:
         return None
 
-    skills = profile.get("skills_extracted") or []
-    if isinstance(skills, str):
-        skills = json.loads(skills)
-    skills_str = ", ".join(skills[:15]) if skills else "Not specified"
-
-    job_title = profile.get("job_title") or "Not specified"
-    salary_min = profile.get("target_salary_min") or "?"
-    salary_max = profile.get("target_salary_max") or "?"
-    location = profile.get("location") or "Not specified"
-    schedule = profile.get("schedule_preference") or "any"
+    candidate_section = _build_candidate_section(profile)
 
     j_title = job.get("title") or ""
     j_company = job.get("company") or ""
     j_location = job.get("location") or ""
-    j_salary_min = job.get("salary_min") or "?"
-    j_salary_max = job.get("salary_max") or "?"
     j_desc = (job.get("description") or "")[:500]
+
+    # Build job salary string
+    j_salary_parts = []
+    if job.get("salary_min"):
+        j_salary_parts.append(f"${job['salary_min']:,}")
+    if job.get("salary_max"):
+        j_salary_parts.append(f"${job['salary_max']:,}")
+    j_salary = " - ".join(j_salary_parts) if j_salary_parts else "Not listed"
 
     prompt = f"""Score how well this candidate matches this job on a 0-100 scale.
 
 Candidate Profile:
-- Current role: {job_title}
-- Key skills: {skills_str}
-- Target salary: ${salary_min}-${salary_max}
-- Location: {location}
-- Schedule preference: {schedule}
+{candidate_section}
 
 Job:
 Title: {j_title}
 Company: {j_company}
 Location: {j_location}
-Salary: {j_salary_min}-{j_salary_max}
+Salary: {j_salary}
 Description: {j_desc}
 
 Score based on:
