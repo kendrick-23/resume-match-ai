@@ -12,6 +12,7 @@ from app.services.jobspy_service import search_jobspy
 from app.services.holt_score import calculate_holt_score
 from app.services.enrich import enrich_jobs_batch
 from app.services.semantic_score import semantic_rescore_batch
+from app.services.gap_analyzer import analyze_gaps_batch
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -92,6 +93,12 @@ async def _score_jobs(jobs: list, user: dict) -> list:
         await semantic_rescore_batch(jobs, profile, user.get("user_id", ""))
     except Exception as exc:
         print(f"[SemanticScore] Batch re-scoring failed: {exc}")
+
+    # Step 5: Claude-powered gap analysis for Within Reach jobs (50-69%)
+    try:
+        await analyze_gaps_batch(jobs, resume_skills)
+    except Exception as exc:
+        print(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
 
     return jobs
 
