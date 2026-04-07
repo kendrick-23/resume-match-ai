@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
@@ -45,6 +46,7 @@ function makeCacheKey(searchType, keywords = '', location = '') {
 }
 
 export default function Jobs() {
+  const navigate = useNavigate();
   const toast = useToast();
 
   const saved = loadSavedSearch();
@@ -97,6 +99,7 @@ export default function Jobs() {
 
   const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword);
   const [profileMatchLoading, setProfileMatchLoading] = useState(false);
+  const [profileEmpty, setProfileEmpty] = useState(false);
 
   useEffect(() => {
     loadRecommendations();
@@ -287,6 +290,7 @@ export default function Jobs() {
 
   async function handleProfileMatch(forceRefresh = false) {
     setProfileMatchLoading(true);
+    setProfileEmpty(false);
     setCachedAt(null);
     try {
       const profile = await getProfile();
@@ -294,11 +298,16 @@ export default function Jobs() {
       const skills = Array.isArray(profile.skills_extracted) ? profile.skills_extracted : [];
       const loc = (profile.location || '').trim() || 'Florida';
 
+      if (roles.length === 0 && skills.length === 0) {
+        setProfileEmpty(true);
+        setProfileMatchLoading(false);
+        return;
+      }
+
       const queries = [];
       for (const role of roles.slice(0, 2)) queries.push(role);
       const skillPhrase = skills.slice(0, 3).join(' ').trim();
       if (skillPhrase && !queries.includes(skillPhrase)) queries.push(skillPhrase);
-      if (queries.length === 0) queries.push('manager');
 
       setLocation(loc);
 
@@ -528,6 +537,17 @@ export default function Jobs() {
       {/* Profile match button + loading state */}
       {profileMatchLoading ? (
         <ProfileMatchLoading />
+      ) : profileEmpty ? (
+        <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
+          <Ott state="coaching" size={80} />
+          <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+            Ott needs to know more about you first!
+          </p>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)', marginBottom: 'var(--space-4)' }}>
+            Upload your resume to power your job matches.
+          </p>
+          <Button onClick={() => navigate('/upload')}>Upload Resume</Button>
+        </Card>
       ) : (
         <Button
           full

@@ -316,9 +316,10 @@ export default function Results() {
   }, [result]);
 
   async function loadAnalyses() {
+    const timeout = setTimeout(() => setLoading(false), 8000);
     try {
       const data = await listAnalyses();
-      if (data.length > 0) {
+      if (Array.isArray(data) && data.length > 0) {
         const latest = data[0];
         setResult({
           score: latest.score,
@@ -343,8 +344,9 @@ export default function Results() {
         setPastAnalyses(data.slice(1));
       }
     } catch {
-      // Silently fail
+      // Empty state will show — no analyses available
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   }
