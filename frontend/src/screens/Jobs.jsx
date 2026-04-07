@@ -965,6 +965,23 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
                   Degree: {breakdown.degree_flag}
                 </div>
               )}
+              {breakdown.reasoning && (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  marginTop: 'var(--space-1)',
+                  paddingTop: 'var(--space-2)',
+                  borderTop: '1px solid var(--color-border)',
+                }}>
+                  <p style={{
+                    fontSize: '12px',
+                    fontStyle: 'italic',
+                    color: 'var(--color-text-muted)',
+                    lineHeight: 1.4,
+                  }}>
+                    {breakdown.reasoning}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </>
