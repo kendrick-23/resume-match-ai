@@ -141,12 +141,16 @@ function Whiskers() {
 function EyesNormal() {
   return (
     <g>
-      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={47} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={45} cy={31} r={1.2} style={{ fill: C.white }} />
-      <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={73} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={71} cy={31} r={1.2} style={{ fill: C.white }} />
+      <g className="ott-eye ott-eye--left">
+        <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+        <circle cx={47} cy={33} r={3.5} style={{ fill: C.dark }} />
+        <circle cx={45} cy={31} r={1.2} style={{ fill: C.white }} />
+      </g>
+      <g className="ott-eye ott-eye--right">
+        <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
+        <circle cx={73} cy={33} r={3.5} style={{ fill: C.dark }} />
+        <circle cx={71} cy={31} r={1.2} style={{ fill: C.white }} />
+      </g>
     </g>
   );
 }
@@ -186,11 +190,13 @@ function EyesSleeping() {
 function EyesWink() {
   return (
     <g>
-      {/* Left eye — normal */}
-      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={47} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={45} cy={31} r={1.2} style={{ fill: C.white }} />
-      {/* Right eye — wink arc */}
+      {/* Left eye — normal, blinks */}
+      <g className="ott-eye ott-eye--left">
+        <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+        <circle cx={47} cy={33} r={3.5} style={{ fill: C.dark }} />
+        <circle cx={45} cy={31} r={1.2} style={{ fill: C.white }} />
+      </g>
+      {/* Right eye — wink arc (already closed, no blink) */}
       <path
         d="M 67 34 Q 73 28 79 34"
         style={{
@@ -207,12 +213,16 @@ function EyesWink() {
 function EyesWide() {
   return (
     <g>
-      <circle cx={47} cy={32} r={7} style={{ fill: C.white }} />
-      <circle cx={47} cy={33} r={4} style={{ fill: C.dark }} />
-      <circle cx={45} cy={30} r={1.4} style={{ fill: C.white }} />
-      <circle cx={73} cy={32} r={7} style={{ fill: C.white }} />
-      <circle cx={73} cy={33} r={4} style={{ fill: C.dark }} />
-      <circle cx={71} cy={30} r={1.4} style={{ fill: C.white }} />
+      <g className="ott-eye ott-eye--left">
+        <circle cx={47} cy={32} r={7} style={{ fill: C.white }} />
+        <circle cx={47} cy={33} r={4} style={{ fill: C.dark }} />
+        <circle cx={45} cy={30} r={1.4} style={{ fill: C.white }} />
+      </g>
+      <g className="ott-eye ott-eye--right">
+        <circle cx={73} cy={32} r={7} style={{ fill: C.white }} />
+        <circle cx={73} cy={33} r={4} style={{ fill: C.dark }} />
+        <circle cx={71} cy={30} r={1.4} style={{ fill: C.white }} />
+      </g>
     </g>
   );
 }
@@ -220,12 +230,16 @@ function EyesWide() {
 function EyesLookUp() {
   return (
     <g>
-      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={47} cy={30} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={45} cy={28.5} r={1.2} style={{ fill: C.white }} />
-      <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={73} cy={30} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={71} cy={28.5} r={1.2} style={{ fill: C.white }} />
+      <g className="ott-eye ott-eye--left">
+        <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+        <circle cx={47} cy={30} r={3.5} style={{ fill: C.dark }} />
+        <circle cx={45} cy={28.5} r={1.2} style={{ fill: C.white }} />
+      </g>
+      <g className="ott-eye ott-eye--right">
+        <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
+        <circle cx={73} cy={30} r={3.5} style={{ fill: C.dark }} />
+        <circle cx={71} cy={28.5} r={1.2} style={{ fill: C.white }} />
+      </g>
     </g>
   );
 }
@@ -233,12 +247,16 @@ function EyesLookUp() {
 function EyesLookSide() {
   return (
     <g>
-      <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={49} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={47.5} cy={31} r={1.2} style={{ fill: C.white }} />
-      <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
-      <circle cx={75} cy={33} r={3.5} style={{ fill: C.dark }} />
-      <circle cx={73.5} cy={31} r={1.2} style={{ fill: C.white }} />
+      <g className="ott-eye ott-eye--left">
+        <circle cx={47} cy={32} r={6} style={{ fill: C.white }} />
+        <circle cx={49} cy={33} r={3.5} style={{ fill: C.dark }} />
+        <circle cx={47.5} cy={31} r={1.2} style={{ fill: C.white }} />
+      </g>
+      <g className="ott-eye ott-eye--right">
+        <circle cx={73} cy={32} r={6} style={{ fill: C.white }} />
+        <circle cx={75} cy={33} r={3.5} style={{ fill: C.dark }} />
+        <circle cx={73.5} cy={31} r={1.2} style={{ fill: C.white }} />
+      </g>
     </g>
   );
 }
@@ -330,8 +348,11 @@ function OtterBase({ eyes, mouth, arms, extras, tilt }) {
     <>
       <Tail />
       <Feet />
-      <BodyShape />
-      <BellyShape />
+      {/* Body + belly grouped so the breathing animation scales them together */}
+      <g className="ott-body-anim">
+        <BodyShape />
+        <BellyShape />
+      </g>
       <Scarf />
       <HeadShape />
       <Ears />
@@ -388,19 +409,22 @@ function ThinkingState() {
       }
       extras={
         <g>
-          {/* Magnifying glass: handle + lens */}
+          {/* Magnifying glass anchored to where the rotated paw actually lands.
+              Right arm rotates 140° CW around (92, 72); paw originally at
+              (92, 98) ends up at (~75, ~52). Glass handle starts at the paw
+              and the lens sits just above it so the otter "holds" it. */}
           <line
-            x1={108} y1={47}
-            x2={110} y2={38}
+            x1={75} y1={50}
+            x2={70} y2={42}
             style={{ stroke: C.dark, strokeWidth: 3, strokeLinecap: 'round' }}
           />
           <circle
-            cx={112} cy={28}
+            cx={66} cy={32}
             r={10}
             style={{ stroke: C.dark, strokeWidth: 2.5, fill: 'none' }}
           />
           <circle
-            cx={112} cy={28}
+            cx={66} cy={32}
             r={7}
             style={{ fill: C.accentLight, opacity: 0.4 }}
           />
@@ -654,7 +678,12 @@ export default function Ott({ state = 'idle', size = 120 }) {
       role="img"
       aria-label={`Ott the Otter — ${state}`}
     >
-      <StateComponent />
+      {/* key={state} forces React to remount this group on state change,
+          which restarts the ott-state-fade animation — a 200ms cross-fade
+          replacing the old hard cut between states. */}
+      <g key={state} className="ott-state-fade">
+        <StateComponent />
+      </g>
     </svg>
   );
 }

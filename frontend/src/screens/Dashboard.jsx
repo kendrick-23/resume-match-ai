@@ -81,7 +81,7 @@ export default function Dashboard() {
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <Ott state={ottState} size={96} />
         <h2 style={{ marginTop: 'var(--space-3)' }}>
-          {streak >= 7 ? "You're crushing it!" : streak >= 3 ? 'Nice momentum!' : 'Welcome back!'}
+          {streak >= 7 ? "Three days in a row. That's how interviews start." : streak >= 3 ? "You're building something. Keep going." : 'Welcome back!'}
         </h2>
         <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
           Let's keep the momentum going.

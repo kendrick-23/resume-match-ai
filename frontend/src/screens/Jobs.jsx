@@ -648,7 +648,7 @@ export default function Jobs() {
             Analyze your resume first
           </p>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
-            Then Ott will find your best matches
+            Then I'll find your best matches
           </p>
         </Card>
       )}
@@ -673,7 +673,7 @@ export default function Jobs() {
         <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
           <Ott state="coaching" size={80} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
-            Ott needs to know more about you first!
+            I need to know more about you first!
           </p>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)', marginBottom: 'var(--space-4)' }}>
             Upload your resume to power your job matches.

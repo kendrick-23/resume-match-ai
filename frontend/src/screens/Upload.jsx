@@ -333,7 +333,7 @@ export default function Upload() {
         disabled={!file || !jobText.trim() || analyzing}
         onClick={handleAnalyze}
       >
-        {analyzing ? 'Ott is reading your resume...' : 'Analyze Match'}
+        {analyzing ? 'Reading through this carefully...' : 'Analyze Match'}
       </Button>
 
       {/* Loading state hint */}

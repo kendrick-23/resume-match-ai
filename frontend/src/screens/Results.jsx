@@ -581,7 +581,7 @@ export default function Results() {
                   marginTop: 'var(--space-1)',
                   marginBottom: 'var(--space-4)',
                 }}>
-                  Ott will rewrite your resume using the exact keywords this job is scanning for. Takes about 15 seconds.
+                  I'll rewrite your resume using the exact keywords this job is scanning for. Takes about 15 seconds.
                 </p>
                 {resumeError && (
                   <p style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
@@ -609,7 +609,7 @@ export default function Results() {
               <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
                 <Ott state="thinking" size={80} />
                 <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
-                  Ott is tailoring your resume...
+                  Tailoring your resume...
                 </p>
                 <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
                   Matching keywords, reframing experience, optimizing for ATS

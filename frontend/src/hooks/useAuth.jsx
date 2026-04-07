@@ -66,7 +66,7 @@ export function AuthProvider({ children }) {
             marginTop: 'var(--space-2)',
             marginBottom: 'var(--space-6)',
           }}>
-            Ott can't reach the server right now. Check your connection and try again.
+            I can't reach the server right now. Check your connection and try again.
           </p>
           <Button full onClick={() => window.location.reload()}>
             Try refreshing

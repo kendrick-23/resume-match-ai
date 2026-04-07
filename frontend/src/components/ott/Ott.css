@@ -7,18 +7,22 @@
   animation: ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* Celebrating: entrance + 3x bounce dance */
+/* Celebrating: entrance + 100ms anticipation squat + 3x bounce dance.
+   Anticipation (Disney principle #2) makes the bounce feel earned, not random. */
 .ott--celebrating {
   animation:
     ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
-    ott-celebrate 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms 3;
+    ott-anticipate 100ms ease-in 350ms forwards,
+    ott-celebrate 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 450ms 3;
 }
 
-/* Excited: entrance + 3x bounce dance */
+/* Excited: entrance + anticipation + 3x bounce. Same shape as celebrating
+   for now; differentiated visually via the wider arms and open mouth. */
 .ott--excited {
   animation:
     ott-entrance 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
-    ott-celebrate 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms 3;
+    ott-anticipate 100ms ease-in 350ms forwards,
+    ott-celebrate 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 450ms 3;
 }
 
 /* Thinking: gentle side-to-side sway */
@@ -33,4 +37,56 @@
   25%  { transform: rotate(3deg); }
   75%  { transform: rotate(-3deg); }
   100% { transform: rotate(0deg); }
+}
+
+/* ============================================
+   IDLE LIFE — breathing + blinking
+   The single biggest "icon → character" lever per Section 5
+   of the Ott research report. Always-on, slow, low-amplitude.
+   Subtle enough to never distract a stressed user.
+   ============================================ */
+
+@keyframes ott-anticipate {
+  0%   { transform: scale(1); }
+  100% { transform: scale(0.92); }
+}
+
+@keyframes ott-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(1.025); }
+}
+
+@keyframes ott-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(0.08); }
+}
+
+@keyframes ott-state-fade {
+  0%   { opacity: 0.85; }
+  100% { opacity: 1; }
+}
+
+/* Body group: scaleY breathe around its center */
+.ott-body-anim {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ott-breathe 4s ease-in-out infinite;
+}
+
+/* Per-eye blink groups; right eye offset 100ms so they're not perfectly
+   synced — perfect sync reads as mechanical, slight desync reads as alive. */
+.ott-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ott-blink 4s ease-in-out infinite;
+}
+.ott-eye--right {
+  animation-delay: 100ms;
+}
+
+/* State cross-fade: when the parent re-keys this group on state change,
+   the keyframe restarts and produces a 200ms fade-in from 0.85. Replaces
+   the old hard-cut state transition. */
+.ott-state-fade {
+  animation: ott-state-fade 200ms ease-in-out;
 }

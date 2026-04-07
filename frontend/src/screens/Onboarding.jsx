@@ -75,7 +75,7 @@ export default function Onboarding() {
             <h1 className="onboarding__headline">Welcome to Holt</h1>
             <p className="onboarding__subtext">
               Your AI-powered job search companion.
-              Ott will help you find the right jobs and stand out.
+              I'll help you find the right jobs and stand out.
             </p>
             <Button full onClick={() => setStep(1)}>
               Meet Ott &rarr;
