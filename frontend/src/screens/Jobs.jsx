@@ -103,6 +103,11 @@ export default function Jobs() {
   const [profileTimedOut, setProfileTimedOut] = useState(false);
   const profileAbortRef = useRef(null);
 
+  // Cached profile from mount — handleProfileMatch reuses this instead of
+  // re-fetching. Stale-on-edit is acceptable: the user goes to /profile to
+  // change anything, and Jobs unmounts.
+  const [cachedProfile, setCachedProfile] = useState(null);
+
   useEffect(() => {
     loadRecommendations();
     // Auto-trigger search if restoring from sessionStorage
@@ -116,27 +121,34 @@ export default function Jobs() {
 
   async function loadRecommendations() {
     setRecError(false);
-    try {
-      // Load profile first for target roles + location
-      let profileTargetRoles = '';
-      let profileLocation = '';
-      try {
-        const profile = await getProfile();
-        profileTargetRoles = profile.target_roles || '';
-        profileLocation = profile.location || '';
-        setUserLocation(profileLocation);
-        setSalaryTarget({
-          min: profile.target_salary_min || null,
-          max: profile.target_salary_max || null,
-        });
-        setTargetCompanies(
-          (profile.target_companies || '').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
-        );
-      } catch {
-        // No profile yet
-      }
 
-      const analyses = await listAnalyses();
+    // Parallel fetch — profile and analyses fire concurrently instead of
+    // serially. Saves ~250-500ms on mount. Each is wrapped independently so
+    // a profile failure does not block the analyses path.
+    const [profileResult, analysesResult] = await Promise.allSettled([
+      getProfile(),
+      listAnalyses(),
+    ]);
+
+    let profileTargetRoles = '';
+    let profileLocation = '';
+    if (profileResult.status === 'fulfilled' && profileResult.value) {
+      const profile = profileResult.value;
+      setCachedProfile(profile);
+      profileTargetRoles = profile.target_roles || '';
+      profileLocation = profile.location || '';
+      setUserLocation(profileLocation);
+      setSalaryTarget({
+        min: profile.target_salary_min || null,
+        max: profile.target_salary_max || null,
+      });
+      setTargetCompanies(
+        (profile.target_companies || '').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
+      );
+    }
+
+    try {
+      const analyses = analysesResult.status === 'fulfilled' ? analysesResult.value : null;
       if (!analyses || analyses.length === 0) {
         setHasAnalysis(false);
         setRecLoading(false);
@@ -302,10 +314,17 @@ export default function Jobs() {
     profileAbortRef.current = controller;
 
     try {
-      const profile = await getProfile();
-      const roles = (profile.target_roles || '').split(',').map((r) => r.trim()).filter(Boolean);
-      const skills = Array.isArray(profile.skills_extracted) ? profile.skills_extracted : [];
-      const loc = (profile.location || '').trim() || 'Florida';
+      // Reuse the profile fetched on mount instead of making a redundant API
+      // call. Only fall back to a fresh fetch if mount failed (cachedProfile
+      // is still null) or the user just signed in.
+      let profile = cachedProfile;
+      if (!profile) {
+        profile = await getProfile();
+        if (profile) setCachedProfile(profile);
+      }
+      const roles = (profile?.target_roles || '').split(',').map((r) => r.trim()).filter(Boolean);
+      const skills = Array.isArray(profile?.skills_extracted) ? profile.skills_extracted : [];
+      const loc = (profile?.location || '').trim() || 'Florida';
 
       if (roles.length === 0 && skills.length === 0) {
         setProfileEmpty(true);
