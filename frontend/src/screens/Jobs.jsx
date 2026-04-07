@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
@@ -100,6 +100,8 @@ export default function Jobs() {
   const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword);
   const [profileMatchLoading, setProfileMatchLoading] = useState(false);
   const [profileEmpty, setProfileEmpty] = useState(false);
+  const [profileTimedOut, setProfileTimedOut] = useState(false);
+  const profileAbortRef = useRef(null);
 
   useEffect(() => {
     loadRecommendations();
@@ -109,6 +111,7 @@ export default function Jobs() {
       searchPrivate(saved.keyword, saved.location || '');
       setRestoredSearch(false);
     }
+    return () => { profileAbortRef.current?.abort(); };
   }, []);
 
   async function loadRecommendations() {
@@ -291,7 +294,13 @@ export default function Jobs() {
   async function handleProfileMatch(forceRefresh = false) {
     setProfileMatchLoading(true);
     setProfileEmpty(false);
+    setProfileTimedOut(false);
     setCachedAt(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    profileAbortRef.current = controller;
+
     try {
       const profile = await getProfile();
       const roles = (profile.target_roles || '').split(',').map((r) => r.trim()).filter(Boolean);
@@ -300,7 +309,6 @@ export default function Jobs() {
 
       if (roles.length === 0 && skills.length === 0) {
         setProfileEmpty(true);
-        setProfileMatchLoading(false);
         return;
       }
 
@@ -319,11 +327,12 @@ export default function Jobs() {
           if (cached.cached) {
             const r = cached.results;
             _applyResults(r.federal || [], r.private || [], loc, cached.cached_at);
-            setProfileMatchLoading(false);
             return;
           }
         } catch { /* cache miss, proceed with fresh search */ }
       }
+
+      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
       setFedLoading(true);
       setFedError('');
@@ -338,6 +347,8 @@ export default function Jobs() {
         )),
       ]);
 
+      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
       const fedMerged = _dedup(fedResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||j.department||'').toLowerCase()}`);
       const pvtMerged = _dedup(pvtResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}`);
 
@@ -350,12 +361,18 @@ export default function Jobs() {
         federalCount: fedMerged.length,
         privateCount: pvtMerged.length,
       }).catch(() => {});
-    } catch {
-      toast.error('Could not load your profile — try keyword search instead');
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setProfileTimedOut(true);
+      } else {
+        toast.error('Could not load your profile — try keyword search instead');
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      profileAbortRef.current = null;
+      setProfileMatchLoading(false);
       setFedLoading(false);
       setPvtLoading(false);
-    } finally {
-      setProfileMatchLoading(false);
     }
   }
 
@@ -534,9 +551,22 @@ export default function Jobs() {
         </Card>
       )}
 
-      {/* Profile match button + loading state */}
+      {/* Profile match button + loading + timeout + empty states */}
       {profileMatchLoading ? (
         <ProfileMatchLoading />
+      ) : profileTimedOut ? (
+        <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
+          <Ott state="coaching" size={80} />
+          <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+            Search took too long
+          </p>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)', marginBottom: 'var(--space-4)' }}>
+            Try again or use keyword search instead
+          </p>
+          <Button onClick={() => { setProfileTimedOut(false); handleProfileMatch(true); }}>
+            Try again
+          </Button>
+        </Card>
       ) : profileEmpty ? (
         <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
           <Ott state="coaching" size={80} />
@@ -551,7 +581,7 @@ export default function Jobs() {
       ) : (
         <Button
           full
-          onClick={handleProfileMatch}
+          onClick={() => handleProfileMatch()}
           disabled={fedLoading && pvtLoading}
           style={{ marginBottom: 0 }}
         >

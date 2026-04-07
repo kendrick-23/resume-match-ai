@@ -37,26 +37,22 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     except Exception as exc:
         print(f"[Enrich] Batch enrichment failed: {exc}")
 
-    # Step 2: Fetch profile data
+    # Step 2: Fetch profile + analysis data with a SINGLE Supabase client
     profile = {}
+    resume_skills = []
+    analysis_gaps = []
     try:
         sb = _user_sb(user)
         profile_res = sb.table("profiles").select("*").eq("id", user["user_id"]).execute()
         profile = profile_res.data[0] if profile_res.data else {}
-    except Exception as exc:
-        print(f"[HoltScore] Profile fetch failed: {exc}")
 
-    resume_skills = profile.get("skills_extracted") or []
-    if isinstance(resume_skills, str):
-        try:
-            resume_skills = json.loads(resume_skills)
-        except (json.JSONDecodeError, TypeError):
-            resume_skills = []
+        resume_skills = profile.get("skills_extracted") or []
+        if isinstance(resume_skills, str):
+            try:
+                resume_skills = json.loads(resume_skills)
+            except (json.JSONDecodeError, TypeError):
+                resume_skills = []
 
-    # Step 2b: Fetch analysis data (separate so analysis failure doesn't wipe profile)
-    analysis_gaps = []
-    try:
-        sb = _user_sb(user)
         analysis_res = sb.table("analyses").select("strengths,gaps,skills_match") \
             .eq("user_id", user["user_id"]) \
             .order("created_at", desc=True) \
@@ -67,7 +63,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             raw_gaps = latest.get("gaps", "[]")
             analysis_gaps = json.loads(raw_gaps) if isinstance(raw_gaps, str) else raw_gaps or []
     except Exception as exc:
-        print(f"[HoltScore] Analysis fetch failed: {exc}")
+        print(f"[HoltScore] Profile/analysis fetch failed: {exc}")
 
     # Step 3: Score each job
     for job in jobs:
@@ -136,7 +132,14 @@ async def search_jobs(
             remote=remote,
             page=page,
         )
-        scored = await _score_jobs(results.get("jobs", []), user)
+        try:
+            scored = await asyncio.wait_for(
+                _score_jobs(results.get("jobs", []), user),
+                timeout=30.0,
+            )
+        except asyncio.TimeoutError:
+            print("[/jobs/search] Scoring pipeline timed out after 30s")
+            scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
         return results
@@ -160,7 +163,14 @@ async def search_adzuna(
             location=location,
             page=page,
         )
-        scored = await _score_jobs(results.get("jobs", []), user)
+        try:
+            scored = await asyncio.wait_for(
+                _score_jobs(results.get("jobs", []), user),
+                timeout=30.0,
+            )
+        except asyncio.TimeoutError:
+            print("[/jobs/adzuna] Scoring pipeline timed out after 30s")
+            scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
         return results
@@ -206,8 +216,14 @@ async def search_aggregated(
                 seen.add(key)
                 unique_jobs.append(job)
 
-        # Score all jobs
-        unique_jobs = await _score_jobs(unique_jobs, user)
+        # Score all jobs with timeout
+        try:
+            unique_jobs = await asyncio.wait_for(
+                _score_jobs(unique_jobs, user),
+                timeout=30.0,
+            )
+        except asyncio.TimeoutError:
+            print("[/jobs/aggregated] Scoring pipeline timed out after 30s")
 
         # Sort by Holt Score descending (best matches first)
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
