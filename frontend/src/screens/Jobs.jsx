@@ -170,7 +170,7 @@ export default function Jobs() {
       if (!searchKeyword) {
         searchKeyword = roleName
           ? roleName.split(/\s+/).slice(0, 3).join(' ')
-          : 'analyst';
+          : 'operations manager';
       }
 
       const searchLocation = profileLocation || 'Florida';

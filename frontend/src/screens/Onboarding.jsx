@@ -5,6 +5,7 @@ import HoltWordmark from '../components/ui/HoltWordmark';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { updateProfile } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import './Onboarding.css';
 
 export default function Onboarding() {
@@ -26,10 +27,13 @@ export default function Onboarding() {
   const [jobSeekerStatus, setJobSeekerStatus] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const navigate = useNavigate();
+  const toast = useToast();
 
   async function handleFinish() {
     setSaving(true);
+    setSaveError(false);
     try {
       const updates = {};
       if (name.trim()) updates.full_name = name.trim();
@@ -44,8 +48,12 @@ export default function Onboarding() {
       if (Object.keys(updates).length > 0) {
         await updateProfile(updates);
       }
-    } catch {
-      // Profile save failed — continue anyway, they can update in settings
+    } catch (err) {
+      // Block onboarding completion on save failure — do NOT advance.
+      setSaving(false);
+      setSaveError(true);
+      toast.error(err?.message || 'Could not save your profile — try again');
+      return;
     }
     localStorage.setItem('holt_onboarded', 'true');
     setSaving(false);
@@ -210,8 +218,22 @@ export default function Onboarding() {
               </div>
             </div>
 
+            {saveError && (
+              <p
+                role="alert"
+                style={{
+                  color: 'var(--color-danger)',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  margin: 'var(--space-3) 0 var(--space-2)',
+                  textAlign: 'center',
+                }}
+              >
+                Couldn't save your profile. Check your connection and try again.
+              </p>
+            )}
             <Button full onClick={handleFinish} disabled={saving}>
-              {saving ? 'Saving...' : 'Start my search \u2192'}
+              {saving ? 'Saving...' : saveError ? 'Try again \u2192' : 'Start my search \u2192'}
             </Button>
             <button className="onboarding__skip" onClick={handleFinish} disabled={saving}>
               I'll fill this in later
