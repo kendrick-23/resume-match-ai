@@ -94,11 +94,18 @@ def calculate_holt_score(
     if is_ops_role and has_ops_profile and skills_match < 65:
         skills_match = 65
 
-    # Domain mismatch detection — scan title AND first 500 chars of description
-    # Each domain maps trigger words (title/desc) → required background signals
+    # Domain mismatch detection — scan title for licensed-profession triggers.
+    # Each domain maps trigger words → required background signals.
+    #
+    # CRITICAL: short triggers and signals (e.g. "md", "do", "rn") MUST be
+    # matched with word boundaries. A naive substring check matches "do" inside
+    # "vendor", "rn" inside "concern", "md" inside "command" — which falsely
+    # marks a hospitality candidate as having medical credentials and bypasses
+    # the penalty entirely. See _trigger_matches / _signal_matches helpers.
     domain_requirements = [
         {
-            "triggers": ["nurse", "nursing degree", "nursing license"],
+            "triggers": ["nurse", "nursing", "nurse practitioner", "rn",
+                         "nursing degree", "nursing license"],
             "signals": ["nursing", "rn", "bsn", "lpn", "clinical", "patient care", "bedside"],
         },
         {
@@ -112,10 +119,17 @@ def calculate_holt_score(
                         "supervised practice", "counseling"],
         },
         {
+            # Expanded physician / medical specialist coverage. Any title with
+            # MD or DO as a standalone token counts (handled via word-boundary
+            # match in _trigger_matches).
             "triggers": ["physician", "medicine", "medical degree",
-                         "radiologist", "radiology", "diagnostic imaging"],
-            "signals": ["medical degree", "md", "do", "residency", "clinical",
-                        "board certified"],
+                         "radiologist", "radiology", "diagnostic imaging",
+                         "surgeon", "surgery", "anesthesiologist", "anesthesia",
+                         "psychiatrist", "psychiatry", "pathologist", "pathology",
+                         "neurologist", "neurology", "cardiologist", "cardiology",
+                         "md", "do"],
+            "signals": ["medical degree", "md", "do", "residency",
+                        "board certified", "physician assistant"],
         },
         {
             "triggers": ["pharmacist", "pharmacy", "pharmaceutical"],
@@ -126,7 +140,8 @@ def calculate_holt_score(
             "signals": ["engineering degree", "pe license", "p.e.", "licensed engineer"],
         },
         {
-            "triggers": ["attorney", "law degree", "legal degree"],
+            # Legal: includes "counsel" and "lawyer" titles in addition to attorney.
+            "triggers": ["attorney", "lawyer", "counsel", "law degree", "legal degree"],
             "signals": ["law degree", "jd", "bar exam", "admitted to bar", "esquire"],
         },
         {
@@ -159,15 +174,32 @@ def calculate_holt_score(
     domain_penalty_applied = False
     skills_str = " ".join(skills).lower()
     degree = (profile.get("degree_status") or "").lower()
-    # Scan job title for domain keywords — description is too noisy
-    # (e.g., "dental offices" in description doesn't mean role requires dental degree)
-    domain_scan_text = job_title
+    # Scan job title for domain triggers. Description is also scanned for
+    # hard licensure keywords later (see Section 2 / scan_description_for_licensure).
+    title_words = set(re.findall(r"[a-z]+", job_title))
+
+    def _trigger_matches(trigger: str) -> bool:
+        """Match a trigger with word-boundary semantics for single-word triggers
+        (so "do" only matches the standalone word, not vendor/door/etc.)."""
+        t = trigger.lower().strip()
+        if " " in t:
+            return t in job_title  # multi-word phrase: substring is OK
+        return t in title_words
+
+    def _signal_matches(signal: str) -> bool:
+        """Match a credential signal in skills/degree with word boundaries
+        for single-word signals (md, do, rn, jd, etc. would otherwise match
+        'command', 'vendor', 'concern', 'adjacent', and silently bypass the
+        penalty for legitimate non-clinical candidates)."""
+        s = signal.lower().strip()
+        if " " in s:
+            return s in skills_str or s in degree
+        pat = re.compile(rf"\b{re.escape(s)}\b")
+        return bool(pat.search(skills_str) or pat.search(degree))
 
     for domain in domain_requirements:
-        if any(trigger in domain_scan_text for trigger in domain["triggers"]):
-            has_background = any(
-                sig in skills_str or sig in degree for sig in domain["signals"]
-            )
+        if any(_trigger_matches(trigger) for trigger in domain["triggers"]):
+            has_background = any(_signal_matches(sig) for sig in domain["signals"])
             if not has_background:
                 skills_match = max(0, skills_match - 40)
                 degree_warning = True
@@ -354,9 +386,11 @@ def calculate_holt_score(
     )
     total_score = max(0, min(100, total_score))
 
-    # Domain penalty caps total — good salary/location doesn't make you a psychologist
+    # Domain penalty caps total — good salary/location doesn't make you a psychologist.
+    # Cap is 15% (lowered from 28) so domain-mismatched roles drop to the very bottom
+    # of the list and never appear in "Within Reach" or "Strong Match" buckets.
     if domain_penalty_applied:
-        total_score = min(total_score, 28)
+        total_score = min(total_score, 15)
 
     # Coaching label
     if domain_penalty_applied:

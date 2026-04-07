@@ -101,10 +101,13 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     except Exception as exc:
         print(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
 
-    # Step 6: FINAL domain penalty enforcement — 28% cap cannot be overridden
+    # Step 6: FINAL domain penalty enforcement — 15% cap cannot be overridden.
+    # This runs LAST so semantic re-scoring can never lift a domain-mismatched
+    # job back into the visible buckets. Cap lowered from 28 → 15 so these
+    # roles drop to the bottom of the list.
     for job in jobs:
         if job.get("domain_penalized"):
-            job["holt_score"] = min(job["holt_score"], 28)
+            job["holt_score"] = min(job["holt_score"], 15)
             job["coaching_label"] = "Different specialization"
 
     return jobs
