@@ -158,7 +158,7 @@ async def semantic_rescore_batch(jobs: list, profile: dict, user_id: str = "") -
     eligible = []
     for job in jobs:
         kw_score = job.get("holt_score", 0)
-        is_penalized = job.get("coaching_label") == "Different specialization"
+        is_penalized = job.get("domain_penalized") or job.get("coaching_label") == "Different specialization"
         title = job.get("title") or ""
         if kw_score >= 55 and not is_penalized and _is_relevant_title(title):
             eligible.append(job)

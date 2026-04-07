@@ -112,7 +112,8 @@ def calculate_holt_score(
                         "supervised practice", "counseling"],
         },
         {
-            "triggers": ["physician", "medicine", "medical degree"],
+            "triggers": ["physician", "medicine", "medical degree",
+                         "radiologist", "radiology", "diagnostic imaging"],
             "signals": ["medical degree", "md", "do", "residency", "clinical",
                         "board certified"],
         },
@@ -389,4 +390,5 @@ def calculate_holt_score(
         "degree_warning": degree_warning,
         "dealbreaker_triggered": dealbreaker_triggered,
         "is_target_company": is_target_company,
+        "domain_penalized": domain_penalty_applied,
     }

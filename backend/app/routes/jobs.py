@@ -79,6 +79,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["degree_warning"] = score_data["degree_warning"]
             job["dealbreaker_triggered"] = score_data["dealbreaker_triggered"]
             job["is_target_company"] = score_data["is_target_company"]
+            job["domain_penalized"] = score_data.get("domain_penalized", False)
         except Exception as exc:
             print(f"[HoltScore] Scoring failed for job {job.get('id', '?')}: {exc}")
             job["holt_score"] = 50
@@ -90,18 +91,25 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["degree_warning"] = False
             job["dealbreaker_triggered"] = False
             job["is_target_company"] = False
+            job["domain_penalized"] = False
 
-    # Step 4: Semantic re-scoring for top candidates (55%+ and not domain-penalized)
+    # Step 4: Semantic re-scoring — SKIP domain-penalized jobs entirely
     try:
         await semantic_rescore_batch(jobs, profile, user.get("user_id", ""))
     except Exception as exc:
         print(f"[SemanticScore] Batch re-scoring failed: {exc}")
 
-    # Step 5: Claude-powered gap analysis for Within Reach jobs (50-69%)
+    # Step 5: Claude-powered gap analysis — SKIP domain-penalized jobs entirely
     try:
         await analyze_gaps_batch(jobs, resume_skills)
     except Exception as exc:
         print(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
+
+    # Step 6: FINAL domain penalty enforcement — 28% cap cannot be overridden
+    for job in jobs:
+        if job.get("domain_penalized"):
+            job["holt_score"] = min(job["holt_score"], 28)
+            job["coaching_label"] = "Different specialization"
 
     return jobs
 

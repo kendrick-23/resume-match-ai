@@ -90,6 +90,7 @@ async def analyze_gaps_batch(
         j for j in jobs
         if j.get("holt_score") is not None
         and 50 <= j["holt_score"] <= 69
+        and not j.get("domain_penalized")
         and j.get("coaching_label") != "Different specialization"
     ]
 
