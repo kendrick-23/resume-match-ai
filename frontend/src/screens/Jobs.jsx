@@ -13,12 +13,43 @@ import { useToast } from '../context/ToastContext';
 import './Jobs.css';
 
 const STORAGE_KEY = 'holt_jobs_search';
+const RECOMMENDATIONS_CACHE_KEY = 'holt_recommendations_cache';
 
 // Client-side freshness gate for the Supabase job_search_cache. The backend
 // holds rows for 4 hours so that an explicit Refresh after a long break can
 // still fall back to cached data if the API is down — but unattended cache
-// hits on browser refresh should NEVER show results older than this.
+// hits on browser refresh should NEVER show results older than this. Also
+// reused for the sessionStorage recommendations cache.
 const CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
+
+function loadRecommendationsCache() {
+  try {
+    const raw = sessionStorage.getItem(RECOMMENDATIONS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp || !Array.isArray(parsed?.jobs)) return null;
+    if (Date.now() - parsed.timestamp > CACHE_MAX_AGE_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveRecommendationsCache(jobs, hasAnalysis) {
+  try {
+    sessionStorage.setItem(
+      RECOMMENDATIONS_CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), jobs, hasAnalysis }),
+    );
+  } catch {
+    // sessionStorage full or unavailable — proceed without caching
+  }
+}
+
+function clearRecommendationsCache() {
+  try { sessionStorage.removeItem(RECOMMENDATIONS_CACHE_KEY); } catch {}
+}
 
 function loadSavedSearch() {
   try {
@@ -125,8 +156,21 @@ export default function Jobs() {
     return () => { profileAbortRef.current?.abort(); };
   }, []);
 
-  async function loadRecommendations() {
+  async function loadRecommendations(forceRefresh = false) {
     setRecError(false);
+
+    // Cache hit (sessionStorage, 30-minute TTL) — short-circuits the entire
+    // recommendation pipeline including the backend Anthropic Haiku calls.
+    // Cuts ~10-30 Haiku invocations per repeat mount.
+    if (!forceRefresh) {
+      const cached = loadRecommendationsCache();
+      if (cached) {
+        setRecommended(cached.jobs);
+        setHasAnalysis(!!cached.hasAnalysis);
+        setRecLoading(false);
+        return;
+      }
+    }
 
     // Parallel fetch — profile and analyses fire concurrently instead of
     // serially. Saves ~250-500ms on mount. Each is wrapped independently so
@@ -158,6 +202,9 @@ export default function Jobs() {
       if (!analyses || analyses.length === 0) {
         setHasAnalysis(false);
         setRecLoading(false);
+        // Cache the empty state too — saves 2 API calls on repeat mounts
+        // for users who haven't analyzed anything yet.
+        saveRecommendationsCache([], false);
         return;
       }
 
@@ -210,7 +257,11 @@ export default function Jobs() {
         const filtered = (data.jobs || []).filter(
           (j) => (j.holt_score ?? 0) >= 70 && !j.domain_penalized
         );
-        setRecommended(filtered.slice(0, 5));
+        const top = filtered.slice(0, 5);
+        setRecommended(top);
+        // Cache the recommendation list (sessionStorage, 30min TTL) so a
+        // repeat mount within the window skips the entire scoring pipeline.
+        saveRecommendationsCache(top, true);
       } catch {
         setRecError(true);
       }
@@ -577,7 +628,7 @@ export default function Jobs() {
           <p style={{ fontWeight: 700, marginTop: 'var(--space-3)', fontSize: '14px' }}>
             Couldn't load recommendations
           </p>
-          <Button variant="ghost" onClick={loadRecommendations} style={{ marginTop: 'var(--space-2)' }}>
+          <Button variant="ghost" onClick={() => loadRecommendations(true)} style={{ marginTop: 'var(--space-2)' }}>
             Tap to retry
           </Button>
         </Card>
@@ -735,7 +786,13 @@ export default function Jobs() {
             return mins < 1 ? 'just now' : `${mins}m ago`;
           })()}</span>
           <button
-            onClick={() => handleProfileMatch(true)}
+            onClick={() => {
+              // Refresh clears BOTH the profile-match cache and the
+              // sessionStorage recommendations cache, then re-runs both.
+              clearRecommendationsCache();
+              handleProfileMatch(true);
+              loadRecommendations(true);
+            }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
