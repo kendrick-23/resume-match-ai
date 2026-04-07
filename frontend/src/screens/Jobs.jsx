@@ -14,6 +14,12 @@ import './Jobs.css';
 
 const STORAGE_KEY = 'holt_jobs_search';
 
+// Client-side freshness gate for the Supabase job_search_cache. The backend
+// holds rows for 4 hours so that an explicit Refresh after a long break can
+// still fall back to cached data if the API is down — but unattended cache
+// hits on browser refresh should NEVER show results older than this.
+const CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
 function loadSavedSearch() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -338,15 +344,26 @@ export default function Jobs() {
 
       setLocation(loc);
 
-      // Check cache first (unless forced refresh)
+      // Check cache first (unless forced refresh). The backend retains rows
+      // up to 4h, but we refuse to render anything older than CACHE_MAX_AGE_MS
+      // (30 min) here. This prevents the "Find jobs that fit me" button from
+      // showing results hours stale after a browser refresh — the user always
+      // gets fresh data unless they explicitly chose Refresh on a recent run.
       const cacheKey = makeCacheKey('profile', queries.join('|'), loc);
       if (!forceRefresh) {
         try {
           const cached = await getSearchCache(cacheKey);
           if (cached.cached) {
-            const r = cached.results;
-            _applyResults(r.federal || [], r.private || [], loc, cached.cached_at);
-            return;
+            const cachedAtMs = cached.cached_at
+              ? new Date(cached.cached_at).getTime()
+              : 0;
+            const ageMs = Date.now() - cachedAtMs;
+            if (cachedAtMs > 0 && ageMs <= CACHE_MAX_AGE_MS) {
+              const r = cached.results;
+              _applyResults(r.federal || [], r.private || [], loc, cached.cached_at);
+              return;
+            }
+            // Stale cache — fall through to a fresh fetch below.
           }
         } catch { /* cache miss, proceed with fresh search */ }
       }
