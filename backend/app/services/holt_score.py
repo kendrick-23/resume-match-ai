@@ -206,6 +206,49 @@ def calculate_holt_score(
                 domain_penalty_applied = True
             break
 
+    # Title-trigger missed it — scan first 500 chars of description for HARD
+    # licensure phrases. A job titled "Care Coordinator" with "MD required" in
+    # the body must still be flagged as out-of-domain for an ops candidate.
+    if not domain_penalty_applied:
+        desc_head = job_desc[:500]
+        # Multi-word, unambiguous phrases. No bare "md" / "do" here — too
+        # noisy in description text. Use word-boundary regex for short tokens.
+        licensure_phrases = [
+            r"\bmd\s+required\b",
+            r"\bdo\s+required\b",
+            r"\brn\s+required\b",
+            r"\bnp\s+required\b",
+            r"\blpn\s+required\b",
+            r"\blicensed\s+physician\b",
+            r"\bmedical\s+degree\s+required\b",
+            r"\bmedical\s+license\b",
+            r"\bnursing\s+license\b",
+            r"\bnursing\s+degree\s+required\b",
+            r"\bboard[\s-]?certified\b",
+            r"\bbar\s+exam\b",
+            r"\badmitted\s+to\s+the\s+bar\b",
+            r"\bjuris\s+doctor\b",
+            r"\bpharmacy\s+license\b",
+            r"\bdental\s+license\b",
+            r"\bveterinary\s+license\b",
+        ]
+        # Same has-background test as the title path — if the candidate
+        # actually holds the credential, no penalty.
+        candidate_has_credential = (
+            re.search(r"\b(md|do|rn|jd|pharmd|dds|dvm)\b", skills_str)
+            or re.search(r"\b(md|do|rn|jd)\b", degree)
+            or "medical degree" in skills_str
+            or "nursing license" in skills_str
+            or "law degree" in skills_str
+        )
+        for phrase in licensure_phrases:
+            if re.search(phrase, desc_head):
+                if not candidate_has_credential:
+                    skills_match = max(0, skills_match - 40)
+                    degree_warning = True
+                    domain_penalty_applied = True
+                break
+
     # Operations/management bonus — stacks with floor
     ops_signals = ["operations", "manager", "general manager", "agm",
                    "assistant manager", "branch manager", "operations coordinator",
