@@ -372,28 +372,67 @@ def calculate_holt_score(
 
     # --- Job-specific gaps ---
     # Extract skills/experience the job requires that the user doesn't have
+    _STOPWORDS = {
+        "the","a","an","and","or","but","in","on","at","to",
+        "for","of","with","by","from","is","are","was","were",
+        "be","been","being","have","has","had","do","does","did",
+        "will","would","could","should","may","might","must",
+        "our","their","your","its","this","that","these","those",
+        "we","you","they","he","she","it","not","also","all",
+        "as","if","so","up","out","no","new","just","can",
+    }
+    _NOISE_VERBS = {
+        "providing","ensuring","managing","supporting","working",
+        "including","using","developing","maintaining","creating",
+        "leading","building","serves","serving","making","helping",
+        "seeking","looking","required","preferred","ability","must",
+    }
+    _LOCATION_WORDS = {
+        "maitland","orlando","florida","casselberry","sanford",
+        "north","south","east","west","york","united","states",
+        "county","beach","lake","city","town","area","region",
+    }
+
+    def _is_valid_gap_term(term: str) -> bool:
+        t = term.lower().strip()
+        if len(t) < 4:
+            return False
+        if t.isdigit():
+            return False
+        if t in _STOPWORDS or t in _NOISE_VERBS or t in _LOCATION_WORDS:
+            return False
+        # Reject single common words without domain meaning
+        if len(t.split()) == 1 and t in {
+            "other", "more", "many", "such", "some", "each", "both",
+            "able", "well", "good", "high", "full", "part", "time",
+        }:
+            return False
+        return True
+
     job_specific_gaps = []
     if job_desc and skills:
-        # Find requirement phrases in the job description
+        # Prefer multi-word phrases from requirement sentences
         req_patterns = [
             r"(?:required|must have|experience with|knowledge of|proficiency in|"
             r"familiar with|expertise in|skilled in|ability to use)\s*:?\s*([^.;\n]{3,60})",
         ]
-        required_terms = set()
+        required_terms = []
+        seen_terms = set()
         for pat in req_patterns:
             for m in re.finditer(pat, job_desc):
                 phrase = m.group(1).strip().lower()
-                # Split compound requirements (e.g. "Excel, QuickBooks, and SAP")
                 for term in re.split(r"[,;&/]|\band\b", phrase):
                     term = term.strip()
-                    if 3 <= len(term) <= 40:
-                        required_terms.add(term)
+                    if _is_valid_gap_term(term) and term not in seen_terms:
+                        seen_terms.add(term)
+                        required_terms.append(term)
 
-        # Also extract capitalized tool/system names from description
+        # Also extract capitalized tool/system names (multi-word preferred)
         for m in re.finditer(r"\b([A-Z][a-zA-Z+#]{2,15})\b", job.get("description") or ""):
             word = m.group(1).lower()
-            if word not in {"the", "this", "that", "with", "from", "have", "will", "must", "can"}:
-                required_terms.add(word)
+            if _is_valid_gap_term(word) and word not in seen_terms:
+                seen_terms.add(word)
+                required_terms.append(word)
 
         skills_lower = set(skills)
         for term in required_terms:
