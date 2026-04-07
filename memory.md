@@ -188,8 +188,22 @@ Order is fixed: enrich → fetch profile (once) → keyword score → semantic r
 - Score history chart
 - Polish pass
 
+## Recent Session Fixes (April 2026)
+This session resolved a large batch of HIGH/CRITICAL audit findings. All fixes are committed and pushed.
+
+- **Profile empty-fields race fixed** — `routes/profile.py::get_profile()` now SELECTs after auto-create, catches unique-violation races, and never returns `{}`. Always returns the full row or raises 500. (Most likely cause of Nicole's empty-fields bug; verify on her account.)
+- **Onboarding silent save failure fixed** — `Onboarding.jsx` now blocks navigation on `updateProfile` error, surfaces a toast + inline alert + "Try again" button. Jobs.jsx fallback keyword changed from `'analyst'` → `'operations manager'`.
+- **handleProfileMatch lockup fixed** — `Jobs.jsx::handleProfileMatch` now explicitly clears `profileTimedOut` on non-Abort errors and resets every loading flag in `finally`.
+- **Magic-byte file validation added** — `backend/app/main.py::upload_resume` validates `%PDF` / `PK\x03\x04` signatures BEFORE PdfReader/Document touches the bytes. Spoofed MIME types are rejected with 400.
+- **Unbounded text fields capped** — `AnalyzeRequest`, `InterviewPrepRequest`, `GenerateResumeRequest` all have `Field(max_length=…)` constraints (resume 50k, JD 20k, linkedin 10k). Profile.jsx LinkedIn textarea has matching `maxLength={10000}`.
+- **Domain penalty now firing on Federal + Private results** — root cause was 2-letter signal substrings (`md`, `do`, `rn`) matching inside common words like `vendor` (contains `do`), falsely setting `has_background=True`. Fix uses tokenized word-boundary matching for both triggers and signals. Expanded protected list (radiologist, surgeon, dentist, anesthesiologist, psychiatrist, pathologist, neurologist, cardiologist, attorney, lawyer, counsel, MD, DO). **Cap lowered from 28 → 15.** Verified: Physician → 15, Director of Operations → 84 (no false positive on "do" inside "Director").
+- **Description licensure scan added** — title-trigger misses now fall through to a 500-char description scan with multi-word, word-bounded phrases ("MD required", "Bar exam", "licensed physician", etc.). Verified on "Care Coordinator" + "MD required" body → penalized to 15. Word-boundary regex prevents false positives from "we do" / "CMD".
+- **Hospitality-to-corporate keyword bridge added** — `HOSPITALITY_BRIDGE` dict in `holt_score.py` expands Nicole's vocabulary (`f&b`, `guest experience`, `front of house`, `scheduling`, `payroll`, `vendor`, `staff training`, `agm`, etc.) into corporate equivalents (`operations`, `customer experience`, `workforce planning`, `procurement`, `l&d`, `operations manager`, etc.) before substring matching. Denominator stays tied to original skill count so the bridge can only improve scores, never dilute. Verified: ops manager skills_match 85 → 100 (+15), total 84 → 89 (+5).
+- **Badge N+1 fixed** — `routes/profile.py::check_badges` now does 2 bulk fetches (analyses + applications) instead of 8 serial conditional queries. `get_streak` deduplicated to a single call (was 2). Verified via mocked Supabase: round-trips dropped from 9 → 4. All 7 badge conditions still resolve correctly.
+- **Jobs mount parallelized** — `Jobs.jsx::loadRecommendations` now uses `Promise.allSettled([getProfile, listAnalyses])` instead of serial awaits. `cachedProfile` state added; `handleProfileMatch` reuses it instead of re-fetching. ~500ms saved on mount + first profile match.
+
 ## Known Issues
-- **Profile screen shows empty fields for Nicole** — UNRESOLVED. Data confirmed in Supabase, column names verified correct across the entire stack (Profile.jsx, Onboarding.jsx, HeaderSettingsMenu.jsx, Jobs.jsx, backend `profile.py`, SQL migrations). There is NO column-name mismatch to fix. Next step: DevTools Network tab on `GET /profile` — does it return Nicole's populated row or an empty object? That distinguishes a frontend rendering bug from a backend query/RLS/auto-create bug in `profile.py::get_profile()`.
+- **Profile screen shows empty fields for Nicole** — Most likely fixed by the `get_profile` race-condition fix above. Verify on Nicole's account: open DevTools Network tab on a fresh page load and confirm `GET /profile` returns the populated row. If still empty, the bug is in frontend rendering of `Profile.jsx`.
 
 ## What NEVER To Do
 ❌ Dark backgrounds | ❌ Purple gradients | ❌ Glassmorphism
