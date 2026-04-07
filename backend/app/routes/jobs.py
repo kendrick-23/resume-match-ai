@@ -89,7 +89,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
 
     # Step 4: Semantic re-scoring for top candidates (55%+ and not domain-penalized)
     try:
-        await semantic_rescore_batch(jobs, profile)
+        await semantic_rescore_batch(jobs, profile, user.get("user_id", ""))
     except Exception as exc:
         print(f"[SemanticScore] Batch re-scoring failed: {exc}")
 

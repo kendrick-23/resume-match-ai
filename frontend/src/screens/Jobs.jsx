@@ -506,18 +506,22 @@ export default function Jobs() {
         </Card>
       )}
 
-      {/* Profile match button */}
-      <Button
-        full
-        onClick={handleProfileMatch}
-        disabled={profileMatchLoading || (fedLoading && pvtLoading)}
-        style={{ marginBottom: 0 }}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-          <Ott state="idle" size={24} />
-          {profileMatchLoading ? 'Finding your matches...' : 'Find jobs that fit me'}
-        </span>
-      </Button>
+      {/* Profile match button + loading state */}
+      {profileMatchLoading ? (
+        <ProfileMatchLoading />
+      ) : (
+        <Button
+          full
+          onClick={handleProfileMatch}
+          disabled={fedLoading && pvtLoading}
+          style={{ marginBottom: 0 }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+            <Ott state="idle" size={24} />
+            Find jobs that fit me
+          </span>
+        </Button>
+      )}
 
       {/* Divider */}
       <div style={{
@@ -816,6 +820,35 @@ export default function Jobs() {
         </div>
       )}
     </ScreenWrapper>
+  );
+}
+
+
+const LOADING_MESSAGES = [
+  'Searching across 6 job sources...',
+  'Scoring each job against your profile...',
+  'Finding your best matches...',
+  'Almost there...',
+];
+
+function ProfileMatchLoading() {
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length), 2000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <Card style={{ textAlign: 'center', padding: 'var(--space-5)', marginBottom: 0 }}>
+      <Ott state="thinking" size={64} />
+      <p style={{
+        fontWeight: 600,
+        fontSize: '14px',
+        marginTop: 'var(--space-3)',
+        color: 'var(--color-text)',
+      }}>
+        {LOADING_MESSAGES[msgIdx]}
+      </p>
+    </Card>
   );
 }
 
