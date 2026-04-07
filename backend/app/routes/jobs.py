@@ -11,6 +11,7 @@ from app.services.adzuna import search_adzuna_jobs
 from app.services.jobspy_service import search_jobspy
 from app.services.holt_score import calculate_holt_score
 from app.services.enrich import enrich_jobs_batch
+from app.services.semantic_score import semantic_rescore_batch
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -77,6 +78,12 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["degree_warning"] = False
             job["dealbreaker_triggered"] = False
             job["is_target_company"] = False
+
+    # Step 4: Semantic re-scoring for top candidates (55%+ and not domain-penalized)
+    try:
+        await semantic_rescore_batch(jobs, profile)
+    except Exception as exc:
+        print(f"[SemanticScore] Batch re-scoring failed: {exc}")
 
     return jobs
 
