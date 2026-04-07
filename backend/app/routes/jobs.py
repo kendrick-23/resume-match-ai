@@ -76,6 +76,8 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["dealbreaker_triggered"] = score_data["dealbreaker_triggered"]
             job["is_target_company"] = score_data["is_target_company"]
             job["domain_penalized"] = score_data.get("domain_penalized", False)
+            job["salary_floor_violation"] = score_data.get("salary_floor_violation", False)
+            job["salary_not_disclosed"] = score_data.get("salary_not_disclosed", False)
         except Exception as exc:
             print(f"[HoltScore] Scoring failed for job {job.get('id', '?')}: {exc}")
             job["holt_score"] = 50
@@ -88,6 +90,8 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["dealbreaker_triggered"] = False
             job["is_target_company"] = False
             job["domain_penalized"] = False
+            job["salary_floor_violation"] = False
+            job["salary_not_disclosed"] = False
 
     # Step 4: Semantic re-scoring — SKIP domain-penalized jobs entirely
     try:
@@ -109,6 +113,32 @@ async def _score_jobs(jobs: list, user: dict) -> list:
         if job.get("domain_penalized"):
             job["holt_score"] = min(job["holt_score"], 15)
             job["coaching_label"] = "Different specialization"
+
+    # Step 7: FINAL salary-floor enforcement — composite cap @ 25 for jobs that
+    # pay > 25% below the seeker's stated minimum. Same architectural pattern as
+    # the domain penalty: runs LAST so semantic re-scoring can never override.
+    # Domain penalty wins ties (it's even more severe), so this only fires on
+    # jobs that aren't already domain-capped at 15.
+    for job in jobs:
+        if job.get("salary_floor_violation") and not job.get("domain_penalized"):
+            job["holt_score"] = min(job["holt_score"], 25)
+            job["coaching_label"] = "Below your salary range"
+
+    # Step 8: Hard exclusion when the user has explicitly set salary as a
+    # dealbreaker AND the job violates the floor. The user told us "$70k is my
+    # floor" — honor it. Filter at the route layer (mirrors how dealbreakers
+    # should have been enforced from day one).
+    if (profile.get("dealbreakers") or {}).get("below_salary") if isinstance(profile.get("dealbreakers"), dict) else False:
+        jobs = [j for j in jobs if not j.get("salary_floor_violation")]
+    else:
+        # dealbreakers may be a JSON string in the column; handle both
+        raw_db = profile.get("dealbreakers")
+        if isinstance(raw_db, str):
+            try:
+                if json.loads(raw_db).get("below_salary"):
+                    jobs = [j for j in jobs if not j.get("salary_floor_violation")]
+            except (json.JSONDecodeError, TypeError):
+                pass
 
     return jobs
 

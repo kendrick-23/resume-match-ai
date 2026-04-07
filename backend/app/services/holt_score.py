@@ -326,23 +326,60 @@ def calculate_holt_score(
         ops_bonus = min(20, ops_keyword_count * 3)
         skills_match = min(100, skills_match + ops_bonus)
 
-    # --- 2. Salary Alignment (20%) ---
-    if target_salary_min and job_salary_max:
-        if job_salary_max >= target_salary_min:
+    # --- 2. Salary Alignment (20%) — sigmoid curve, hard floor, overpay penalty ---
+    # Replaces the old 3-bucket cliff with a continuous curve grounded in
+    # reservation-wage theory (Krueger & Mueller, NBER WP 19870): acceptance
+    # probability is step-shaped around the seeker's stated minimum, not gradient.
+    #
+    #   Comfort band (target_min .. target_max)            → 100
+    #   Shoulder    (target_min*0.9 .. target_min)         → linear 100 → 65
+    #   Steep      (target_min*0.75 .. target_min*0.9)    → linear 65 → 25
+    #   Hard floor  (< target_min*0.75)                    → 15  + composite cap @ 25
+    #   Overpay    (> target_max)                         → max(70, 100 - 10*ratio)
+    #   No data                                            → 55  + salary_not_disclosed flag
+    #
+    # The hard-floor composite cap is enforced in routes/jobs.py (final loop)
+    # so semantic re-scoring can never lift a salary-floor job back into
+    # visible buckets — same pattern as the domain penalty.
+    job_salary = job_salary_max or job_salary_min
+    salary_floor_violation = False
+    salary_not_disclosed = False
+
+    if target_salary_min and job_salary:
+        # target_salary_max may be missing; fall back to target_salary_min as the
+        # band ceiling (degenerates the comfort band to a single point).
+        band_top = target_salary_max if target_salary_max else target_salary_min
+        floor_min = target_salary_min
+
+        if floor_min <= job_salary <= band_top:
             salary_alignment = 100
-        elif job_salary_max >= target_salary_min * 0.9:
-            salary_alignment = 60
+        elif job_salary > band_top:
+            # Overpay: gentle decline (seniority-creep signal). Floored at 70.
+            overpay_ratio = (job_salary - band_top) / (band_top * 0.25)
+            salary_alignment = max(70, round(100 - 10 * overpay_ratio))
+        elif job_salary >= floor_min * 0.9:
+            # Shoulder: linear 100 → 65 across the top 10% below floor.
+            salary_alignment = round(
+                65 + 35 * ((job_salary - floor_min * 0.9) / (floor_min * 0.1))
+            )
+            salary_alignment = max(65, min(100, salary_alignment))
+        elif job_salary >= floor_min * 0.75:
+            # Steep decline: linear 65 → 25 across 10–25% below floor.
+            salary_alignment = round(
+                25 + 40 * ((job_salary - floor_min * 0.75) / (floor_min * 0.15))
+            )
+            salary_alignment = max(25, min(65, salary_alignment))
         else:
-            salary_alignment = 30
+            # Hard floor: > 25% below the seeker's stated minimum.
+            salary_alignment = 15
+            salary_floor_violation = True
             if dealbreakers.get("below_salary"):
                 dealbreaker_triggered = True
-    elif target_salary_min and job_salary_min:
-        if job_salary_min >= target_salary_min * 0.8:
-            salary_alignment = 80
-        else:
-            salary_alignment = 40
     else:
-        salary_alignment = 70  # neutral if no data
+        # No salary data — slightly pessimistic prior (was 70). Stops rewarding
+        # postings that hide their pay relative to honest postings near floor.
+        salary_alignment = 55
+        salary_not_disclosed = True
 
     # --- 3. Schedule Fit (15%) ---
     schedule_red_flags = ["weekend", "nights", "shift", "rotating", "overnight"]
@@ -502,6 +539,8 @@ def calculate_holt_score(
     # Coaching label
     if domain_penalty_applied:
         coaching_label = "Different specialization"
+    elif salary_floor_violation:
+        coaching_label = "Below your salary range"
     elif total_score >= 70:
         coaching_label = "Strong match"
     elif total_score >= 50:
@@ -532,4 +571,6 @@ def calculate_holt_score(
         "dealbreaker_triggered": dealbreaker_triggered,
         "is_target_company": is_target_company,
         "domain_penalized": domain_penalty_applied,
+        "salary_floor_violation": salary_floor_violation,
+        "salary_not_disclosed": salary_not_disclosed,
     }
