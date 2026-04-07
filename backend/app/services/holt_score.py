@@ -380,6 +380,15 @@ def calculate_holt_score(
         "our","their","your","its","this","that","these","those",
         "we","you","they","he","she","it","not","also","all",
         "as","if","so","up","out","no","new","just","can",
+        "again","after","before","between","through","during",
+        "without","within","along","following","across","behind",
+        "beyond","plus","except","under","around","among",
+        "above","below","about","into","over","then","than",
+        "application","submission","assigned","employees",
+        "role","position","candidate","candidates",
+        "experience","required","preferred","ability",
+        "skills","knowledge","work","team","company",
+        "including","related","other",
     }
     _NOISE_VERBS = {
         "providing","ensuring","managing","supporting","working",
@@ -392,16 +401,22 @@ def calculate_holt_score(
         "north","south","east","west","york","united","states",
         "county","beach","lake","city","town","area","region",
     }
-
     _JOB_TITLE_WORDS = {
-        "manager", "director", "supervisor", "coordinator", "specialist",
-        "assistant", "associate", "personal", "general", "regional",
-        "area", "district", "store", "training", "club", "fitness", "gym",
+        "manager","director","supervisor","coordinator","specialist",
+        "assistant","associate","personal","general","regional",
+        "area","district","store","training","club","fitness","gym",
     }
+
+    # Build company-name exclusion set from this job's company
+    company_words = set()
+    for w in (job.get("company") or "").lower().split():
+        w = re.sub(r"[^a-z]", "", w)
+        if len(w) >= 3:
+            company_words.add(w)
 
     def _is_valid_gap_term(term: str) -> bool:
         t = term.lower().strip()
-        if len(t) < 5:
+        if len(t) < 6:
             return False
         if t.isdigit():
             return False
@@ -409,10 +424,12 @@ def calculate_holt_score(
             return False
         if t in _JOB_TITLE_WORDS:
             return False
+        if t in company_words:
+            return False
         # Reject single common words without domain meaning
         if len(t.split()) == 1 and t in {
-            "other", "more", "many", "such", "some", "each", "both",
-            "able", "well", "good", "high", "full", "part", "time",
+            "other","more","many","such","some","each","both",
+            "able","well","good","high","full","part","time",
         }:
             return False
         return True
