@@ -365,11 +365,16 @@ export default function Jobs() {
       if (err.name === 'AbortError') {
         setProfileTimedOut(true);
       } else {
+        // Non-timeout errors must NOT leave the timeout coaching card
+        // stuck on screen. Always clear it explicitly.
+        setProfileTimedOut(false);
         toast.error('Could not load your profile — try keyword search instead');
       }
     } finally {
       clearTimeout(timeoutId);
       profileAbortRef.current = null;
+      // Always reset every loading flag regardless of error type, so the
+      // user can always retry. Per CLAUDE.md resilience rules.
       setProfileMatchLoading(false);
       setFedLoading(false);
       setPvtLoading(false);
