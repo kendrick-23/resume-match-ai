@@ -200,6 +200,25 @@ export async function searchAdzunaJobs({ keyword, location, page }) {
   return apiRequest(`${API_URL}/jobs/adzuna?${params}`, { headers });
 }
 
+export async function getSearchCache(cacheKey) {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/jobs/cache?key=${encodeURIComponent(cacheKey)}`, { headers });
+}
+
+export async function saveSearchCache({ cacheKey, results, federalCount, privateCount }) {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/jobs/cache`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({
+      cache_key: cacheKey,
+      results,
+      federal_count: federalCount || 0,
+      private_count: privateCount || 0,
+    }),
+  });
+}
+
 /* ============================================
    Activity / Dashboard
    ============================================ */

@@ -5,7 +5,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, createApplication, listAnalyses, getProfile } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
@@ -32,6 +32,16 @@ function saveSearch(data) {
 
 export function clearJobsSearch() {
   try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
+function makeCacheKey(searchType, keywords = '', location = '') {
+  const raw = `${searchType}:${keywords}:${location}`.toLowerCase().trim();
+  // Simple hash — same as backend md5 but client-side
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
 }
 
 export default function Jobs() {
@@ -81,6 +91,9 @@ export default function Jobs() {
   const [filterPostedWithin, setFilterPostedWithin] = useState('any');
   const [filterDegree, setFilterDegree] = useState('all');
   const [showDealbreakers, setShowDealbreakers] = useState(true);
+
+  // Cache state
+  const [cachedAt, setCachedAt] = useState(null);
 
   const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword);
   const [profileMatchLoading, setProfileMatchLoading] = useState(false);
@@ -241,88 +254,94 @@ export default function Jobs() {
     searchPrivate(kw, loc);
   }
 
-  async function handleProfileMatch() {
+  function _applyResults(fedMerged, pvtMerged, loc, cached = null) {
+    fedMerged.sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0));
+    setFedJobs(fedMerged);
+    setFedTotal(fedMerged.length);
+    setFedPage(1);
+    setFedSearched(true);
+    setFedLoading(false);
+
+    pvtMerged.sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0));
+    setPvtJobs(pvtMerged);
+    setPvtTotal(pvtMerged.length);
+    setPvtPage(1);
+    setPvtSearched(true);
+    setPvtLoading(false);
+
+    setCachedAt(cached);
+    saveSearch({ keyword: '', location: loc, remoteOnly, activeTab });
+  }
+
+  function _dedup(results, keyFn) {
+    const seen = new Set();
+    const merged = [];
+    for (const res of results) {
+      for (const job of (res.jobs || [])) {
+        const k = keyFn(job);
+        if (!seen.has(k)) { seen.add(k); merged.push(job); }
+      }
+    }
+    return merged;
+  }
+
+  async function handleProfileMatch(forceRefresh = false) {
     setProfileMatchLoading(true);
+    setCachedAt(null);
     try {
       const profile = await getProfile();
       const roles = (profile.target_roles || '').split(',').map((r) => r.trim()).filter(Boolean);
       const skills = Array.isArray(profile.skills_extracted) ? profile.skills_extracted : [];
       const loc = (profile.location || '').trim() || 'Florida';
 
-      // Build up to 3 search queries: one per target role, plus a skills-based query
       const queries = [];
-      for (const role of roles.slice(0, 2)) {
-        queries.push(role);
-      }
-      // Third query: top skills as a phrase (e.g. "Operations Management Leadership")
+      for (const role of roles.slice(0, 2)) queries.push(role);
       const skillPhrase = skills.slice(0, 3).join(' ').trim();
-      if (skillPhrase && !queries.includes(skillPhrase)) {
-        queries.push(skillPhrase);
-      }
-      // Fallback if no roles or skills
+      if (skillPhrase && !queries.includes(skillPhrase)) queries.push(skillPhrase);
       if (queries.length === 0) queries.push('manager');
 
-      // Do NOT pre-fill keyword box — profile search is separate from manual search
       setLocation(loc);
 
-      // Run parallel federal searches (one per query)
+      // Check cache first (unless forced refresh)
+      const cacheKey = makeCacheKey('profile', queries.join('|'), loc);
+      if (!forceRefresh) {
+        try {
+          const cached = await getSearchCache(cacheKey);
+          if (cached.cached) {
+            const r = cached.results;
+            _applyResults(r.federal || [], r.private || [], loc, cached.cached_at);
+            setProfileMatchLoading(false);
+            return;
+          }
+        } catch { /* cache miss, proceed with fresh search */ }
+      }
+
       setFedLoading(true);
       setFedError('');
-      const fedPromises = queries.map((q) =>
-        searchJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
-      );
-
-      // Run parallel aggregated searches for private tab
       setPvtLoading(true);
-      const pvtPromises = queries.map((q) =>
-        searchAggregatedJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
-      );
 
       const [fedResults, pvtResults] = await Promise.all([
-        Promise.all(fedPromises),
-        Promise.all(pvtPromises),
+        Promise.all(queries.map((q) =>
+          searchJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
+        )),
+        Promise.all(queries.map((q) =>
+          searchAggregatedJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
+        )),
       ]);
 
-      // Merge and deduplicate federal results
-      const fedSeen = new Set();
-      const fedMerged = [];
-      for (const res of fedResults) {
-        for (const job of (res.jobs || [])) {
-          const key = `${(job.title || '').toLowerCase()}|${(job.company || job.department || '').toLowerCase()}`;
-          if (!fedSeen.has(key)) {
-            fedSeen.add(key);
-            fedMerged.push(job);
-          }
-        }
-      }
-      fedMerged.sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0));
-      setFedJobs(fedMerged);
-      setFedTotal(fedMerged.length);
-      setFedPage(1);
-      setFedSearched(true);
-      setFedLoading(false);
+      const fedMerged = _dedup(fedResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||j.department||'').toLowerCase()}`);
+      const pvtMerged = _dedup(pvtResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}`);
 
-      // Merge and deduplicate private results
-      const pvtSeen = new Set();
-      const pvtMerged = [];
-      for (const res of pvtResults) {
-        for (const job of (res.jobs || [])) {
-          const key = `${(job.title || '').toLowerCase()}|${(job.company || '').toLowerCase()}`;
-          if (!pvtSeen.has(key)) {
-            pvtSeen.add(key);
-            pvtMerged.push(job);
-          }
-        }
-      }
-      pvtMerged.sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0));
-      setPvtJobs(pvtMerged);
-      setPvtTotal(pvtMerged.length);
-      setPvtPage(1);
-      setPvtSearched(true);
-      setPvtLoading(false);
+      _applyResults(fedMerged, pvtMerged, loc);
 
-      saveSearch({ keyword: '', location: loc, remoteOnly, activeTab });
-    } catch (err) {
+      // Save to cache in background
+      saveSearchCache({
+        cacheKey,
+        results: { federal: fedMerged, private: pvtMerged },
+        federalCount: fedMerged.length,
+        privateCount: pvtMerged.length,
+      }).catch(() => {});
+    } catch {
       toast.error('Could not load your profile — try keyword search instead');
       setFedLoading(false);
       setPvtLoading(false);
@@ -596,6 +615,34 @@ export default function Jobs() {
           }}>
             Federal = government jobs &middot; Private = Indeed, Glassdoor, ZipRecruiter &amp; more
           </p>
+        </div>
+      )}
+
+      {/* Cache status */}
+      {cachedAt && (fedSearched || pvtSearched) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--space-2)',
+          marginBottom: 'var(--space-3)',
+          fontSize: '12px',
+          color: 'var(--color-text-muted)',
+        }}>
+          <span>Showing saved results from {(() => {
+            const mins = Math.round((Date.now() - new Date(cachedAt).getTime()) / 60000);
+            return mins < 1 ? 'just now' : `${mins}m ago`;
+          })()}</span>
+          <button
+            onClick={() => handleProfileMatch(true)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
+              fontWeight: 600, fontSize: '12px', padding: 0,
+            }}
+          >
+            ↻ Refresh
+          </button>
         </div>
       )}
 

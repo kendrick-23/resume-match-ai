@@ -1,8 +1,11 @@
 import asyncio
+import hashlib
 import json
 import os
-from fastapi import APIRouter, HTTPException, Query, Depends, Request
+from datetime import datetime, timezone, timedelta
+from fastapi import APIRouter, HTTPException, Query, Depends, Request, Body
 from typing import Optional
+from pydantic import BaseModel
 from supabase import create_client
 
 from app.main import limiter, get_current_user
@@ -206,3 +209,86 @@ async def search_aggregated(
     except Exception as e:
         print(f"[/jobs/aggregated] Error: {e}")
         return {"total": 0, "jobs": []}
+
+
+# --- Search result caching ---
+
+def _make_cache_key(search_type: str, keywords: str = "", location: str = "") -> str:
+    raw = f"{search_type}:{keywords}:{location}".lower().strip()
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+class CacheSaveBody(BaseModel):
+    cache_key: str
+    results: dict
+    federal_count: int = 0
+    private_count: int = 0
+
+
+@router.get("/cache")
+@limiter.limit("100/hour")
+async def get_cached_search(
+    request: Request,
+    key: str = Query(..., min_length=1, max_length=64),
+    user: dict = Depends(get_current_user),
+):
+    """Retrieve cached search results if not expired."""
+    sb = _user_sb(user)
+
+    # Clean up expired entries
+    try:
+        sb.table("job_search_cache") \
+            .delete() \
+            .eq("user_id", user["user_id"]) \
+            .lt("expires_at", datetime.now(timezone.utc).isoformat()) \
+            .execute()
+    except Exception:
+        pass
+
+    res = sb.table("job_search_cache") \
+        .select("*") \
+        .eq("user_id", user["user_id"]) \
+        .eq("cache_key", key) \
+        .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
+        .limit(1) \
+        .execute()
+
+    if res.data:
+        row = res.data[0]
+        return {
+            "cached": True,
+            "results": row["results"],
+            "federal_count": row.get("federal_count", 0),
+            "private_count": row.get("private_count", 0),
+            "cached_at": row["created_at"],
+        }
+    return {"cached": False}
+
+
+@router.post("/cache")
+@limiter.limit("30/hour")
+async def save_search_cache(
+    request: Request,
+    body: CacheSaveBody,
+    user: dict = Depends(get_current_user),
+):
+    """Cache search results with 4-hour expiry."""
+    sb = _user_sb(user)
+    expires = (datetime.now(timezone.utc) + timedelta(hours=4)).isoformat()
+
+    try:
+        sb.table("job_search_cache") \
+            .upsert({
+                "user_id": user["user_id"],
+                "cache_key": body.cache_key,
+                "results": body.results,
+                "federal_count": body.federal_count,
+                "private_count": body.private_count,
+                "expires_at": expires,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }) \
+            .execute()
+        return {"ok": True}
+    except Exception as exc:
+        print(f"[Cache] Save failed: {exc}")
+        return {"ok": False}
