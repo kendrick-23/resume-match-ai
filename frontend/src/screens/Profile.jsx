@@ -362,6 +362,7 @@ export default function Profile() {
               placeholder="Paste your LinkedIn About section, experience summary, or any profile text..."
               value={linkedinText}
               onChange={(e) => { setLinkedinText(e.target.value); setHasChanges(true); }}
+              maxLength={10000}
               style={{ minHeight: '100px' }}
             />
             <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>

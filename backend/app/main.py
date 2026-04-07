@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from anthropic import Anthropic
 from supabase import create_client
 from dotenv import load_dotenv
@@ -136,18 +136,18 @@ app.include_router(generate_resume_router)
 
 
 class AnalyzeRequest(BaseModel):
-    resume: str
-    job_description: str
-    company_name: str = ""
-    role_name: str = ""
-    linkedin_text: str = ""
+    resume: str = Field(..., max_length=50000)
+    job_description: str = Field(..., max_length=20000)
+    company_name: str = Field(default="", max_length=200)
+    role_name: str = Field(default="", max_length=200)
+    linkedin_text: str = Field(default="", max_length=10000)
 
 
 class InterviewPrepRequest(BaseModel):
-    role: str
-    company: str = ""
-    gaps: list[str] = []
-    job_description: str = ""
+    role: str = Field(..., max_length=200)
+    company: str = Field(default="", max_length=200)
+    gaps: list[str] = Field(default_factory=list, max_length=20)
+    job_description: str = Field(default="", max_length=20000)
 
 
 @app.post("/interview-prep")

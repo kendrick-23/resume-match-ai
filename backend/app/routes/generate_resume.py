@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from anthropic import Anthropic
 from supabase import create_client
 import os
@@ -21,8 +21,8 @@ def _user_sb(user: dict):
 
 
 class GenerateResumeRequest(BaseModel):
-    analysis_id: str
-    linkedin_text: str = ""
+    analysis_id: str = Field(..., max_length=100)
+    linkedin_text: str = Field(default="", max_length=10000)
 
 
 @router.post("/generate-resume")
