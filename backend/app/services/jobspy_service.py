@@ -1,3 +1,4 @@
+import math
 import re
 import time
 import asyncio
@@ -16,6 +17,18 @@ def _strip_html(text: str) -> str:
     if not text:
         return ""
     return re.sub(r"<[^>]+>", "", str(text)).strip()
+
+
+def _clean_str(val, fallback: str = "") -> str:
+    """Clean a value from a pandas row — handle None, NaN, and 'nan' strings."""
+    if val is None:
+        return fallback
+    if isinstance(val, float) and math.isnan(val):
+        return fallback
+    s = str(val).strip()
+    if not s or s.lower() == "nan":
+        return fallback
+    return s
 
 
 def _search_sync(keywords: str, location: str, results: int) -> dict:
@@ -53,17 +66,22 @@ def _search_sync(keywords: str, location: str, results: int) -> dict:
         except (ValueError, TypeError):
             pass
 
-        location_str = str(row.get("location", "")) or "Location not specified"
+        location_str = _clean_str(row.get("location"), "Location not specified")
         posted = ""
         if row.get("date_posted"):
-            posted = str(row["date_posted"])[:10]
+            posted = _clean_str(row["date_posted"])[:10]
 
         is_remote = bool(row.get("is_remote"))
 
+        title = _clean_str(row.get("title"), "Position available")
+        company = _clean_str(row.get("company"), "Company not listed")
+        url = _clean_str(row.get("job_url"))
+        description = _strip_html(_clean_str(row.get("description")))
+
         jobs.append({
             "id": f"{source}-{raw_id}",
-            "title": str(row.get("title", "")),
-            "company": str(row.get("company", "")),
+            "title": title,
+            "company": company,
             "department": "",
             "location": location_str,
             "locations": [location_str],
@@ -71,12 +89,12 @@ def _search_sync(keywords: str, location: str, results: int) -> dict:
             "salary_max": salary_max,
             "posted": posted,
             "closing": "",
-            "url": str(row.get("job_url", "")),
-            "apply_url": str(row.get("job_url", "")),
-            "description": _strip_html(str(row.get("description", ""))),
+            "url": url,
+            "apply_url": url,
+            "description": description,
             "source": source,
             "is_remote": is_remote,
-            "job_type": str(row.get("job_type", "")),
+            "job_type": _clean_str(row.get("job_type")),
         })
 
     return {"total": len(jobs), "jobs": jobs}
