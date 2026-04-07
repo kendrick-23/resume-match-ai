@@ -157,12 +157,39 @@ Holt must be installable as a Progressive Web App:
 12. ✅ Brand identity: HoltWordmark, illustrated empty states, app header
 13. ✅ Onboarding flow (3-screen welcome at /welcome)
 
+### Phase D — AI Scoring Pipeline (all complete)
+14. ✅ Job description enrichment (Claude Haiku, sparse jobs only, 24h cache)
+15. ✅ Semantic re-scoring (Haiku, blends 30/70 with keyword score, eligibility-gated)
+16. ✅ Job-specific gap analyzer (Haiku, 2-3 missing skills per Within Reach job)
+17. ✅ Token budget guardrail (`HAIKU_DAILY_TOKEN_LIMIT`, every Haiku call gates)
+18. ✅ Domain penalty bulletproof (28% cap applied LAST, semantic can't override)
+19. ✅ Parallel Haiku via `asyncio.gather` + `Semaphore(5)`
+20. ✅ Search result caching — `job_search_cache` Supabase table, 4h TTL per user
+
+### Phase E — Resilience & Reliability (all complete)
+21. ✅ Auth corruption fix — `_score_jobs()` uses ONE Supabase client; downstream services receive profile as parameter (never fetch their own session)
+22. ✅ Backend pipeline timeout — `asyncio.wait_for(_score_jobs, timeout=30.0)` on all 3 job routes; returns partial results on timeout
+23. ✅ Frontend `handleProfileMatch` — `finally` block always resets all loading flags
+24. ✅ Frontend `AbortController` — 45s timeout cancels in-flight fetches, shows Ott coaching + Try Again
+25. ✅ Results screen — 8s loading safety timeout, empty state always reachable
+26. ✅ Jobs empty profile state — coaching prompt instead of generic "manager" search
+
+## Scoring Pipeline (read CLAUDE.md "AI Scoring Pipeline" for full details)
+Order is fixed: enrich → fetch profile (once) → keyword score → semantic rescore → gap analysis → domain penalty (last). Domain penalty applied LAST so it can never be overridden. Every Haiku stage gates on `check_budget()`. Skip semantic + gap stages for `domain_penalized` jobs.
+
+## Resilience Rules (Non-Negotiable — read CLAUDE.md for context)
+- Backend `_score_jobs()` MUST use one Supabase client; downstream services receive profile as parameter
+- Every job route MUST wrap `_score_jobs()` in `asyncio.wait_for(timeout=30.0)`
+- Frontend long-running handlers MUST reset loading state in `finally` regardless of outcome
+- Loading screens MUST have a hard timeout fallback — never infinite spinners
+
 ### Still to build
 - LinkedIn PDF upload
-- Within Reach job recommendations
-- Adzuna private sector jobs
 - Score history chart
 - Polish pass
+
+## Known Issues
+- **Profile screen shows empty fields for Nicole** — UNRESOLVED. Data confirmed in Supabase, column names verified correct across the entire stack (Profile.jsx, Onboarding.jsx, HeaderSettingsMenu.jsx, Jobs.jsx, backend `profile.py`, SQL migrations). There is NO column-name mismatch to fix. Next step: DevTools Network tab on `GET /profile` — does it return Nicole's populated row or an empty object? That distinguishes a frontend rendering bug from a backend query/RLS/auto-create bug in `profile.py::get_profile()`.
 
 ## What NEVER To Do
 ❌ Dark backgrounds | ❌ Purple gradients | ❌ Glassmorphism

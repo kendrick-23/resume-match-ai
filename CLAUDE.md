@@ -558,6 +558,45 @@ These are hard constraints on every design decision:
 
 ---
 
+## AI Scoring Pipeline
+
+The job search scoring pipeline lives in `backend/app/routes/jobs.py::_score_jobs()` and runs in this exact order:
+
+1. **Enrich** (`services/enrich.py`) — Claude Haiku expands sparse job descriptions (<300 chars) into ~100-word requirement summaries. Only runs on jobs with relevant operations/management titles. Results cached 24h. Parallel via `asyncio.Semaphore(5)`.
+2. **Profile + analysis fetch** — ONE Supabase client fetches both `profiles` and latest `analyses` row. Never split into multiple clients (avoids connection pool exhaustion).
+3. **Keyword scoring** (`services/holt_score.py`) — Deterministic 6-dimension scoring: skills, salary, schedule, experience, location, degree. Sets `domain_penalized` flag for fundamentally mismatched roles (e.g., physician for an ops candidate).
+4. **Semantic re-scoring** (`services/semantic_score.py`) — Claude Haiku scores 0–100 for jobs with `holt_score >= 55`, relevant titles, and NOT domain-penalized. Blends `final = keyword * 0.3 + semantic * 0.7`. Results cached 24h. Parallel via semaphore. Receives `profile` as a parameter — never fetches it itself.
+5. **Gap analysis** (`services/gap_analyzer.py`) — Claude Haiku identifies 2–3 specific missing skills per "Within Reach" job (50–69% score). Results cached 24h. Receives `user_skills` as a parameter.
+6. **Domain penalty enforcement (FINAL, bulletproof)** — Caps `holt_score` at 28% for any `domain_penalized` job. This step runs LAST so semantic re-scoring can never override it. Sets `coaching_label = "Different specialization"`.
+
+### Token Budget Guardrail
+`services/token_budget.py` enforces `HAIKU_DAILY_TOKEN_LIMIT`. Every Haiku call (`enrich`, `semantic_score`, `gap_analyzer`) gates on `check_budget(estimate_tokens(prompt))` and returns its safe fallback (original description / `None` / `[]`) when the budget is exhausted. This prevents runaway costs from a hot search.
+
+### Parallelism
+All three Haiku stages use `asyncio.gather` with `asyncio.Semaphore(5)` to cap concurrent Anthropic API calls.
+
+### Caching
+- **In-memory module caches** (24h TTL) inside each service for repeated job titles within a process.
+- **Supabase `job_search_cache` table** caches the entire scored result set for 4h per `(user_id, cache_key)`. Cuts repeat searches to a single DB read with zero Haiku spend. RLS-enforced per user.
+
+## Resilience Patterns (Non-Negotiable)
+
+These patterns exist because of a real auth-corruption incident where a hung scoring pipeline broke every other screen until refresh. Do not regress.
+
+### Backend
+- **Pipeline hard timeout:** Every job search route wraps `_score_jobs()` in `asyncio.wait_for(timeout=30.0)`. On `TimeoutError`, the route returns whatever jobs were fetched (unscored or partially scored) instead of hanging. Applies to `/jobs/search`, `/jobs/adzuna`, `/jobs/aggregated`.
+- **Single profile fetch:** `_score_jobs()` creates ONE Supabase client and reuses it for both profile + analyses queries. Downstream functions (`semantic_rescore_batch`, `analyze_gaps_batch`) receive profile/skills as parameters — they MUST NOT fetch their own Supabase session. Multiple parallel sessions exhaust the connection pool and corrupt auth state.
+- **Per-stage try/except:** Each stage in `_score_jobs()` is wrapped so a single failure (e.g., Haiku timeout) does not abort the rest of the pipeline.
+
+### Frontend
+- **`finally` blocks always reset loading state:** Long-running async handlers (e.g., `Jobs.jsx::handleProfileMatch`) MUST reset every loading flag (`profileMatchLoading`, `fedLoading`, `pvtLoading`) inside `finally`, regardless of success / error / timeout. Stuck loading flags block subsequent requests.
+- **45s `AbortController` timeout:** `handleProfileMatch` creates an `AbortController` with a 45s `setTimeout(() => controller.abort(), 45000)`. On abort, it shows Ott in `coaching` state with "Search took too long — try again or use keyword search instead" and a Try Again button. Cleaned up in unmount effect.
+- **Loading screen hard timeouts:** Screens that fetch on mount (e.g., `Results.jsx::loadAnalyses`) wrap their loading state in an 8s safety `setTimeout(() => setLoading(false), 8000)`. The empty state must always be reachable — never an infinite spinner.
+
+## Known Issues
+
+- **Profile screen empty fields (UNRESOLVED).** Nicole's profile data is confirmed populated in Supabase, but the Profile screen displays empty fields. Audited every read/write site (`Profile.jsx`, `Onboarding.jsx`, `HeaderSettingsMenu.jsx`, `Jobs.jsx`, `backend/app/routes/profile.py`, `add_profile_enriched_columns.sql`) — column names match correctly across the entire stack. There is NO column-name mismatch to fix. **Next debugging step:** check the browser DevTools Network tab during profile load — does `GET /profile` return 200 with Nicole's populated row or an empty object? If populated, the bug is in frontend rendering. If empty, the bug is backend query / RLS / auto-create logic in `profile.py::get_profile()`.
+
 ## Phase Roadmap (For Context Only — Build in Order)
 
 | Phase | What gets built |
