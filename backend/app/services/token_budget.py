@@ -7,9 +7,10 @@ exhausted, callers fall back to keyword-only scoring.
 """
 
 import datetime
+import os
 
 _daily_tokens = {"date": None, "count": 0}
-DAILY_TOKEN_LIMIT = 50000  # ~$0.05/day max on Haiku
+DAILY_TOKEN_LIMIT = int(os.environ.get("HAIKU_DAILY_TOKEN_LIMIT", "250000"))
 
 
 def check_budget(estimated_tokens: int) -> bool:

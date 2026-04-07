@@ -393,13 +393,21 @@ def calculate_holt_score(
         "county","beach","lake","city","town","area","region",
     }
 
+    _JOB_TITLE_WORDS = {
+        "manager", "director", "supervisor", "coordinator", "specialist",
+        "assistant", "associate", "personal", "general", "regional",
+        "area", "district", "store", "training", "club", "fitness", "gym",
+    }
+
     def _is_valid_gap_term(term: str) -> bool:
         t = term.lower().strip()
-        if len(t) < 4:
+        if len(t) < 5:
             return False
         if t.isdigit():
             return False
         if t in _STOPWORDS or t in _NOISE_VERBS or t in _LOCATION_WORDS:
+            return False
+        if t in _JOB_TITLE_WORDS:
             return False
         # Reject single common words without domain meaning
         if len(t.split()) == 1 and t in {
