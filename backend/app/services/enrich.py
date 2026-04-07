@@ -14,6 +14,8 @@ import time
 
 import anthropic
 
+from app.services.token_budget import check_budget, estimate_tokens
+
 # Module-level cache: key → (timestamp, enriched_text)
 _description_cache: dict[str, tuple[float, str]] = {}
 _CACHE_TTL = 86400  # 24 hours
@@ -64,20 +66,22 @@ async def enrich_job_description(job: dict) -> str:
     if not api_key:
         return desc
 
+    prompt_text = (
+        f"Job: {title} at {company}. {desc}\n"
+        "Write a 100-word requirements summary covering: "
+        "required skills, experience level, key responsibilities. "
+        "Return only the summary."
+    )
+
+    if not check_budget(estimate_tokens(prompt_text)):
+        return desc
+
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
             model=HAIKU_MODEL,
             max_tokens=150,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Job: {title} at {company}. {desc}\n"
-                    "Write a 100-word requirements summary covering: "
-                    "required skills, experience level, key responsibilities. "
-                    "Return only the summary."
-                ),
-            }],
+            messages=[{"role": "user", "content": prompt_text}],
         )
         enriched = response.content[0].text.strip()
         combined = f"{desc} {enriched}".strip()

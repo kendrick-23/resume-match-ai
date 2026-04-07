@@ -15,6 +15,8 @@ from typing import Optional
 
 import anthropic
 
+from app.services.token_budget import check_budget, estimate_tokens
+
 # Cache: cache_key → (timestamp, result_dict)
 _semantic_cache: dict[str, tuple[float, dict]] = {}
 _CACHE_TTL = 86400  # 24 hours
@@ -121,6 +123,9 @@ Job: {j_title} at {j_company}, {j_loc}, {j_sal}
 
 Criteria: Skills alignment 40%, Career trajectory 25%, Practical fit 35%.
 Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practical_score":<int>,"reasoning":"<1 sentence>"}}"""
+
+    if not check_budget(estimate_tokens(prompt)):
+        return None
 
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
