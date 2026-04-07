@@ -216,6 +216,15 @@ ALLOWED_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 
+# Magic bytes (file signatures) for each declared MIME type. Validating these
+# before parsing prevents a spoofed Content-Type from feeding arbitrary bytes
+# to PdfReader / python-docx. PDFs start with "%PDF" (25 50 44 46). DOCX is
+# a ZIP container, so it starts with "PK\x03\x04" (50 4B 03 04).
+FILE_SIGNATURES = {
+    "application/pdf": b"%PDF",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": b"PK\x03\x04",
+}
+
 
 @app.post("/upload-resume")
 @limiter.limit("20/hour")
@@ -236,6 +245,14 @@ async def upload_resume(
         raise HTTPException(
             status_code=400,
             detail="File too large. Maximum size is 5 MB.",
+        )
+
+    # Magic-byte validation — runs BEFORE any parser touches the bytes.
+    expected_sig = FILE_SIGNATURES[file.content_type]
+    if not contents[: len(expected_sig)] == expected_sig:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file format. The file does not match its declared type.",
         )
 
     try:
