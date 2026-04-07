@@ -124,96 +124,76 @@ async def list_badges(request: Request, user: dict = Depends(get_current_user)):
 @limiter.limit("100/hour")
 async def check_badges(request: Request, user: dict = Depends(get_current_user)):
     """Evaluate all badge conditions and award any newly earned ones.
-    Returns list of newly awarded badge keys."""
+
+    Bulk-fetches analyses + applications upfront, then evaluates every badge
+    condition in memory. Replaces 8 serial Supabase reads (one per condition)
+    with 2 bulk reads. Streak is also computed at most ONCE per call.
+    """
     sb = _user_sb(user)
     user_id = user["user_id"]
 
-    # Load existing badges
+    # Load existing badges (1 query — unavoidable)
     existing_res = sb.table("badges") \
         .select("badge_key") \
         .eq("user_id", user_id) \
         .execute()
     earned = {row["badge_key"] for row in existing_res.data}
 
-    newly_earned = []
+    # --- Bulk fetch 1: all analyses needed for first_dive, sharp_eye, upgraded
+    analyses_data = sb.table("analyses") \
+        .select("id,score,created_at") \
+        .eq("user_id", user_id) \
+        .order("created_at", desc=False) \
+        .execute().data or []
 
-    # first_dive: first analysis run
-    if "first_dive" not in earned:
-        analyses = sb.table("analyses") \
-            .select("id", count="exact") \
-            .eq("user_id", user_id) \
-            .limit(1) \
-            .execute()
-        if analyses.count and analyses.count >= 1:
-            newly_earned.append("first_dive")
+    # --- Bulk fetch 2: all applications needed for first_wave, making_moves, momentum
+    apps_data = sb.table("applications") \
+        .select("id,status") \
+        .eq("user_id", user_id) \
+        .execute().data or []
 
-    # sharp_eye: first score >= 80
-    if "sharp_eye" not in earned:
-        high_score = sb.table("analyses") \
-            .select("id") \
-            .eq("user_id", user_id) \
-            .gte("score", 80) \
-            .limit(1) \
-            .execute()
-        if high_score.data:
-            newly_earned.append("sharp_eye")
+    newly_earned: list[str] = []
 
-    # consistent: 7-day streak
-    if "consistent" not in earned:
+    # first_dive: at least one analysis
+    if "first_dive" not in earned and len(analyses_data) >= 1:
+        newly_earned.append("first_dive")
+
+    # sharp_eye: any analysis with score >= 80
+    if "sharp_eye" not in earned and any(
+        (a.get("score") or 0) >= 80 for a in analyses_data
+    ):
+        newly_earned.append("sharp_eye")
+
+    # upgraded: best score improved 20+ over first score
+    if "upgraded" not in earned and len(analyses_data) >= 2:
+        scores = [a.get("score") or 0 for a in analyses_data]
+        if max(scores) - scores[0] >= 20:
+            newly_earned.append("upgraded")
+
+    # first_wave: at least one application
+    if "first_wave" not in earned and len(apps_data) >= 1:
+        newly_earned.append("first_wave")
+
+    # making_moves: 10+ applications
+    if "making_moves" not in earned and len(apps_data) >= 10:
+        newly_earned.append("making_moves")
+
+    # momentum: any application moved to Interview
+    if "momentum" not in earned and any(
+        a.get("status") == "Interview" for a in apps_data
+    ):
+        newly_earned.append("momentum")
+
+    # consistent / dedicated: fetch streak ONCE, only if either could change
+    needs_streak = "consistent" not in earned or "dedicated" not in earned
+    if needs_streak:
         streak_data = await get_streak(request, user)
-        if streak_data["streak"] >= 7:
+        streak_value = streak_data.get("streak", 0)
+
+        if "consistent" not in earned and streak_value >= 7:
             newly_earned.append("consistent")
-
-    # dedicated: 30-day streak
-    if "dedicated" not in earned:
-        if "consistent" in earned or "consistent" in newly_earned:
-            # Re-use streak if already calculated
-            streak_data = await get_streak(request, user)
-            if streak_data["streak"] >= 30:
-                newly_earned.append("dedicated")
-
-    # first_wave: first application tracked
-    if "first_wave" not in earned:
-        apps = sb.table("applications") \
-            .select("id", count="exact") \
-            .eq("user_id", user_id) \
-            .limit(1) \
-            .execute()
-        if apps.count and apps.count >= 1:
-            newly_earned.append("first_wave")
-
-    # making_moves: 10 applications tracked
-    if "making_moves" not in earned:
-        apps_10 = sb.table("applications") \
-            .select("id", count="exact") \
-            .eq("user_id", user_id) \
-            .execute()
-        if apps_10.count and apps_10.count >= 10:
-            newly_earned.append("making_moves")
-
-    # momentum: first application moved to Interview
-    if "momentum" not in earned:
-        interviews = sb.table("applications") \
-            .select("id") \
-            .eq("user_id", user_id) \
-            .eq("status", "Interview") \
-            .limit(1) \
-            .execute()
-        if interviews.data:
-            newly_earned.append("momentum")
-
-    # upgraded: resume score improved 20+ from first analysis
-    if "upgraded" not in earned:
-        all_analyses = sb.table("analyses") \
-            .select("score") \
-            .eq("user_id", user_id) \
-            .order("created_at", desc=False) \
-            .execute()
-        if len(all_analyses.data) >= 2:
-            first_score = all_analyses.data[0]["score"]
-            best_score = max(a["score"] for a in all_analyses.data)
-            if best_score - first_score >= 20:
-                newly_earned.append("upgraded")
+        if "dedicated" not in earned and streak_value >= 30:
+            newly_earned.append("dedicated")
 
     # Insert newly earned badges
     for key in newly_earned:
