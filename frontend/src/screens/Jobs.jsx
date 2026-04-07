@@ -179,16 +179,19 @@ export default function Jobs() {
       const words = allText.split(/[\s,;.()]+/).filter((w) => w.length > 3);
       setAnalysisKeywords([...new Set(words)]);
 
-      // Use profile target_roles as primary search signal, fallback to analysis role
+      // Use profile target_roles as the ONLY trusted seed for recommendations.
+      // We deliberately do NOT fall back to `latest.role_name` — that field
+      // reflects whatever role the user most recently analyzed (which could
+      // be exploratory, corrections-adjacent, or otherwise unrelated to their
+      // actual target). A safe corporate-ops default is much better than
+      // accidentally seeding the recommender with an arbitrary past analysis.
       let searchKeyword = '';
       if (profileTargetRoles.trim()) {
         const roles = profileTargetRoles.split(',').map((r) => r.trim()).filter(Boolean);
         searchKeyword = roles.slice(0, 2).join(' ');
       }
       if (!searchKeyword) {
-        searchKeyword = roleName
-          ? roleName.split(/\s+/).slice(0, 3).join(' ')
-          : 'operations manager';
+        searchKeyword = 'operations manager';
       }
 
       const searchLocation = profileLocation || 'Florida';
@@ -199,8 +202,15 @@ export default function Jobs() {
           location: searchLocation,
           page: 1,
         });
-        // Top 5 by Holt Score (already sorted by backend)
-        setRecommended((data.jobs || []).slice(0, 5));
+        // Filter recommendations to high-confidence, in-domain matches only:
+        //   1. holt_score >= 70 (Strong Match floor — never recommend a stretch)
+        //   2. NOT domain_penalized — corrections / clinical / legal mismatches
+        //      and other out-of-domain roles are excluded outright, regardless
+        //      of how the keyword matcher scored them.
+        const filtered = (data.jobs || []).filter(
+          (j) => (j.holt_score ?? 0) >= 70 && !j.domain_penalized
+        );
+        setRecommended(filtered.slice(0, 5));
       } catch {
         setRecError(true);
       }
