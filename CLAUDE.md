@@ -558,16 +558,68 @@ These are hard constraints on every design decision:
 
 ---
 
-## AI Scoring Pipeline
+## AI Prompt Architecture (Non-Negotiable)
+
+Holt has 8 Claude call sites. Every one must follow these guiding principles. Any new prompt that breaks them is a regression.
+
+### Guiding principles
+1. **TRUTHFULNESS.** Never suggest adding a skill or experience the candidate does not already have. Only translate real experience into better language. The test for every recommendation: *"Could she defend this in an interview?"* If no — don't include it.
+2. **PROFILE-AWARE.** Every prompt must use the candidate's profile (`target_roles`, `target_salary_min/max`, `location`, `schedule_preference`, `degree_status`, `about_me`, `skills_extracted`). Fetch from Supabase server-side BEFORE calling Claude.
+3. **TIERED HONESTY.** Tone adapts to the match score:
+   - **70+ (strong):** "You're ready. Here's how to frame it."
+   - **45–69 (stretch):** "You could get here. Here's the gap and whether it's worth closing."
+   - **<45 (weak / wrong_domain):** "This isn't the right path right now. Here's something closer to your goals."
+4. **OTT'S VOICE.** First-person, warm, occasionally punny, always backed by specific evidence from the resume or JD. Direct when she needs a push. Never corporate. Never generic.
+5. **NO FAKE DATA.** If salary info isn't in the JD, set `salary_alignment=null` and `salary_disclosed=false`. Do NOT default to 70 — that turns a measurement into a lie.
+6. **STRUCTURED OUTPUT.** All non-trivial calls use Anthropic tool use (`tools=[...]`, `tool_choice={"type": "tool", "name": "..."}`) instead of regex-parsing free text. Schema enforcement is the floor, not the ceiling.
+7. **SYSTEM PROMPTS for persona/format**, user message for variable data. Never bury rules inside the user turn.
+
+### Scoring tiers (used everywhere — keep in sync)
+- **70–100 strong** — has the core requirements; gaps are reframeable language.
+- **45–69 stretch** — transferable foundation; gaps need real effort (course, cert, 3–6 months experience).
+- **20–44 weak** — missing hard requirements that take significant time.
+- **0–19 wrong_domain** — requires fundamentally different education or licensing (MD, JD, PE).
+
+### Gap effort tags
+Every gap returned by `/analyze` and the gap analyzer carries an effort tag:
+- `reframe` — she already has it; just needs to use the JD's language.
+- `easy` — short course / tutorial / self-study (under 1 month).
+- `months` — certification or substantial training (1–6 months).
+- `years` — degree, license, or major career detour.
+
+### The 8 call sites (current as of April 2026 overhaul)
+| # | File | Endpoint / function | Model | Tool use | System prompt | Profile-aware |
+|---|---|---|---|---|---|---|
+| 1 | `main.py::analyze` | `/analyze` | Opus 4.6 | ✅ `submit_analysis` | ✅ | ✅ |
+| 2 | `main.py::_generate_coaching_tips` | (called inside `/analyze`) | Haiku 4.5 | ✅ `submit_coaching_tips` | ✅ | ✅ |
+| 3 | `main.py::_extract_and_merge_skills` | (called inside `/analyze`) | Haiku 4.5 | ✅ `submit_skills` | ❌ inline | ✅ (target_roles, existing skills) |
+| 4 | `main.py::interview_prep` | `/interview-prep` | Haiku 4.5 | ✅ `submit_interview_prep` | ✅ | ✅ |
+| 5 | `routes/generate_resume.py::generate_resume` | `/generate-resume` | Opus 4.6 | ❌ markdown output | ✅ | ✅ |
+| 6 | `services/semantic_score.py::semantic_rescore` | (jobs pipeline) | Haiku 4.5 | ❌ JSON parse | ❌ inline | ✅ |
+| 7 | `services/gap_analyzer.py::get_job_specific_gaps` | (jobs pipeline) | Haiku 4.5 | ❌ JSON parse | ❌ inline | ✅ (target_roles passed through) |
+| 8 | `services/enrich.py::enrich_job_description` | (jobs pipeline) | Haiku 4.5 | ❌ text passthrough | ❌ inline | N/A (job-side) |
+
+### Specific guardrails per call
+
+- **`/analyze`**: System prompt contains the truthfulness rules + scoring philosophy. JSON tool schema includes `score_tier`, `salary_disclosed`, structured `gaps` (with `effort` tag), and `translation_opportunities`. Salary alignment is `null` when not disclosed.
+- **Ott's Take coaching tips**: Receives FULL resume + FULL JD (no 500-char truncation). Tone matches the score tier. Truthfulness rule scoped to "find the closest real experience and translate, never invent."
+- **Skills extraction**: Removed the hardcoded "operations/management" bias — uses the candidate's actual `target_roles`. Sends FULL resume (no 3000-char cap). Receives `existing_skills` and is instructed to merge + dedupe + normalize, NOT overwrite.
+- **Interview prep**: Pulls the most recent matching analysis (`role_name` first, then most recent overall) and the candidate's profile. Returns structured `{question, competency, star_scaffold}` objects. Each STAR scaffold must point at a real situation from the resume.
+- **Resume rewrite**: Removed the dangerous "Quantify achievements that are already implied" line — replaced with "Quantify ONLY where the original resume already contains a specific number." Added explicit anti-fabrication rules (no fake employers, dates, certifications, metrics). Profile context injected so the summary positions the pivot from `current_background` → `target_roles`.
+- **Semantic scorer**: Job description bumped from 300 → 1500 chars. `about_me` from 150 → 400 chars. Sends FULL skills list (was top 8). Career trajectory has explicit anchor points (lateral 60, step-up 75, two-levels-above 45, pivot-with-skills 65, pivot-without 30). `reasoning` field MUST cite specific text.
+- **Gap analyzer**: Sends FULL skill list (was top 10) and FULL JD (1500 chars, was 400). Each gap is tagged with `effort` (easy/months/years) and an `effort_note`. Receives `target_roles` so it doesn't flag misaligned skills as gaps.
+- **Job enrichment**: Refusal path — if the JD has fewer than 20 words, return original unchanged. Do NOT manufacture requirements out of nothing. Enriched content is tagged `[ENRICHED]` so downstream scorers can weight it lower. The model can also explicitly return `NOT_ENOUGH_INFO` and we honor it. Company name is used as an anchor.
+
+## AI Scoring Pipeline (Job Search)
 
 The job search scoring pipeline lives in `backend/app/routes/jobs.py::_score_jobs()` and runs in this exact order:
 
-1. **Enrich** (`services/enrich.py`) — Claude Haiku expands sparse job descriptions (<300 chars) into ~100-word requirement summaries. Only runs on jobs with relevant operations/management titles. Results cached 24h. Parallel via `asyncio.Semaphore(5)`.
+1. **Enrich** (`services/enrich.py`) — Claude Haiku expands sparse job descriptions (<300 chars but ≥20 words) into ~100-word requirement summaries. **Refuses** if JD is empty or under 20 words. Only runs on jobs with relevant operations/management titles. Tags enriched content with `[ENRICHED]`. Results cached 24h. Parallel via `asyncio.Semaphore(5)`.
 2. **Profile + analysis fetch** — ONE Supabase client fetches both `profiles` and latest `analyses` row. Never split into multiple clients (avoids connection pool exhaustion).
 3. **Keyword scoring** (`services/holt_score.py`) — Deterministic 6-dimension scoring: skills, salary, schedule, experience, location, degree. Sets `domain_penalized` flag for fundamentally mismatched roles (e.g., physician for an ops candidate).
-4. **Semantic re-scoring** (`services/semantic_score.py`) — Claude Haiku scores 0–100 for jobs with `holt_score >= 55`, relevant titles, and NOT domain-penalized. Blends `final = keyword * 0.3 + semantic * 0.7`. Results cached 24h. Parallel via semaphore. Receives `profile` as a parameter — never fetches it itself.
-5. **Gap analysis** (`services/gap_analyzer.py`) — Claude Haiku identifies 2–3 specific missing skills per "Within Reach" job (50–69% score). Results cached 24h. Receives `user_skills` as a parameter.
-6. **Domain penalty enforcement (FINAL, bulletproof)** — Caps `holt_score` at 28% for any `domain_penalized` job. This step runs LAST so semantic re-scoring can never override it. Sets `coaching_label = "Different specialization"`.
+4. **Semantic re-scoring** (`services/semantic_score.py`) — Claude Haiku scores 0–100 for jobs with `holt_score >= 55`, relevant titles, and NOT domain-penalized. Blends `final = keyword * 0.3 + semantic * 0.7`. Receives FULL profile + 1500 chars of JD. Career trajectory has anchor points. Reasoning must cite specific text. Results cached 24h. Parallel via semaphore. Receives `profile` as a parameter — never fetches it itself.
+5. **Gap analysis** (`services/gap_analyzer.py`) — Claude Haiku identifies 2–3 effort-tagged gaps per "Within Reach" job (50–69% score). Receives FULL `user_skills`, 1500 chars of JD, and `target_roles`. Each gap returned with `effort` (easy/months/years) and an `effort_note`. Results cached 24h.
+6. **Domain penalty enforcement (FINAL, bulletproof)** — Caps `holt_score` at 15% for any `domain_penalized` job. This step runs LAST so semantic re-scoring can never override it. Sets `coaching_label = "Different specialization"`.
 
 ### Token Budget Guardrail
 `services/token_budget.py` enforces `HAIKU_DAILY_TOKEN_LIMIT`. Every Haiku call (`enrich`, `semantic_score`, `gap_analyzer`) gates on `check_budget(estimate_tokens(prompt))` and returns its safe fallback (original description / `None` / `[]`) when the budget is exhausted. This prevents runaway costs from a hot search.
