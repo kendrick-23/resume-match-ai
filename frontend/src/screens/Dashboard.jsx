@@ -5,7 +5,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { useStreak } from '../context/StreakContext';
-import { getActivity, listBadges } from '../services/api';
+import { getActivity, listBadges, listApplications } from '../services/api';
 import { FileText, ClipboardList, Search, Clock } from 'lucide-react';
 import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
 import { useToast } from '../context/ToastContext';
@@ -20,9 +20,11 @@ export default function Dashboard() {
   const [activityError, setActivityError] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState([]);
   const [badgesError, setBadgesError] = useState(false);
+  const [applications, setApplications] = useState([]);
+  const [appsError, setAppsError] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadActivity(), loadBadges()]);
+    Promise.all([loadActivity(), loadBadges(), loadApplications()]);
   }, []);
 
   async function loadActivity() {
@@ -44,6 +46,22 @@ export default function Dashboard() {
       setBadgesError(true);
     }
   }
+
+  async function loadApplications() {
+    setAppsError(false);
+    try {
+      const data = await listApplications();
+      setApplications(Array.isArray(data) ? data : []);
+    } catch {
+      setAppsError(true);
+    }
+  }
+
+  // Stat card counts: unique applications, derived from the live tracker.
+  const APPLIED_STATUSES = new Set(['Applied', 'Responded', 'Interview', 'Offer']);
+  const INTERVIEW_STATUSES = new Set(['Interview', 'Offer']);
+  const appliedCount = applications.filter((a) => APPLIED_STATUSES.has(a.status)).length;
+  const interviewCount = applications.filter((a) => INTERVIEW_STATUSES.has(a.status)).length;
 
   // Ott state based on streak
   const ottState =
@@ -81,10 +99,10 @@ export default function Dashboard() {
     if (last.action_type === 'analysis' && isToday) {
       return 'Back already. I like the energy.';
     }
-    if (last.action_type === 'application_created' && isToday) {
+    if (last.action_type === 'status_applied' && isToday) {
       return "You applied again today. That's how it's done.";
     }
-    if (last.action_type === 'application_updated') {
+    if (last.action_type === 'status_interview' || last.action_type === 'status_offer') {
       return "Progress on your applications — let's keep going.";
     }
     return 'Good to see you. Ready to find your next ottertunity?';
@@ -121,14 +139,14 @@ export default function Dashboard() {
         </p>
       </Card>
 
-      {/* Today's summary */}
-      {activityError ? (
+      {/* Pipeline summary — meaningful job-search counts */}
+      {appsError ? (
         <Card style={{ textAlign: 'center', marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
           <Ott state="coaching" size={48} />
           <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
             Couldn't load your stats
           </p>
-          <Button variant="ghost" onClick={loadActivity} style={{ marginTop: 'var(--space-2)' }}>
+          <Button variant="ghost" onClick={loadApplications} style={{ marginTop: 'var(--space-2)' }}>
             Tap to retry
           </Button>
         </Card>
@@ -136,18 +154,24 @@ export default function Dashboard() {
         <div className="today-summary-grid">
           <Card>
             <p className="today-summary-grid__label">
-              Analyses today
+              Applied
             </p>
             <p className="today-summary-grid__value">
-              {activity?.analyses_today ?? 0}
+              {appliedCount}
+            </p>
+            <p className="today-summary-grid__sub">
+              jobs submitted
             </p>
           </Card>
           <Card>
             <p className="today-summary-grid__label">
-              Apps logged
+              Interviews
             </p>
             <p className="today-summary-grid__value">
-              {activity?.applications_today ?? 0}
+              {interviewCount}
+            </p>
+            <p className="today-summary-grid__sub">
+              in progress
             </p>
           </Card>
         </div>
