@@ -67,7 +67,11 @@ export default function Onboarding() {
         {step === 0 && (
           <div className="onboarding__screen onboarding__screen--enter">
             <div className="onboarding__ott-bounce">
-              <Ott state="waving" size={120} />
+              <img
+                src="/ott/ott-splash.png"
+                alt="Ott"
+                style={{ width: 200, height: 'auto', display: 'block', margin: '0 auto' }}
+              />
             </div>
             <div style={{ marginTop: 'var(--space-5)', display: 'flex', justifyContent: 'center' }}>
               <HoltWordmark size="large" />
