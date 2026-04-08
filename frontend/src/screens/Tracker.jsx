@@ -179,11 +179,7 @@ export default function Tracker() {
         marginBottom: 'var(--space-5)',
       }}>
         <h2>Tracker</h2>
-        <Button
-          variant="primary"
-          style={{ padding: '10px 20px', minHeight: '44px', fontSize: '14px' }}
-          onClick={() => setShowForm(true)}
-        >
+        <Button variant="primary" onClick={() => setShowForm(true)}>
           <Plus size={18} /> Add
         </Button>
       </div>
