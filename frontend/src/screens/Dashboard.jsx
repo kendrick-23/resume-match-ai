@@ -22,8 +22,7 @@ export default function Dashboard() {
   const [badgesError, setBadgesError] = useState(false);
 
   useEffect(() => {
-    loadActivity();
-    loadBadges();
+    Promise.all([loadActivity(), loadBadges()]);
   }, []);
 
   async function loadActivity() {
