@@ -41,7 +41,8 @@ def _is_relevant_title(title: str) -> bool:
 
 
 def _build_candidate_section(profile: dict) -> str:
-    """Build compact candidate section, omitting empty fields."""
+    """Build candidate section. Uses ALL extracted skills (not top 8) and a
+    fuller about_me window — quality matters more than tokens here."""
     lines = []
 
     job_title = profile.get("job_title")
@@ -59,7 +60,8 @@ def _build_candidate_section(profile: dict) -> str:
         except (json.JSONDecodeError, TypeError):
             skills = []
     if skills:
-        lines.append(f"Skills: {', '.join(skills[:8])}")
+        # Send the FULL skill list — was previously truncated to 8.
+        lines.append(f"Skills: {', '.join(skills)}")
 
     salary_min = profile.get("target_salary_min")
     salary_max = profile.get("target_salary_max")
@@ -77,7 +79,8 @@ def _build_candidate_section(profile: dict) -> str:
 
     about_me = profile.get("about_me")
     if about_me:
-        lines.append(f"Background: {about_me[:150]}")
+        # Was [:150] — far too short for a real pivot story. Bumped to 400.
+        lines.append(f"Background: {about_me[:400]}")
 
     return "\n".join(lines) if lines else "No profile data"
 
@@ -104,7 +107,8 @@ async def semantic_rescore(job: dict, profile: dict, user_id: str) -> Optional[d
     j_title = job.get("title") or ""
     j_company = job.get("company") or ""
     j_loc = job.get("location") or ""
-    j_desc = (job.get("description") or "")[:300]
+    # Was [:300] — far too short to identify real requirements. Bumped to 1500.
+    j_desc = (job.get("description") or "")[:1500]
 
     sal_parts = []
     if job.get("salary_min"):
@@ -122,7 +126,17 @@ Job: {j_title} at {j_company}, {j_loc}, {j_sal}
 {j_desc}
 
 Criteria: Skills alignment 40%, Career trajectory 25%, Practical fit 35%.
-Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practical_score":<int>,"reasoning":"<1 sentence>"}}"""
+
+Career trajectory scoring guidance:
+- Lateral move (same level, adjacent field): 60
+- Step up one level: 75
+- Two+ levels above current: 45 (too far)
+- Field pivot with transferable skills: 65
+- Field pivot without transferable skills: 30
+
+Your `reasoning` field MUST cite specific text from either the candidate profile or the job description above. Do not invent justifications. If you can't ground your reasoning in the prompt content, lower your confidence and pick a more conservative score.
+
+Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practical_score":<int>,"reasoning":"<1 sentence with a specific quote or paraphrase from the prompt>"}}"""
 
     if not check_budget(estimate_tokens(prompt)):
         return None
@@ -131,7 +145,7 @@ Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practica
         client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
             model=HAIKU_MODEL,
-            max_tokens=150,
+            max_tokens=250,
             messages=[{"role": "user", "content": prompt}],
         )
         text = response.content[0].text.strip()
