@@ -509,14 +509,33 @@ export default function Results() {
             <h3 className="results-section__title">Gaps</h3>
             {gaps.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {gaps.map((g, i) => (
-                  <Card key={i}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
-                      <Badge variant="danger">Gap</Badge>
-                      <p style={{ color: 'var(--color-text-secondary)' }}>{g}</p>
-                    </div>
-                  </Card>
-                ))}
+                {gaps.map((g, i) => {
+                  // Backwards-compat: legacy analyses store gaps as plain strings;
+                  // new analyses store them as { gap, effort, honest } objects.
+                  const gapText = typeof g === 'string' ? g : (g?.gap || '');
+                  const effort = typeof g === 'object' ? g?.effort : null;
+                  const EFFORT_LABEL = {
+                    reframe: 'Already have it — just reframe',
+                    easy: 'Quick to close',
+                    months: 'Months of effort',
+                    years: 'Years / major detour',
+                  };
+                  return (
+                    <Card key={i}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+                        <Badge variant="danger">Gap</Badge>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ color: 'var(--color-text-secondary)' }}>{gapText}</p>
+                          {effort && EFFORT_LABEL[effort] && (
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 600, marginTop: '4px' }}>
+                              {EFFORT_LABEL[effort]}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             ) : (
               <Card>

@@ -278,6 +278,175 @@ async def upload_resume(
     return {"text": text, "filename": file.filename}
 
 
+OPUS_MODEL = "claude-opus-4-6"
+
+ANALYZE_SYSTEM_PROMPT = """You are Ott, Holt's career intelligence engine. You are analyzing a resume for a specific candidate with a known background and career goals.
+
+The candidate is making a career pivot. Their current experience is real and valuable — it is simply described in the wrong vocabulary for their target industry. Your job is to identify both the match AND the translation opportunity.
+
+TRUTHFULNESS RULES — these are non-negotiable:
+- Strengths must come from actual content in the resume or LinkedIn profile.
+- Gaps must be real requirements from the job description that are genuinely absent.
+- Recommendations must only suggest reframing language the candidate already uses, never adding skills they don't have.
+- If a skill could be inferred from their existing experience (e.g., "ran a Wawa office" implies basic office administration), flag this in `translation_opportunities`, NOT as a gap.
+- The test for every recommendation: "Could the candidate defend this in an interview?" If no, do not include it.
+
+SCORING PHILOSOPHY:
+- 70-100 (strong): Has the core requirements. Gaps are soft skills or easily reframeable language.
+- 45-69 (stretch): Has a transferable foundation. Gaps require real effort to close (a course, certification, or 3-6 months experience).
+- 20-44 (weak): Missing hard requirements that take significant time to acquire.
+- 0-19 (wrong_domain): Requires fundamentally different education or licensing (medical degree, law degree, engineering PE license).
+
+SUB-SCORE RULES:
+- skills_match: How well the candidate's actual demonstrated skills match the JD's must-haves. Be honest.
+- seniority_fit: Years and level of responsibility vs. what the JD asks for.
+- salary_alignment: ONLY score this if the JD discloses a salary or salary range. If salary is absent, return null and set salary_disclosed=false. NEVER default to 70.
+- growth_potential: How much this role could advance the candidate's stated trajectory toward target_roles.
+
+GAP EFFORT TAGS — be honest with the candidate about what closing each gap would take:
+- "reframe": She already has it; just needs to use the JD's language.
+- "easy": A short course, online tutorial, or self-study (under 1 month).
+- "months": A certification or substantial training (1-6 months).
+- "years": Degree, license, or major career detour.
+
+The `honest` field on each gap should be true if this is a REAL gap she lacks, false if it's something she has but described differently (in which case it should arguably move to translation_opportunities instead).
+
+OTT'S VOICE for the summary field:
+- Strong tier: energetic, affirming, names the strongest evidence. "You've got this."
+- Stretch tier: coaching, specific. "Closer than you think — here's the bridge."
+- Weak tier: honest and redirecting. "This one's a reach — here's something closer."
+- Wrong-domain tier: kind but firm. "This isn't the right path right now."
+- First-person ("I see..."), warm, never corporate, occasional otter pun is fine but not required.
+- 2-3 sentences. Always backed by something specific from the resume or JD."""
+
+
+# Tool-use schema — forces structured JSON output, no regex parsing.
+ANALYSIS_TOOL = {
+    "name": "submit_analysis",
+    "description": "Submit the structured resume analysis result for this candidate and job.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "company": {"type": "string", "description": "Company/organization name extracted from the JD"},
+            "role": {"type": "string", "description": "Job title/role name extracted from the JD"},
+            "match_score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "score_tier": {
+                "type": "string",
+                "enum": ["strong", "stretch", "weak", "wrong_domain"],
+                "description": "Tier label per the scoring philosophy",
+            },
+            "sub_scores": {
+                "type": "object",
+                "properties": {
+                    "skills_match": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "seniority_fit": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "salary_alignment": {
+                        "type": ["integer", "null"],
+                        "description": "0-100 if JD discloses salary, null otherwise. Never default to 70.",
+                    },
+                    "growth_potential": {"type": "integer", "minimum": 0, "maximum": 100},
+                },
+                "required": ["skills_match", "seniority_fit", "salary_alignment", "growth_potential"],
+            },
+            "salary_disclosed": {
+                "type": "boolean",
+                "description": "True if the JD includes a salary or salary range, false otherwise",
+            },
+            "strengths": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Real strengths from the resume that match this role. Each grounded in actual resume content.",
+            },
+            "gaps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "gap": {"type": "string"},
+                        "effort": {"type": "string", "enum": ["reframe", "easy", "months", "years"]},
+                        "honest": {"type": "boolean"},
+                    },
+                    "required": ["gap", "effort", "honest"],
+                },
+            },
+            "recommendations": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Honest reframes only. Never suggest adding a skill the candidate doesn't have.",
+            },
+            "translation_opportunities": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Specific examples of the candidate's existing language (e.g. hospitality/retail) that map to corporate vocabulary for this role. Format: 'X → Y'.",
+            },
+            "summary": {
+                "type": "string",
+                "description": "2-3 sentences in Ott's voice, tone matching the score tier.",
+            },
+        },
+        "required": [
+            "company", "role", "match_score", "score_tier", "sub_scores",
+            "salary_disclosed", "strengths", "gaps", "recommendations",
+            "translation_opportunities", "summary",
+        ],
+    },
+}
+
+
+def _fetch_profile_for_analysis(sb, user_id: str) -> dict:
+    """Best-effort fetch of the user's profile for prompt context.
+
+    Returns an empty dict on any failure — analysis must still run even
+    if the profile row is missing or unreadable.
+    """
+    try:
+        res = sb.table("profiles").select("*").eq("id", user_id).execute()
+        if res.data:
+            return res.data[0]
+    except Exception:
+        pass
+    return {}
+
+
+def _format_profile_for_prompt(profile: dict) -> str:
+    """Render the profile into a compact, model-friendly section.
+    Only includes fields that are non-empty so the model isn't biased by 'None' / 'null'."""
+    if not profile:
+        return "No profile data on file — treat the candidate as anonymous."
+
+    lines = []
+    if profile.get("full_name"):
+        lines.append(f"Name: {profile['full_name']}")
+    if profile.get("job_title"):
+        lines.append(f"Current role: {profile['job_title']}")
+    if profile.get("target_roles"):
+        lines.append(f"Targeting: {profile['target_roles']}")
+    sal_min = profile.get("target_salary_min")
+    sal_max = profile.get("target_salary_max")
+    if sal_min and sal_max:
+        lines.append(f"Salary target: ${sal_min:,} - ${sal_max:,}")
+    elif sal_min:
+        lines.append(f"Salary target: ${sal_min:,}+")
+    if profile.get("location"):
+        lines.append(f"Location: {profile['location']}")
+    if profile.get("schedule_preference"):
+        lines.append(f"Schedule preference: {profile['schedule_preference']}")
+    if profile.get("degree_status"):
+        lines.append(f"Degree status: {profile['degree_status']}")
+    skills = profile.get("skills_extracted")
+    if isinstance(skills, str):
+        try:
+            skills = json.loads(skills)
+        except (json.JSONDecodeError, TypeError):
+            skills = []
+    if skills:
+        lines.append(f"Extracted skills: {', '.join(skills)}")
+    if profile.get("about_me"):
+        lines.append(f"About: {profile['about_me']}")
+
+    return "\n".join(lines) if lines else "No profile data on file."
+
+
 @app.post("/analyze")
 @limiter.limit("10/hour")
 async def analyze(
@@ -288,95 +457,75 @@ async def analyze(
     if not body.resume.strip() or not body.job_description.strip():
         raise HTTPException(status_code=400, detail="Resume and job description are required.")
 
+    sb = _user_sb(user)
+
+    # Fetch the candidate's profile BEFORE the Claude call so the prompt is personalized.
+    profile = _fetch_profile_for_analysis(sb, user["user_id"])
+    profile_section = _format_profile_for_prompt(profile)
+
     linkedin_section = ""
     if body.linkedin_text.strip():
-        linkedin_section = f"""
+        linkedin_section = f"\n\nLINKEDIN (supplementary):\n{body.linkedin_text.strip()}"
 
-LINKEDIN PROFILE (supplementary context about the candidate's background, skills framing, and professional narrative — use this to inform your analysis alongside the resume):
-{body.linkedin_text.strip()}
-"""
-
-    prompt = f"""You are an expert resume analyst and career coach.
-
-Compare the following resume against the job description and return a structured analysis.
+    user_message = f"""CANDIDATE PROFILE:
+{profile_section}
 
 RESUME:
-{body.resume}
-{linkedin_section}
+{body.resume}{linkedin_section}
+
 JOB DESCRIPTION:
 {body.job_description}
 
-Return your analysis in this exact format:
-
-COMPANY: [Extract the company/organization name from the job description]
-ROLE: [Extract the job title/role name from the job description]
-
-MATCH SCORE: [0-100]
-
-SUB-SCORES:
-SKILLS_MATCH: [0-100 how well the candidate's technical skills and experience match the job requirements]
-SENIORITY_FIT: [0-100 how well the candidate's level and years of experience match the role's seniority expectations]
-SALARY_ALIGNMENT: [0-100 based on role type, location, and any salary info — how well the role likely aligns with reasonable expectations for this candidate's level. If no salary info available, use 70]
-GROWTH_POTENTIAL: [0-100 how much this role could advance the candidate's career trajectory based on their background]
-
-STRENGTHS:
-- [List what the candidate does well relative to this role]
-
-GAPS:
-- [List missing skills, experience, or qualifications]
-
-RECOMMENDATIONS:
-- [Specific, actionable advice to improve the resume for this role]
-
-SUMMARY:
-[2-3 sentence overall assessment]"""
+Analyze this match. Apply the truthfulness rules strictly. Use the gap effort tags honestly. If salary is not disclosed in the JD, set salary_alignment=null and salary_disclosed=false. Submit the result via the submit_analysis tool."""
 
     try:
         message = anthropic_client.messages.create(
-            model="claude-opus-4-20250514",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}]
+            model=OPUS_MODEL,
+            max_tokens=2048,
+            system=ANALYZE_SYSTEM_PROMPT,
+            tools=[ANALYSIS_TOOL],
+            tool_choice={"type": "tool", "name": "submit_analysis"},
+            messages=[{"role": "user", "content": user_message}],
         )
-        raw_result = message.content[0].text
 
-        # Extract company and role from AI response (fallback to user-provided)
-        company_match = re.search(r"COMPANY:\s*(.+)", raw_result, re.IGNORECASE)
-        role_match = re.search(r"ROLE:\s*(.+)", raw_result, re.IGNORECASE)
-        extracted_company = company_match.group(1).strip() if company_match else ""
-        extracted_role = role_match.group(1).strip() if role_match else ""
+        # Extract the structured tool_use payload
+        result_data = None
+        for block in message.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "submit_analysis":
+                result_data = block.input
+                break
+        if result_data is None:
+            raise ValueError("Model did not return submit_analysis tool call")
+
+        extracted_company = (result_data.get("company") or "").strip()
+        extracted_role = (result_data.get("role") or "").strip()
         final_company = body.company_name or extracted_company
         final_role = body.role_name or extracted_role
 
-        # Parse score from the AI response
-        score_match = re.search(r"MATCH SCORE:\s*(\d+)", raw_result, re.IGNORECASE)
-        score = int(score_match.group(1)) if score_match else 0
+        score = int(result_data.get("match_score") or 0)
+        score_tier = result_data.get("score_tier") or ""
 
-        # Parse sub-scores
-        def parse_sub_score(name: str, default: int = 50) -> int:
-            m = re.search(rf"{name}:\s*(\d+)", raw_result, re.IGNORECASE)
-            return int(m.group(1)) if m else default
+        sub_scores = result_data.get("sub_scores") or {}
+        skills_match = int(sub_scores.get("skills_match") or 0)
+        seniority_fit = int(sub_scores.get("seniority_fit") or 0)
+        # salary_alignment is intentionally allowed to be None — we no longer fake it.
+        salary_alignment = sub_scores.get("salary_alignment")
+        if salary_alignment is not None:
+            salary_alignment = int(salary_alignment)
+        growth_potential = int(sub_scores.get("growth_potential") or 0)
+        salary_disclosed = bool(result_data.get("salary_disclosed", False))
 
-        skills_match = parse_sub_score("SKILLS_MATCH")
-        seniority_fit = parse_sub_score("SENIORITY_FIT")
-        salary_alignment = parse_sub_score("SALARY_ALIGNMENT", 70)
-        growth_potential = parse_sub_score("GROWTH_POTENTIAL")
+        strengths = [s for s in (result_data.get("strengths") or []) if isinstance(s, str)]
+        # gaps are now structured objects {gap, effort, honest} — store as-is.
+        gaps_structured = result_data.get("gaps") or []
+        recommendations = [r for r in (result_data.get("recommendations") or []) if isinstance(r, str)]
+        translation_opportunities = [
+            t for t in (result_data.get("translation_opportunities") or []) if isinstance(t, str)
+        ]
+        summary = (result_data.get("summary") or "").strip()
 
-        # Parse sections
-        def parse_section(text: str, section: str) -> list[str]:
-            pattern = rf"{section}:\s*\n([\s\S]*?)(?=\n(?:STRENGTHS|GAPS|RECOMMENDATIONS|SUMMARY):|$)"
-            m = re.search(pattern, text, re.IGNORECASE)
-            if not m:
-                return []
-            return [line.strip().lstrip("-•* ") for line in m.group(1).split("\n") if line.strip()]
-
-        strengths = parse_section(raw_result, "STRENGTHS")
-        gaps = parse_section(raw_result, "GAPS")
-        recommendations = parse_section(raw_result, "RECOMMENDATIONS")
-        summary_match = re.search(r"SUMMARY:\s*\n([\s\S]*?)$", raw_result, re.IGNORECASE)
-        summary = summary_match.group(1).strip() if summary_match else ""
-
-        # Save analysis to Supabase (include original inputs for resume generation)
-        sb = _user_sb(user)
+        # Save analysis to Supabase (include original inputs for resume generation).
+        # The sb client was created at the top of the function for the profile fetch.
         insert_data = {
             "user_id": user["user_id"],
             "company_name": final_company,
@@ -384,7 +533,7 @@ SUMMARY:
             "score": score,
             "summary": summary,
             "strengths": json.dumps(strengths),
-            "gaps": json.dumps(gaps),
+            "gaps": json.dumps(gaps_structured),
             "recommendations": json.dumps(recommendations),
             "resume_text": body.resume,
             "job_description_text": body.job_description,
@@ -392,14 +541,24 @@ SUMMARY:
             "seniority_fit": seniority_fit,
             "salary_alignment": salary_alignment,
             "growth_potential": growth_potential,
+            "score_tier": score_tier,
+            "salary_disclosed": salary_disclosed,
+            "translation_opportunities": json.dumps(translation_opportunities),
         }
+        # Newer columns may not exist on older Supabase schemas. Drop them progressively.
+        OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities")
+        OPTIONAL_SUB_SCORE_COLS = ("skills_match", "seniority_fit", "salary_alignment", "growth_potential")
         try:
             insert_res = sb.table("analyses").insert(insert_data).execute()
         except Exception:
-            # Sub-score columns may not exist yet — retry without them
-            for col in ("skills_match", "seniority_fit", "salary_alignment", "growth_potential"):
+            for col in OPTIONAL_NEW_COLS:
                 insert_data.pop(col, None)
-            insert_res = sb.table("analyses").insert(insert_data).execute()
+            try:
+                insert_res = sb.table("analyses").insert(insert_data).execute()
+            except Exception:
+                for col in OPTIONAL_SUB_SCORE_COLS:
+                    insert_data.pop(col, None)
+                insert_res = sb.table("analyses").insert(insert_data).execute()
 
         analysis_id = insert_res.data[0]["id"] if insert_res.data else None
 
@@ -409,16 +568,17 @@ SUMMARY:
             "action_type": "analysis",
         }).execute()
 
-        # Generate Ott coaching tips via Haiku (fast + cheap)
+        # Generate Ott coaching tips via Haiku (legacy inline version — overhauled in Section 2)
         coaching_tips = []
         try:
+            gaps_text_for_haiku = json.dumps([g.get("gap", "") if isinstance(g, dict) else str(g) for g in gaps_structured])
             coaching_prompt = f"""You are Ott, a warm and encouraging otter career coach. You speak in a friendly, specific, and actionable way — like a supportive mentor who knows ATS systems inside out.
 
 Given this resume analysis, generate exactly 2-3 coaching tips.
 
 SCORE: {score}/100
 STRENGTHS: {json.dumps(strengths)}
-GAPS: {json.dumps(gaps)}
+GAPS: {gaps_text_for_haiku}
 RESUME EXCERPT (first 500 chars): {body.resume[:500]}
 JOB DESCRIPTION EXCERPT (first 500 chars): {body.job_description[:500]}
 
@@ -437,7 +597,6 @@ Return ONLY the tips as a JSON array of strings. No other text."""
                 messages=[{"role": "user", "content": coaching_prompt}]
             )
             coaching_raw = coaching_msg.content[0].text.strip()
-            # Strip markdown code fences if present
             if coaching_raw.startswith("```"):
                 coaching_raw = re.sub(r"^```(?:json)?\s*", "", coaching_raw)
                 coaching_raw = re.sub(r"\s*```$", "", coaching_raw)
@@ -474,11 +633,13 @@ Resume: {body.resume[:3000]}"""
         except Exception as exc:
             print(f"[Skills extraction] Failed: {exc}")
 
-        return {"result": raw_result, "analysis_id": analysis_id, "parsed": {
+        return {"analysis_id": analysis_id, "parsed": {
             "score": score,
+            "score_tier": score_tier,
             "strengths": strengths,
-            "gaps": gaps,
+            "gaps": gaps_structured,
             "recommendations": recommendations,
+            "translation_opportunities": translation_opportunities,
             "summary": summary,
             "coaching_tips": coaching_tips,
             "company_name": final_company,
@@ -487,6 +648,7 @@ Resume: {body.resume[:3000]}"""
             "skills_match": skills_match,
             "seniority_fit": seniority_fit,
             "salary_alignment": salary_alignment,
+            "salary_disclosed": salary_disclosed,
             "growth_potential": growth_potential,
             "skills_extracted": extracted_skills,
         }}
