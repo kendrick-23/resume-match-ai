@@ -3,24 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
 import Ott from '../components/ott/Ott';
 import { useStreak } from '../hooks/useStreak';
 import { getActivity, listBadges } from '../services/api';
 import { FileText, ClipboardList, Search, Clock } from 'lucide-react';
 import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
 import { useToast } from '../context/ToastContext';
-
-const BADGE_META = {
-  first_dive:   { emoji: '\u{1F30A}', name: 'First Dive' },
-  sharp_eye:    { emoji: '\u{1F441}\uFE0F', name: 'Sharp Eye' },
-  consistent:   { emoji: '\u{1F525}', name: 'Consistent' },
-  dedicated:    { emoji: '\u2B50', name: 'Dedicated' },
-  first_wave:   { emoji: '\u{1F4CB}', name: 'First Wave' },
-  making_moves: { emoji: '\u{1F4BC}', name: 'Making Moves' },
-  momentum:     { emoji: '\u{1F3AF}', name: 'Momentum' },
-  upgraded:     { emoji: '\u{1F4C8}', name: 'Upgraded' },
-};
+import { BADGES } from '../constants/badges';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -220,16 +209,40 @@ export default function Dashboard() {
         </Card>
       ) : (
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          {Object.entries(BADGE_META).map(([key, meta]) => {
+          {Object.entries(BADGES).map(([key, meta]) => {
             const earned = earnedBadges.includes(key);
             return (
-              <Badge
+              <div
                 key={key}
-                variant={earned ? 'success' : 'info'}
-                style={earned ? {} : { opacity: 0.5 }}
+                title={`${meta.name}${earned ? '' : ' — Locked'}`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                  width: '64px',
+                }}
               >
-                {meta.emoji} {meta.name}{earned ? '' : ' \u2014 Locked'}
-              </Badge>
+                <img
+                  src={meta.image}
+                  alt={meta.name}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    objectFit: 'contain',
+                    filter: earned ? 'none' : 'grayscale(100%) opacity(0.3)',
+                  }}
+                />
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  color: earned ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  lineHeight: 1.2,
+                }}>
+                  {meta.name}
+                </span>
+              </div>
             );
           })}
         </div>

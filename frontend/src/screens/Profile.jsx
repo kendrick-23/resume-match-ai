@@ -12,17 +12,7 @@ import { supabase } from '../services/supabase';
 import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, TrendingUp, Upload, ChevronDown, ChevronUp, UserCircle, X, Plus } from 'lucide-react';
 import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
 import { useToast } from '../context/ToastContext';
-
-const BADGE_META = {
-  first_dive:   { emoji: '\u{1F30A}', name: 'First Dive' },
-  sharp_eye:    { emoji: '\u{1F441}\uFE0F', name: 'Sharp Eye' },
-  consistent:   { emoji: '\u{1F525}', name: 'Consistent' },
-  dedicated:    { emoji: '\u2B50', name: 'Dedicated' },
-  first_wave:   { emoji: '\u{1F4CB}', name: 'First Wave' },
-  making_moves: { emoji: '\u{1F4BC}', name: 'Making Moves' },
-  momentum:     { emoji: '\u{1F3AF}', name: 'Momentum' },
-  upgraded:     { emoji: '\u{1F4C8}', name: 'Upgraded' },
-};
+import { BADGES } from '../constants/badges';
 
 export default function Profile() {
   const { user, signOut } = useAuth();
@@ -835,16 +825,40 @@ export default function Profile() {
       </h3>
       <Card style={{ marginBottom: 'var(--space-5)' }}>
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          {Object.entries(BADGE_META).map(([key, meta]) => {
+          {Object.entries(BADGES).map(([key, meta]) => {
             const earned = earnedBadges.includes(key);
             return (
-              <Badge
+              <div
                 key={key}
-                variant={earned ? 'success' : 'info'}
-                style={earned ? {} : { opacity: 0.5 }}
+                title={`${meta.name}${earned ? '' : ' — Locked'}`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                  width: '64px',
+                }}
               >
-                {meta.emoji} {meta.name}
-              </Badge>
+                <img
+                  src={meta.image}
+                  alt={meta.name}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    objectFit: 'contain',
+                    filter: earned ? 'none' : 'grayscale(100%) opacity(0.3)',
+                  }}
+                />
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  color: earned ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  lineHeight: 1.2,
+                }}>
+                  {meta.name}
+                </span>
+              </div>
             );
           })}
         </div>
