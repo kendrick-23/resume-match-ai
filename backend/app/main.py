@@ -150,6 +150,46 @@ class InterviewPrepRequest(BaseModel):
     job_description: str = Field(default="", max_length=20000)
 
 
+INTERVIEW_PREP_SYSTEM_PROMPT = """You are an expert interview coach. You know this candidate's actual background — their resume, skills, target roles, and the strengths/gaps identified for this specific role.
+
+Your job: generate behavioral interview questions AND brief STAR answer scaffolds that draw on the candidate's REAL experience. Not generic prompts. Not advice to "think about a time you led a team" — instead, point them at a specific situation from their actual work history.
+
+RULES:
+- Every STAR scaffold must reference something concrete from the candidate's resume or about_me. If you can't ground a scaffold in their real experience, choose a different question.
+- Cover different competency areas across the 5 questions (leadership, problem-solving, teamwork, communication, adaptability, and any technical skills relevant to this role).
+- If the role has identified gaps, include 1-2 questions that gently probe those gaps so the candidate can prepare a thoughtful answer (acknowledging the gap and showing transferable skill).
+- Tone: like a friend who has read their resume and is helping them prep over coffee. Direct, specific, encouraging."""
+
+
+INTERVIEW_PREP_TOOL = {
+    "name": "submit_interview_prep",
+    "description": "Submit 5 candidate-specific behavioral interview questions with STAR scaffolds.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "questions": {
+                "type": "array",
+                "minItems": 5,
+                "maxItems": 5,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string"},
+                        "competency": {"type": "string", "description": "The competency this question tests, e.g. 'Leadership', 'Problem-solving'"},
+                        "star_scaffold": {
+                            "type": "string",
+                            "description": "2-sentence STAR scaffold pointing the candidate at a specific real situation from their resume.",
+                        },
+                    },
+                    "required": ["question", "competency", "star_scaffold"],
+                },
+            },
+        },
+        "required": ["questions"],
+    },
+}
+
+
 @app.post("/interview-prep")
 @limiter.limit("5/hour")
 async def interview_prep(
@@ -157,41 +197,115 @@ async def interview_prep(
     body: InterviewPrepRequest,
     user: dict = Depends(get_current_user),
 ):
-    """Generate 5 STAR-format behavioral interview questions."""
-    gaps_text = "\n".join(f"- {g}" for g in body.gaps) if body.gaps else "No specific gaps identified."
-    jd_section = f"\nJOB DESCRIPTION:\n{body.job_description[:2000]}" if body.job_description.strip() else ""
+    """Generate 5 candidate-specific STAR-format behavioral interview questions
+    with personalized answer scaffolds."""
+    sb = _user_sb(user)
 
-    prompt = f"""You are an expert interview coach preparing a candidate for a behavioral interview.
+    # Pull profile + the most recent analysis for this role/company so the prep
+    # is anchored in the candidate's actual experience.
+    profile = _fetch_profile_for_analysis(sb, user["user_id"])
 
-ROLE: {body.role}
-COMPANY: {body.company or 'Not specified'}
+    latest_analysis = None
+    try:
+        ana_query = sb.table("analyses") \
+            .select("strengths,gaps,resume_text,role_name,company_name") \
+            .eq("user_id", user["user_id"]) \
+            .order("created_at", desc=True) \
+            .limit(10) \
+            .execute()
+        rows = ana_query.data or []
+        # Prefer an analysis that matches this role; fall back to most recent.
+        for row in rows:
+            if row.get("role_name", "").strip().lower() == body.role.strip().lower():
+                latest_analysis = row
+                break
+        if latest_analysis is None and rows:
+            latest_analysis = rows[0]
+    except Exception as exc:
+        print(f"[/interview-prep] Profile/analysis fetch failed: {exc}")
+
+    # Build the candidate background section.
+    target_roles = profile.get("target_roles") or "(not specified)"
+    about_me = profile.get("about_me") or "(none)"
+    skills = profile.get("skills_extracted") or []
+    if isinstance(skills, str):
+        try:
+            skills = json.loads(skills)
+        except (json.JSONDecodeError, TypeError):
+            skills = []
+
+    # Resume highlights — first 4000 chars of the resume from the matching analysis.
+    resume_highlights = ""
+    if latest_analysis and latest_analysis.get("resume_text"):
+        resume_highlights = latest_analysis["resume_text"][:4000]
+    else:
+        resume_highlights = "(no resume on file for this candidate)"
+
+    # Strengths/gaps from the analysis (handles both old string format and new structured format)
+    analysis_strengths = []
+    analysis_gaps = []
+    if latest_analysis:
+        try:
+            raw_s = latest_analysis.get("strengths")
+            analysis_strengths = json.loads(raw_s) if isinstance(raw_s, str) else (raw_s or [])
+        except (json.JSONDecodeError, TypeError):
+            analysis_strengths = []
+        try:
+            raw_g = latest_analysis.get("gaps")
+            parsed_g = json.loads(raw_g) if isinstance(raw_g, str) else (raw_g or [])
+            # Normalize new structured-gap shape to plain strings for the prompt
+            analysis_gaps = [
+                g.get("gap") if isinstance(g, dict) else g for g in parsed_g if g
+            ]
+        except (json.JSONDecodeError, TypeError):
+            analysis_gaps = []
+
+    # Caller-provided gaps override (from Tracker)
+    final_gaps = body.gaps if body.gaps else analysis_gaps
+    final_strengths = analysis_strengths
+
+    jd_section = f"\nJOB DESCRIPTION:\n{body.job_description[:3000]}" if body.job_description.strip() else "\n(no JD provided)"
+
+    user_message = f"""ROLE: {body.role} at {body.company or 'Not specified'}
+
+CANDIDATE BACKGROUND:
+- Target roles: {target_roles}
+- About: {about_me}
+- Key skills: {", ".join(skills) if skills else "(none extracted)"}
+
+RESUME HIGHLIGHTS:
+{resume_highlights}
+
+IDENTIFIED STRENGTHS FOR THIS ROLE:
+{json.dumps(final_strengths, ensure_ascii=False)}
+
+IDENTIFIED GAPS FOR THIS ROLE:
+{json.dumps(final_gaps, ensure_ascii=False)}
 {jd_section}
 
-CANDIDATE'S IDENTIFIED GAPS:
-{gaps_text}
-
-Generate exactly 5 behavioral interview questions in STAR format that:
-1. Are specific to this role at this company
-2. Where possible, target the candidate's identified gaps so they can prepare for tough questions
-3. Use the format: "Tell me about a time when..." or "Describe a situation where..."
-4. Cover different competency areas (leadership, problem-solving, teamwork, technical skills, adaptability)
-5. Are realistic questions an interviewer for this specific role would ask
-
-Return ONLY a JSON array of 5 question strings. No other text."""
+Generate 5 behavioral interview questions tailored to this candidate. Each STAR scaffold must reference something specific from the resume highlights above (e.g. "Draw on your experience managing 35 staff at Wawa — describe a specific compliance situation you navigated...")."""
 
     try:
         message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}]
+            model=HAIKU_MODEL,
+            max_tokens=1500,
+            system=INTERVIEW_PREP_SYSTEM_PROMPT,
+            tools=[INTERVIEW_PREP_TOOL],
+            tool_choice={"type": "tool", "name": "submit_interview_prep"},
+            messages=[{"role": "user", "content": user_message}],
         )
-        raw = message.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = re.sub(r"^```(?:json)?\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
-        questions = json.loads(raw)
-        if not isinstance(questions, list):
-            questions = []
+        questions: list[dict] = []
+        for block in message.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "submit_interview_prep":
+                raw_questions = block.input.get("questions") or []
+                for q in raw_questions:
+                    if isinstance(q, dict) and q.get("question"):
+                        questions.append({
+                            "question": str(q.get("question", "")),
+                            "competency": str(q.get("competency", "")),
+                            "star_scaffold": str(q.get("star_scaffold", "")),
+                        })
+                break
         return {"questions": questions[:5]}
     except Exception as e:
         print(f"[/interview-prep] Error: {e}")

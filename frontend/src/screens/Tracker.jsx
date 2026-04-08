@@ -521,32 +521,56 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
 
           {showQuestions && (
             <div style={{ marginTop: 'var(--space-2)' }}>
-              {questions.map((q, i) => (
-                <div key={i} style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 'var(--space-2)',
-                  marginBottom: 'var(--space-2)',
-                  padding: 'var(--space-2)',
-                  background: 'var(--color-bg)',
-                  borderRadius: 'var(--radius-sm)',
-                }}>
-                  <span style={{
-                    fontWeight: 800,
-                    fontSize: '13px',
-                    color: 'var(--color-accent)',
-                    minWidth: '20px',
+              {questions.map((q, i) => {
+                // Backwards-compat: legacy responses returned plain strings;
+                // new responses return { question, competency, star_scaffold }.
+                const questionText = typeof q === 'string' ? q : (q?.question || '');
+                const competency = typeof q === 'object' ? q?.competency : null;
+                const starScaffold = typeof q === 'object' ? q?.star_scaffold : null;
+                return (
+                  <div key={i} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 'var(--space-2)',
+                    marginBottom: 'var(--space-2)',
+                    padding: 'var(--space-2)',
+                    background: 'var(--color-bg)',
+                    borderRadius: 'var(--radius-sm)',
                   }}>
-                    {i + 1}.
-                  </span>
-                  <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                    {q}
-                  </p>
-                </div>
-              ))}
+                    <span style={{
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      color: 'var(--color-accent)',
+                      minWidth: '20px',
+                    }}>
+                      {i + 1}.
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                        {questionText}
+                      </p>
+                      {competency && (
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', marginTop: '4px' }}>
+                          {competency}
+                        </p>
+                      )}
+                      {starScaffold && (
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: 1.5, marginTop: '4px', fontStyle: 'italic' }}>
+                          {starScaffold}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(questions.map((q, i) => `${i + 1}. ${q}`).join('\n\n'));
+                  const exportText = questions.map((q, i) => {
+                    const text = typeof q === 'string' ? q : (q?.question || '');
+                    const scaffold = typeof q === 'object' && q?.star_scaffold ? `\n   ${q.star_scaffold}` : '';
+                    return `${i + 1}. ${text}${scaffold}`;
+                  }).join('\n\n');
+                  navigator.clipboard.writeText(exportText);
                   // Toast would be nice here but we don't have access in this component
                 }}
                 style={{
