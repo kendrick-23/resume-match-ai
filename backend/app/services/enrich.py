@@ -44,10 +44,21 @@ def _is_relevant_title(title: str) -> bool:
 
 
 async def enrich_job_description(job: dict) -> str:
-    """Return an enriched description for sparse jobs, or the original if sufficient."""
-    desc = job.get("description") or ""
+    """Return an enriched description for sparse jobs, or the original if sufficient.
+
+    Refusal path: if the JD is empty or has fewer than 20 words, we return the
+    original unchanged — we will NOT manufacture requirements out of nothing.
+    Enriched content (when produced) is tagged with [ENRICHED] so downstream
+    scorers can weight it lower if they choose.
+    """
+    desc = (job.get("description") or "").strip()
     if len(desc) >= 300:
         return desc
+
+    # Refusal path: too sparse to ground anything reasonable.
+    word_count = len(desc.split())
+    if word_count < 20:
+        return desc  # Don't enrich a tagline / empty JD
 
     title = job.get("title") or ""
     if not _is_relevant_title(title):
@@ -67,10 +78,16 @@ async def enrich_job_description(job: dict) -> str:
         return desc
 
     prompt_text = (
-        f"Job: {title} at {company}. {desc}\n"
-        "Write a 100-word requirements summary covering: "
-        "required skills, experience level, key responsibilities. "
-        "Return only the summary."
+        f"Job title: {title}\n"
+        f"Company: {company}\n"
+        f"Existing description: {desc}\n\n"
+        "Write a brief (~100 word) requirements summary covering: required skills, "
+        "experience level, key responsibilities. Stay close to what the title and "
+        "company name imply. Use the company as an anchor — an Operations Manager "
+        "at a credit union has different requirements than one at a tree-trimming "
+        "company. If you cannot make reasonable inferences from title + company "
+        "alone, respond with exactly: NOT_ENOUGH_INFO\n\n"
+        "Return only the summary or the refusal token."
     )
 
     if not check_budget(estimate_tokens(prompt_text)):
@@ -80,11 +97,18 @@ async def enrich_job_description(job: dict) -> str:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
             model=HAIKU_MODEL,
-            max_tokens=150,
+            max_tokens=200,
             messages=[{"role": "user", "content": prompt_text}],
         )
         enriched = response.content[0].text.strip()
-        combined = f"{desc} {enriched}".strip()
+
+        # Honor the refusal token — don't fabricate.
+        if "NOT_ENOUGH_INFO" in enriched.upper():
+            _description_cache[key] = (time.time(), desc)
+            return desc
+
+        # Tag enriched content so downstream scorers know what's real vs inferred.
+        combined = f"{desc}\n[ENRICHED]: {enriched}"
         _description_cache[key] = (time.time(), combined)
         return combined
     except Exception as exc:
