@@ -79,7 +79,11 @@ export default function Dashboard() {
 
       {/* Streak card */}
       <Card style={{ textAlign: 'center', marginBottom: 'var(--space-4)' }}>
-        <span style={{ fontSize: '32px' }}>{streak >= 7 ? '\u{1F525}' : streak >= 1 ? '\u{1F525}' : '\u{1F44B}'}</span>
+        <img
+          src={streak >= 1 ? '/ott/streak-active.png' : '/ott/streak-inactive.png'}
+          alt={streak >= 1 ? 'streak' : 'no streak'}
+          style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+        />
         <p style={{
           fontWeight: 800,
           fontSize: '24px',
