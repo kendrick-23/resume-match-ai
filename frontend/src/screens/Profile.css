@@ -1,0 +1,20 @@
+/* ============================================
+   Profile — desktop reflow
+   ============================================ */
+
+/* Desktop (1200px+): reflow form sections into 2 columns so the
+   form doesn't run as one endless narrow column. Uses CSS multi-column
+   layout with break-inside: avoid so each h3+Card pair stays together. */
+@media (min-width: 1200px) {
+  .profile-form-grid {
+    column-count: 2;
+    column-gap: var(--space-6);
+  }
+
+  .profile-form-grid > h3,
+  .profile-form-grid > div {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

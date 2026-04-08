@@ -10,6 +10,7 @@ import { FileText, ClipboardList, Search, Clock } from 'lucide-react';
 import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
+import './Dashboard.css';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -110,25 +111,20 @@ export default function Dashboard() {
           </Button>
         </Card>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 'var(--space-3)',
-          marginBottom: 'var(--space-6)',
-        }}>
+        <div className="today-summary-grid">
           <Card>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
+            <p className="today-summary-grid__label">
               Analyses today
             </p>
-            <p style={{ fontWeight: 800, fontSize: '24px' }}>
+            <p className="today-summary-grid__value">
               {activity?.analyses_today ?? 0}
             </p>
           </Card>
           <Card>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
+            <p className="today-summary-grid__label">
               Apps logged
             </p>
-            <p style={{ fontWeight: 800, fontSize: '24px' }}>
+            <p className="today-summary-grid__value">
               {activity?.applications_today ?? 0}
             </p>
           </Card>

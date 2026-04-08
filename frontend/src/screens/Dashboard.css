@@ -1,0 +1,33 @@
+/* ============================================
+   Dashboard — responsive layout tweaks
+   ============================================ */
+
+.today-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.today-summary-grid__label {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.today-summary-grid__value {
+  font-weight: 800;
+  font-size: 24px;
+}
+
+/* Tablet+ — more breathing room between the two cards */
+@media (min-width: 768px) {
+  .today-summary-grid {
+    gap: var(--space-5);
+    margin-bottom: var(--space-8);
+  }
+  .today-summary-grid__value {
+    font-size: 32px;
+  }
+}

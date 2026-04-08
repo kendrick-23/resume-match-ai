@@ -29,6 +29,7 @@
   /* === BORDERS === */
   --color-border:           #E8E0D5;  /* Standard borders */
   --color-border-strong:    #C8BFB4;  /* Emphasized borders */
+  --color-border-tertiary:  #F0EBE3;  /* Faint borders — desktop column dividers */
 
   /* === TEXT === */
   --color-text:             #2D2A26;  /* Warm near-black — primary text */

@@ -13,6 +13,7 @@ import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, Tre
 import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
+import './Profile.css';
 
 export default function Profile() {
   const { user, signOut } = useAuth();
@@ -247,6 +248,7 @@ export default function Profile() {
         </p>
       </div>
 
+      <div className="profile-form-grid">
       {/* My Resume section */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resume</h3>
       <Card style={{ marginBottom: 'var(--space-5)' }}>
@@ -600,6 +602,7 @@ export default function Profile() {
         </div>
       </Card>
 
+      </div>
       {/* Spacer before skills — sticky save footer handles saving now */}
 
       {/* Skills — editable */}

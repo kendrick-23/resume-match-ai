@@ -2,6 +2,19 @@
    Results — sticky pill navigation + sections
    ============================================ */
 
+/* Score ring — responsive sizing via CSS so SVG math (RING_SIZE constant) stays put */
+.score-ring {
+  width: 140px;
+  height: 140px;
+}
+
+@media (min-width: 768px) {
+  .score-ring {
+    width: 200px;
+    height: 200px;
+  }
+}
+
 /* Sticky pill bar */
 .results-pills {
   position: sticky;

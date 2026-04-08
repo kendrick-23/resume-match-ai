@@ -34,8 +34,8 @@ function ScoreRing({ score }) {
         : 'var(--color-danger)';
 
   return (
-    <div style={{ position: 'relative', width: RING_SIZE, height: RING_SIZE, margin: '0 auto' }}>
-      <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+    <div className="score-ring" style={{ position: 'relative', margin: '0 auto' }}>
+      <svg width="100%" height="100%" viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
         <circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
