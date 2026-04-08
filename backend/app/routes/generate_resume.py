@@ -13,6 +13,8 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 anthropic_client = Anthropic()
 
+OPUS_MODEL = "claude-opus-4-6"
+
 
 def _user_sb(user: dict):
     sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -59,6 +61,19 @@ async def generate_resume(
     if analysis.get("generated_resume_md"):
         return {"resume_md": analysis["generated_resume_md"], "cached": True}
 
+    # Pull profile for pivot context.
+    profile = {}
+    try:
+        prof_res = sb.table("profiles").select("*").eq("id", user["user_id"]).execute()
+        if prof_res.data:
+            profile = prof_res.data[0]
+    except Exception:
+        pass
+
+    target_roles = (profile.get("target_roles") or "").strip() or "(target roles not specified)"
+    about_me = (profile.get("about_me") or "").strip() or "(no background summary on file)"
+    current_background = (profile.get("job_title") or "their current field").strip()
+
     linkedin_section = ""
     if body.linkedin_text.strip():
         linkedin_section = f"""
@@ -67,15 +82,52 @@ LINKEDIN PROFILE (additional context about the candidate):
 {body.linkedin_text.strip()}
 """
 
-    prompt = f"""You are an expert ATS resume optimizer and career coach. Your job is to rewrite this resume to maximize keyword alignment with the job posting while keeping every experience claim 100% truthful. The candidate has real skills that are being described in the wrong language for this role. Translate their experience into the vocabulary this employer uses.
+    system_prompt = """You are an expert ATS resume optimizer and career coach. Your job is to rewrite a resume to maximize keyword alignment with a specific job posting while keeping every claim 100% truthful.
 
-Focus especially on:
-1. Mirroring exact keyword phrases from the job description
-2. Quantifying achievements that are already implied
-3. Leading bullets with strong action verbs the job posting uses
-4. Rewriting the professional summary to speak directly to this role
+The candidate has real skills described in the wrong language for the target role. Translate, don't invent.
 
-Never invent experience. Only reframe what exists.
+NON-NEGOTIABLE TRUTHFULNESS RULES:
+- Never fabricate employer names, dates, certifications, degrees, or metrics.
+- Quantify achievements ONLY where the original resume already contains a specific number or a clearly countable fact (e.g. "managed 12-person team" — keep "12"). Do NOT invent metrics where the original was qualitative.
+- Never add a skill or experience the candidate doesn't have evidence for in the source material.
+- Every bullet must be defensible by the candidate in an interview.
+
+WHAT YOU CAN AND SHOULD DO:
+- Mirror exact keyword phrases from the JD where the candidate's existing experience legitimately demonstrates them.
+- Lead bullets with strong action verbs the job posting uses.
+- Reframe the professional summary to position the candidate's pivot toward the target role.
+- Reorganize bullet order to lead with the most relevant impact for THIS role.
+
+OUTPUT FORMAT — clean markdown, no commentary:
+
+# [Candidate Name]
+
+## Professional Summary
+[2-3 sentences positioning the candidate's pivot from their current background to the target role. Use the JD's vocabulary where their real experience supports it.]
+
+## Core Competencies
+[8-12 bullets — keyword-rich, using exact JD phrases ONLY where the candidate genuinely possesses the skill. Pull from extracted_skills + resume evidence.]
+
+## Professional Experience
+
+### [Job Title] | [Company] | [Dates]
+- [Achievement-focused bullets, action-verb-led, JD vocabulary where supported]
+- [Numbers ONLY when present in the source]
+
+[Repeat for each role]
+
+## Education
+[Format cleanly]
+
+## Certifications & Training
+[Only if the candidate has them in the source]"""
+
+    user_message = f"""CANDIDATE PROFILE:
+- Current background: {current_background}
+- Pivoting to: {target_roles}
+- About: {about_me}
+
+The candidate is pivoting from {current_background} to {target_roles}. Frame the professional summary to position this pivot, not just to match the JD title.
 
 ORIGINAL RESUME:
 {resume_text}
@@ -83,42 +135,14 @@ ORIGINAL RESUME:
 JOB DESCRIPTION:
 {job_description}
 
-Generate the rewritten resume in clean markdown format with these exact sections:
-
-# [Candidate Name]
-
-## Professional Summary
-[2-3 sentences opening with the target role title, mirroring the job's language. Highlight the candidate's most relevant qualifications using keywords from the job posting.]
-
-## Core Competencies
-[A keyword-rich skills grid using exact phrases from the job description that the candidate genuinely possesses. Format as a bullet list of 8-12 competencies.]
-
-## Professional Experience
-
-### [Job Title] | [Company] | [Dates]
-- [Achievement-focused bullets rewritten to lead with impact and use industry language matching the job posting]
-- [Each bullet should start with a strong action verb from the job description]
-- [Quantify wherever the original resume implies measurable results]
-
-[Repeat for each role]
-
-## Education
-[Format education entries cleanly]
-
-## Certifications & Training
-[Only if the candidate has relevant certifications mentioned in their resume]
-
-Important formatting rules:
-- Use markdown headers (#, ##, ###) for sections
-- Use bullet points (-) for lists
-- Keep it clean and scannable
-- Do not add any commentary or notes — output ONLY the resume content"""
+Rewrite the resume per the system rules. Output only the markdown — no commentary."""
 
     try:
         message = anthropic_client.messages.create(
-            model="claude-opus-4-20250514",
+            model=OPUS_MODEL,
             max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}]
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}]
         )
         resume_md = message.content[0].text.strip()
 
