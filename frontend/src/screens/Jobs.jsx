@@ -10,6 +10,7 @@ import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, createApplication, 
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
+import { useActionToast } from '../context/ActionToastContext';
 import './Jobs.css';
 
 const STORAGE_KEY = 'holt_jobs_search';
@@ -85,6 +86,7 @@ function makeCacheKey(searchType, keywords = '', location = '') {
 export default function Jobs() {
   const navigate = useNavigate();
   const toast = useToast();
+  const showAction = useActionToast();
 
   const saved = loadSavedSearch();
   const [keyword, setKeyword] = useState(saved?.keyword || '');
@@ -511,7 +513,7 @@ export default function Jobs() {
         url: job.url || job.apply_url,
         notes: `Source: ${job.source === 'adzuna' ? 'Adzuna' : 'USAJobs'} | Location: ${job.location}`,
       });
-      toast.success('Saved to your tracker!');
+      showAction('job-saved');
     } catch {
       setSavedIds((prev) => {
         const next = new Set(prev);

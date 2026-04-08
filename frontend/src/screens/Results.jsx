@@ -9,6 +9,7 @@ import { listAnalyses } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
 import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { useActionToast } from '../context/ActionToastContext';
 import './Results.css';
 
 const RING_SIZE = 140;
@@ -263,6 +264,7 @@ export default function Results() {
   const navigate = useNavigate();
 
   const toast = useToast();
+  const showAction = useActionToast();
   const [result, setResult] = useState(location.state?.result || null);
   const [pastAnalyses, setPastAnalyses] = useState([]);
   const [loading, setLoading] = useState(!location.state?.result);
@@ -281,6 +283,8 @@ export default function Results() {
     if (!location.state?.result) {
       loadAnalyses();
     } else {
+      // Fresh analysis just landed from Upload — celebrate it.
+      showAction('analysis-complete');
       loadPastAnalyses();
     }
   }, []);

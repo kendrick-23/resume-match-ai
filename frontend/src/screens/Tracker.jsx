@@ -19,6 +19,7 @@ import {
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 import MilestoneModal from '../components/ui/MilestoneModal';
 import { useToast } from '../context/ToastContext';
+import { useActionToast } from '../context/ActionToastContext';
 
 const STAGES = ['Saved', 'Applied', 'Responded', 'Interview', 'Offer', 'Closed'];
 
@@ -33,6 +34,7 @@ const STAGE_VARIANT = {
 
 export default function Tracker() {
   const toast = useToast();
+  const showAction = useActionToast();
   const location = useLocation();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,7 @@ export default function Tracker() {
       const app = await createApplication(formData);
       setApplications((prev) => [app, ...prev]);
       setShowForm(false);
+      showAction('application-logged');
 
       // Check for badges
       const badgeResult = await checkBadges();
@@ -114,6 +117,8 @@ export default function Tracker() {
         if (newStatus === 'Interview') {
           setPendingPrepApp(updated);
         }
+      } else {
+        showAction('status-updated');
       }
     } catch {
       setApplications((prev) =>
