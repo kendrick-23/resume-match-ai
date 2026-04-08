@@ -5,8 +5,9 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { useStreak } from '../context/StreakContext';
-import { getActivity, listBadges, listApplications } from '../services/api';
-import { FileText, ClipboardList, Search, Clock } from 'lucide-react';
+import { getActivity, listBadges, listApplications, listAnalyses, getProfile } from '../services/api';
+import { FileText, Search, Clock } from 'lucide-react';
+import JourneyMap from '../components/ui/JourneyMap';
 import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
@@ -22,9 +23,17 @@ export default function Dashboard() {
   const [badgesError, setBadgesError] = useState(false);
   const [applications, setApplications] = useState([]);
   const [appsError, setAppsError] = useState(false);
+  const [hasAnalyses, setHasAnalyses] = useState(false);
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    Promise.all([loadActivity(), loadBadges(), loadApplications()]);
+    Promise.all([
+      loadActivity(),
+      loadBadges(),
+      loadApplications(),
+      loadAnalyses(),
+      loadProfile(),
+    ]);
   }, []);
 
   async function loadActivity() {
@@ -57,11 +66,45 @@ export default function Dashboard() {
     }
   }
 
+  async function loadAnalyses() {
+    try {
+      const data = await listAnalyses();
+      setHasAnalyses(Array.isArray(data) && data.length > 0);
+    } catch {
+      // Silent — journey map gracefully shows resume stage as locked
+    }
+  }
+
+  async function loadProfile() {
+    try {
+      const data = await getProfile();
+      setProfile(data || null);
+    } catch {
+      // Silent — journey map shows profile stage as locked
+    }
+  }
+
   // Stat card counts: unique applications, derived from the live tracker.
   const APPLIED_STATUSES = new Set(['Applied', 'Responded', 'Interview', 'Offer']);
   const INTERVIEW_STATUSES = new Set(['Interview', 'Offer']);
   const appliedCount = applications.filter((a) => APPLIED_STATUSES.has(a.status)).length;
   const interviewCount = applications.filter((a) => INTERVIEW_STATUSES.has(a.status)).length;
+  const offerCount = applications.filter((a) => a.status === 'Offer').length;
+
+  // Journey map completion — each stage true if Nicole has cleared it.
+  const profileComplete = !!(
+    profile &&
+    profile.target_roles &&
+    profile.target_salary_min &&
+    profile.location
+  );
+  const journeyCompleted = {
+    resume: hasAnalyses,
+    profile: profileComplete,
+    applied: appliedCount >= 1,
+    interview: interviewCount >= 1,
+    offer: offerCount >= 1,
+  };
 
   // Ott state based on streak
   const ottState =
@@ -177,38 +220,31 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Quick action cards */}
+      {/* Job search journey map */}
+      <h3 style={{ marginBottom: 'var(--space-3)' }}>Your job search</h3>
+      <JourneyMap completed={journeyCompleted} />
+
+      {/* Quick actions — trimmed to two; the journey map drives "what's next" */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Quick actions</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
-        <Card interactive onClick={() => navigate('/upload')}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <FileText size={20} style={{ color: 'var(--color-accent)' }} />
-            <div>
-              <p style={{ fontWeight: 700 }}>Analyze a resume</p>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
-                Match your resume to a job description
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card interactive onClick={() => navigate('/tracker')}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <ClipboardList size={20} style={{ color: 'var(--color-accent)' }} />
-            <div>
-              <p style={{ fontWeight: 700 }}>Log an application</p>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
-                Track where you've applied
-              </p>
-            </div>
-          </div>
-        </Card>
         <Card interactive onClick={() => navigate('/jobs')}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <Search size={20} style={{ color: 'var(--color-accent)' }} />
             <div>
-              <p style={{ fontWeight: 700 }}>Search jobs</p>
+              <p style={{ fontWeight: 700 }}>Find jobs</p>
               <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
                 Discover roles that match your skills
+              </p>
+            </div>
+          </div>
+        </Card>
+        <Card interactive onClick={() => navigate('/upload')}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <FileText size={20} style={{ color: 'var(--color-accent)' }} />
+            <div>
+              <p style={{ fontWeight: 700 }}>Upload resume</p>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                Match your resume to a job description
               </p>
             </div>
           </div>

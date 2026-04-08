@@ -1,0 +1,169 @@
+/* ============================================
+   JourneyMap — 5-stage horizontal job search path
+   ============================================ */
+
+.journey-map {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0;
+  padding: var(--space-5) var(--space-2);
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-6);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.journey-map__node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  min-width: 64px;
+  position: relative;
+  z-index: 1;
+}
+
+.journey-map__circle-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.journey-map__circle {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 2px solid var(--color-border);
+  transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
+}
+
+.journey-map__node--complete .journey-map__circle {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.journey-map__node--current .journey-map__circle {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.journey-map__node--current .journey-map__pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-accent);
+  animation: journey-pulse 1600ms ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes journey-pulse {
+  0%   { transform: scale(0.85); opacity: 0.9; }
+  70%  { transform: scale(1.25); opacity: 0; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+.journey-map__node--locked .journey-map__circle {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.journey-map__check {
+  width: 22px;
+  height: 22px;
+  display: block;
+  stroke: currentColor;
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.journey-map__ott {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, 4px);
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.journey-map__label {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.journey-map__node--locked .journey-map__label {
+  color: var(--color-text-muted);
+}
+
+.journey-map__node--current .journey-map__label,
+.journey-map__node--complete .journey-map__label {
+  color: var(--color-accent-dark);
+}
+
+/* Connecting lines drawn as ::after on each node except the last */
+.journey-map__node:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 21px; /* vertical center of the 44px circle (with 2px padding) */
+  left: calc(50% + 26px);
+  right: calc(-50% + 26px);
+  height: 3px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  z-index: -1;
+}
+
+.journey-map__node--complete:not(:last-child)::after {
+  background: var(--color-accent);
+}
+
+@media (min-width: 768px) {
+  .journey-map {
+    padding: var(--space-6) var(--space-4);
+  }
+  .journey-map__circle {
+    width: 52px;
+    height: 52px;
+    font-size: 18px;
+  }
+  .journey-map__node:not(:last-child)::after {
+    top: 25px;
+    left: calc(50% + 30px);
+    right: calc(-50% + 30px);
+  }
+  .journey-map__label {
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-map__node--current .journey-map__pulse {
+    animation: none;
+  }
+}
