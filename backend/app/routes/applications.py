@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 from typing import Optional
 from supabase import create_client
+from datetime import datetime, timezone, timedelta
 import os
 
 from app.main import get_current_user, limiter
@@ -12,6 +13,58 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 VALID_STATUSES = {"Saved", "Applied", "Responded", "Interview", "Offer", "Closed"}
+
+# Statuses that count toward the streak / "real forward action".
+FORWARD_STATUSES = {"Applied", "Interview", "Offer"}
+
+# Window for collapsing rapid status shuffles on the same application
+# into a single activity_log row.
+DEDUP_WINDOW_MINUTES = 30
+
+
+def _action_type_for_status(status: str) -> str:
+    """Map an application status to an activity_log action_type.
+
+    Forward statuses get distinct action types so the streak query can
+    filter on them. Other status changes are tagged 'status_other' and
+    do not contribute to the streak.
+    """
+    if status == "Applied":
+        return "status_applied"
+    if status == "Interview":
+        return "status_interview"
+    if status == "Offer":
+        return "status_offer"
+    return "status_other"
+
+
+def _log_status_change(sb, user_id: str, application_id: str, status: str) -> None:
+    """Insert a status-change activity row, deduping rapid same-app shuffles.
+
+    If a prior status_* activity for this application exists within
+    DEDUP_WINDOW_MINUTES, delete it first so only the final transition
+    in a quick succession survives.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=DEDUP_WINDOW_MINUTES)).isoformat()
+    try:
+        sb.table("activity_log") \
+            .delete() \
+            .eq("user_id", user_id) \
+            .eq("application_id", application_id) \
+            .like("action_type", "status_%") \
+            .gte("created_at", cutoff) \
+            .execute()
+    except Exception:
+        # If the application_id column doesn't exist yet (migration not
+        # applied), fall through and just insert the new row.
+        pass
+
+    sb.table("activity_log").insert({
+        "user_id": user_id,
+        "action_type": _action_type_for_status(status),
+        "application_id": application_id,
+        "status": status,
+    }).execute()
 
 
 def _user_sb(user: dict):
@@ -72,13 +125,23 @@ async def create_application(
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to create application")
 
-    # Log activity
-    sb.table("activity_log").insert({
-        "user_id": user["user_id"],
-        "action_type": "application_created",
-    }).execute()
+    new_app = res.data[0]
+    initial_status = new_app.get("status", "Saved")
 
-    return res.data[0]
+    # Log activity. If created with a forward status (Applied/Interview/Offer),
+    # log as the status change so the streak picks it up. Otherwise log a
+    # neutral "application_created" entry that does NOT count toward the streak.
+    if initial_status in FORWARD_STATUSES:
+        _log_status_change(sb, user["user_id"], new_app["id"], initial_status)
+    else:
+        sb.table("activity_log").insert({
+            "user_id": user["user_id"],
+            "action_type": "application_created",
+            "application_id": new_app["id"],
+            "status": initial_status,
+        }).execute()
+
+    return new_app
 
 
 @router.patch("/{app_id}")
@@ -106,13 +169,15 @@ async def update_application(
     if not res.data:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    # Log activity
-    sb.table("activity_log").insert({
-        "user_id": user["user_id"],
-        "action_type": "application_updated",
-    }).execute()
+    updated_app = res.data[0]
 
-    return res.data[0]
+    # Only log activity for actual status changes — and dedupe rapid
+    # same-app shuffles. Pure field edits (notes, URL, etc.) do NOT
+    # touch the activity log so they cannot inflate the streak.
+    if "status" in updates:
+        _log_status_change(sb, user["user_id"], app_id, updates["status"])
+
+    return updated_app
 
 
 @router.delete("/{app_id}")

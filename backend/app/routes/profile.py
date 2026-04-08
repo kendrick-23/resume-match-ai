@@ -20,14 +20,22 @@ def _user_sb(user: dict):
     return sb
 
 
+# Action types that represent a real forward action in the job search.
+# Only these contribute to the streak — status shuffles and pure edits do not.
+STREAK_ACTIONS = ["analysis", "status_applied", "status_interview", "status_offer"]
+
+
 @router.get("/streak")
 @limiter.limit("100/hour")
 async def get_streak(request: Request, user: dict = Depends(get_current_user)):
-    """Calculate current streak: consecutive calendar days with at least one activity."""
+    """Calculate current streak: consecutive calendar days with at least one
+    real forward action (resume analysis, or moving an application TO
+    Applied / Interview / Offer)."""
     sb = _user_sb(user)
     res = sb.table("activity_log") \
-        .select("created_at") \
+        .select("created_at,action_type") \
         .eq("user_id", user["user_id"]) \
+        .in_("action_type", STREAK_ACTIONS) \
         .order("created_at", desc=True) \
         .execute()
 
@@ -74,35 +82,50 @@ async def get_activity(request: Request, user: dict = Depends(get_current_user))
 
     today = datetime.now(timezone.utc).date()
     analyses_today = 0
-    apps_today = 0
+    applied_today = 0
+    interviews_today = 0
 
     for row in res.data:
         dt = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
-        if dt.date() == today:
-            if row["action_type"] == "analysis":
-                analyses_today += 1
-            elif row["action_type"] in ("application_created", "application_updated"):
-                apps_today += 1
-
-    # Build recent feed (last 5)
-    recent = []
-    for row in res.data[:5]:
+        if dt.date() != today:
+            continue
         action = row["action_type"]
-        label = {
-            "analysis": "Ran a resume analysis",
-            "application_created": "Logged a new application",
-            "application_updated": "Updated an application",
-        }.get(action, action)
+        if action == "analysis":
+            analyses_today += 1
+        elif action == "status_applied":
+            applied_today += 1
+        elif action in ("status_interview", "status_offer"):
+            interviews_today += 1
+
+    # Build recent feed (last 5). Skip rows that aren't meaningful for the
+    # user-facing activity stream — pure edits and Saved-only entries.
+    LABELS = {
+        "analysis": "Ran a resume analysis",
+        "status_applied": "Submitted an application",
+        "status_interview": "Moved an application to Interview",
+        "status_offer": "Got an offer!",
+        "application_created": "Saved a job",
+    }
+    recent = []
+    for row in res.data:
+        action = row["action_type"]
+        if action not in LABELS:
+            continue
         recent.append({
             "id": row["id"],
-            "label": label,
+            "label": LABELS[action],
             "action_type": action,
             "created_at": row["created_at"],
         })
+        if len(recent) >= 5:
+            break
 
     return {
         "analyses_today": analyses_today,
-        "applications_today": apps_today,
+        "applied_today": applied_today,
+        "interviews_today": interviews_today,
+        # Backwards-compatible alias for any old frontend code still reading it.
+        "applications_today": applied_today,
         "recent": recent,
     }
 
