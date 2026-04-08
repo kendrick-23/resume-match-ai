@@ -47,7 +47,11 @@ export default function Signup() {
     <div className="auth-screen">
       <div className="auth-screen__inner">
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-          <Ott state="excited" size={100} />
+          <img
+            src="/ott/ott-splash.png"
+            alt="Ott"
+            style={{ width: 160, height: 'auto', display: 'block', margin: '0 auto' }}
+          />
           <div style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}>
             <HoltWordmark size="large" />
           </div>
