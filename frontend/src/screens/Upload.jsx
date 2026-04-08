@@ -175,6 +175,7 @@ export default function Upload() {
             <img
               src="/ott/ott-reading.png"
               alt="Ott reviewing your resume"
+              loading="lazy"
               style={{ width: '160px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
             />
             <div style={{ marginTop: 'var(--space-3)' }}>

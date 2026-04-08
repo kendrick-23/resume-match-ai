@@ -226,6 +226,7 @@ export default function Dashboard() {
                 <img
                   src={meta.image}
                   alt={meta.name}
+                  loading="lazy"
                   style={{
                     width: '48px',
                     height: '48px',

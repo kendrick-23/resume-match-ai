@@ -39,6 +39,7 @@ export default function Login() {
           <img
             src="/ott/ott-splash.png"
             alt="Ott"
+            loading="lazy"
             style={{ width: 160, height: 'auto', display: 'block', margin: '0 auto' }}
           />
           <div style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}>
