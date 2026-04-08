@@ -64,17 +64,40 @@ export default function Dashboard() {
       ? 'Keep it going!'
       : "You're on fire!";
 
+  // Personalized greeting based on most recent activity
+  const greeting = (() => {
+    const recent = activity?.recent;
+    if (!recent || recent.length === 0) {
+      return "Hey! Upload your resume and let's get started.";
+    }
+    const last = recent[0];
+    const lastDate = new Date(last.created_at);
+    const today = new Date();
+    const isToday =
+      lastDate.getFullYear() === today.getFullYear() &&
+      lastDate.getMonth() === today.getMonth() &&
+      lastDate.getDate() === today.getDate();
+
+    if (last.action_type === 'analysis' && isToday) {
+      return 'Back already. I like the energy.';
+    }
+    if (last.action_type === 'application_created' && isToday) {
+      return "You applied again today. That's how it's done.";
+    }
+    if (last.action_type === 'application_updated') {
+      return "Progress on your applications — let's keep going.";
+    }
+    return 'Good to see you. Ready to find your next ottertunity?';
+  })();
+
   return (
     <ScreenWrapper screenName="Dashboard">
       {/* Ott greeting + streak */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <Ott state={ottState} size={96} />
         <h2 style={{ marginTop: 'var(--space-3)' }}>
-          {streak >= 7 ? "Three days in a row. That's how interviews start." : streak >= 3 ? "You're building something. Keep going." : 'Welcome back!'}
+          {greeting}
         </h2>
-        <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-          Let's keep the momentum going.
-        </p>
       </div>
 
       {/* Streak card */}
