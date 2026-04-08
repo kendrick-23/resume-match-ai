@@ -279,6 +279,109 @@ async def upload_resume(
 
 
 OPUS_MODEL = "claude-opus-4-6"
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
+
+
+COACHING_SYSTEM_PROMPT = """You are Ott — a career coach who is warm, direct, occasionally punny, and always backed by real data. You speak in first person. You never use corporate jargon. You give specific, actionable advice the candidate can execute today.
+
+TRUTHFULNESS — non-negotiable:
+If a JD keyword does not appear in some form in the candidate's resume or LinkedIn, do NOT tell them to add it. Instead, find the closest real experience they DO have and show them how to translate it into that vocabulary.
+
+TONE BY SCORE TIER:
+- 70+ (strong): Energetic and affirming. "You've got this. Here's how to make it obvious to the ATS."
+- 45-69 (stretch): Coaching and specific. "You're closer than you think. Here's the bridge to build."
+- <45 (weak / wrong_domain): Honest and redirecting. "This one's a reach. Here's what would actually close this gap — and here's a role that's already within reach."
+
+Each tip:
+- References specific text from the resume AND the JD
+- Suggests only reframes of real experience, never new skills
+- Matches the tone for the score tier
+- 1-3 sentences max
+- Sounds like Ott, not a LinkedIn post"""
+
+
+COACHING_TIPS_TOOL = {
+    "name": "submit_coaching_tips",
+    "description": "Submit 2-3 Ott coaching tips for this analysis.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "tips": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 2,
+                "maxItems": 3,
+            },
+        },
+        "required": ["tips"],
+    },
+}
+
+
+def _generate_coaching_tips(
+    *,
+    score: int,
+    score_tier: str,
+    strengths: list,
+    gaps_structured: list,
+    translation_opportunities: list,
+    profile: dict,
+    resume: str,
+    job_description: str,
+) -> list[str]:
+    """Ott's Take — Haiku follow-up after the main /analyze call.
+
+    Receives the structured Opus output instead of re-deriving anything.
+    Sends FULL resume + FULL JD (no 500-char truncations) so the model
+    can ground every tip in real text.
+    """
+    target_roles = profile.get("target_roles") or "(not specified)"
+    skills = profile.get("skills_extracted") or []
+    if isinstance(skills, str):
+        try:
+            skills = json.loads(skills)
+        except (json.JSONDecodeError, TypeError):
+            skills = []
+
+    gaps_payload = json.dumps(gaps_structured, ensure_ascii=False)
+    strengths_payload = json.dumps(strengths, ensure_ascii=False)
+    translation_payload = json.dumps(translation_opportunities, ensure_ascii=False)
+
+    user_message = f"""SCORE: {score}/100
+TIER: {score_tier or "(unknown)"}
+CANDIDATE TARGET ROLES: {target_roles}
+CANDIDATE SKILLS: {", ".join(skills) if skills else "(none extracted yet)"}
+
+ANALYSIS RESULTS:
+Strengths: {strengths_payload}
+Gaps (with effort levels): {gaps_payload}
+Translation opportunities: {translation_payload}
+
+FULL RESUME:
+{resume}
+
+FULL JOB DESCRIPTION:
+{job_description}
+
+Generate 2-3 coaching tips. Apply the truthfulness rule strictly: never tell the candidate to add a skill they don't have evidence for. Match the tone to the {score_tier or "stretch"} tier."""
+
+    try:
+        msg = anthropic_client.messages.create(
+            model=HAIKU_MODEL,
+            max_tokens=600,
+            system=COACHING_SYSTEM_PROMPT,
+            tools=[COACHING_TIPS_TOOL],
+            tool_choice={"type": "tool", "name": "submit_coaching_tips"},
+            messages=[{"role": "user", "content": user_message}],
+        )
+        for block in msg.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "submit_coaching_tips":
+                tips = block.input.get("tips") or []
+                return [t for t in tips if isinstance(t, str)][:3]
+    except Exception as exc:
+        print(f"[Ott coaching] Failed: {exc}")
+    return []
+
 
 ANALYZE_SYSTEM_PROMPT = """You are Ott, Holt's career intelligence engine. You are analyzing a resume for a specific candidate with a known background and career goals.
 
@@ -568,44 +671,18 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             "action_type": "analysis",
         }).execute()
 
-        # Generate Ott coaching tips via Haiku (legacy inline version — overhauled in Section 2)
-        coaching_tips = []
-        try:
-            gaps_text_for_haiku = json.dumps([g.get("gap", "") if isinstance(g, dict) else str(g) for g in gaps_structured])
-            coaching_prompt = f"""You are Ott, a warm and encouraging otter career coach. You speak in a friendly, specific, and actionable way — like a supportive mentor who knows ATS systems inside out.
-
-Given this resume analysis, generate exactly 2-3 coaching tips.
-
-SCORE: {score}/100
-STRENGTHS: {json.dumps(strengths)}
-GAPS: {gaps_text_for_haiku}
-RESUME EXCERPT (first 500 chars): {body.resume[:500]}
-JOB DESCRIPTION EXCERPT (first 500 chars): {body.job_description[:500]}
-
-Rules for each tip:
-- Reference SPECIFIC words, skills, or phrases from the resume and job description
-- Tell the user EXACTLY what to add, change, or rephrase and WHERE
-- Focus on ATS keyword matching — use the job posting's exact terminology
-- Be warm and encouraging — acknowledge what they're doing right before suggesting changes
-- Keep each tip to 1-2 sentences
-
-Return ONLY the tips as a JSON array of strings. No other text."""
-
-            coaching_msg = anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=512,
-                messages=[{"role": "user", "content": coaching_prompt}]
-            )
-            coaching_raw = coaching_msg.content[0].text.strip()
-            if coaching_raw.startswith("```"):
-                coaching_raw = re.sub(r"^```(?:json)?\s*", "", coaching_raw)
-                coaching_raw = re.sub(r"\s*```$", "", coaching_raw)
-            coaching_tips = json.loads(coaching_raw)
-            if not isinstance(coaching_tips, list):
-                coaching_tips = []
-        except Exception as exc:
-            print(f"[Ott coaching] Failed: {exc}")
-            coaching_tips = []
+        # Ott's Take coaching tips — overhauled in Section 2.
+        # Profile-aware, tiered tone, full context, truthfulness guardrail.
+        coaching_tips = _generate_coaching_tips(
+            score=score,
+            score_tier=score_tier,
+            strengths=strengths,
+            gaps_structured=gaps_structured,
+            translation_opportunities=translation_opportunities,
+            profile=profile,
+            resume=body.resume,
+            job_description=body.job_description,
+        )
 
         # Extract skills from resume and save to profile (async, non-blocking)
         extracted_skills = []
