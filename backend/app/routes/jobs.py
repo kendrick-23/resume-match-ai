@@ -99,9 +99,11 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     except Exception as exc:
         print(f"[SemanticScore] Batch re-scoring failed: {exc}")
 
-    # Step 5: Claude-powered gap analysis — SKIP domain-penalized jobs entirely
+    # Step 5: Claude-powered gap analysis — SKIP domain-penalized jobs entirely.
+    # Pass target_roles so the gap analyzer knows what direction the candidate
+    # is heading and doesn't flag misaligned skills as gaps.
     try:
-        await analyze_gaps_batch(jobs, resume_skills)
+        await analyze_gaps_batch(jobs, resume_skills, profile.get("target_roles") or "")
     except Exception as exc:
         print(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
 
