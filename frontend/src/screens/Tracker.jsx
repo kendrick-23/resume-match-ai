@@ -17,6 +17,7 @@ import {
   generateInterviewPrep,
 } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
+import MilestoneModal from '../components/ui/MilestoneModal';
 import { useToast } from '../context/ToastContext';
 
 const STAGES = ['Saved', 'Applied', 'Responded', 'Interview', 'Offer', 'Closed'];
@@ -42,6 +43,8 @@ export default function Tracker() {
   const [celebratingBadge, setCelebratingBadge] = useState(null);
   const [error, setError] = useState(null);
   const [interviewPrepApp, setInterviewPrepApp] = useState(null);
+  const [milestoneModal, setMilestoneModal] = useState(null);
+  const [pendingPrepApp, setPendingPrepApp] = useState(null);
   const [prepQuestions, setPrepQuestions] = useState({});
   const [prepLoading, setPrepLoading] = useState(null);
 
@@ -102,8 +105,15 @@ export default function Tracker() {
       if (badgeResult.newly_earned?.length > 0) {
         setCelebratingBadge(badgeResult.newly_earned[0]);
       }
-      if (newStatus === 'Interview') {
-        setInterviewPrepApp(updated);
+      if (newStatus === 'Interview' || newStatus === 'Offer') {
+        setMilestoneModal({
+          milestone: newStatus,
+          company: updated.company,
+          role: updated.role,
+        });
+        if (newStatus === 'Interview') {
+          setPendingPrepApp(updated);
+        }
       }
     } catch {
       setApplications((prev) =>
@@ -324,6 +334,22 @@ export default function Tracker() {
             </Card>
           </div>
         </div>
+      )}
+
+      {/* Milestone modal — Interview / Offer status change */}
+      {milestoneModal && (
+        <MilestoneModal
+          milestone={milestoneModal.milestone}
+          company={milestoneModal.company}
+          role={milestoneModal.role}
+          onClose={() => {
+            setMilestoneModal(null);
+            if (pendingPrepApp) {
+              setInterviewPrepApp(pendingPrepApp);
+              setPendingPrepApp(null);
+            }
+          }}
+        />
       )}
 
       {/* Milestone celebration */}
