@@ -383,6 +383,106 @@ Generate 2-3 coaching tips. Apply the truthfulness rule strictly: never tell the
     return []
 
 
+SKILLS_EXTRACTION_TOOL = {
+    "name": "submit_skills",
+    "description": "Submit a normalized, deduplicated list of the candidate's skills.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "skills": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Canonical skill names — specific, deduplicated, normalized.",
+            },
+        },
+        "required": ["skills"],
+    },
+}
+
+
+def _extract_and_merge_skills(
+    *,
+    sb,
+    user_id: str,
+    resume: str,
+    target_roles: str,
+    existing_skills,
+) -> list[str]:
+    """Skills extractor — full resume, target_roles-aware, merge-not-overwrite.
+
+    - No more 'operations/management' hardcode — uses the candidate's actual target_roles.
+    - No truncation — sends the full resume.
+    - Receives existing_skills and instructs the model to merge + dedupe.
+    - Normalization rule: prefer canonical terms (e.g. 'P&L management' over 'P and L management').
+    """
+    if isinstance(existing_skills, str):
+        try:
+            existing_skills = json.loads(existing_skills)
+        except (json.JSONDecodeError, TypeError):
+            existing_skills = []
+    if not isinstance(existing_skills, list):
+        existing_skills = []
+
+    target_roles_text = target_roles.strip() or "the candidate's intended career direction"
+    existing_payload = json.dumps(existing_skills, ensure_ascii=False)
+
+    user_message = f"""Extract and normalize all skills from this resume.
+
+Target roles: {target_roles_text}
+
+Previously extracted skills (merge with these — do NOT erase them; if a skill is already present, keep its existing form):
+{existing_payload}
+
+Include:
+- Technical skills and tools (software, platforms, systems)
+- Certifications and licenses
+- Soft skills relevant to {target_roles_text}
+- Any domain expertise demonstrated in the resume
+
+Rules:
+- Be specific. "Inventory management", not "management". "QuickBooks", not "accounting software".
+- Normalize to a single canonical term per skill. Examples:
+    "P and L management" / "Profit & Loss" / "P&L" → "P&L management"
+    "MS Excel" / "Excel" / "Microsoft Excel" → "Microsoft Excel"
+- Deduplicate aggressively. The merged output should have no two entries that mean the same thing.
+- Only include skills with actual evidence in the resume. Do not invent.
+
+FULL RESUME:
+{resume}
+
+Submit the merged, deduplicated, canonical list via the submit_skills tool."""
+
+    try:
+        msg = anthropic_client.messages.create(
+            model=HAIKU_MODEL,
+            max_tokens=800,
+            tools=[SKILLS_EXTRACTION_TOOL],
+            tool_choice={"type": "tool", "name": "submit_skills"},
+            messages=[{"role": "user", "content": user_message}],
+        )
+        merged: list[str] = []
+        for block in msg.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "submit_skills":
+                raw_skills = block.input.get("skills") or []
+                merged = [s.strip() for s in raw_skills if isinstance(s, str) and s.strip()]
+                break
+
+        if merged:
+            try:
+                sb.table("profiles").upsert({
+                    "id": user_id,
+                    "skills_extracted": merged,
+                }).execute()
+            except Exception as exc:
+                print(f"[Skills extraction] Upsert failed: {exc}")
+            return merged
+    except Exception as exc:
+        print(f"[Skills extraction] Failed: {exc}")
+
+    # On any failure, preserve the existing list rather than wiping it.
+    return existing_skills
+
+
 ANALYZE_SYSTEM_PROMPT = """You are Ott, Holt's career intelligence engine. You are analyzing a resume for a specific candidate with a known background and career goals.
 
 The candidate is making a career pivot. Their current experience is real and valuable — it is simply described in the wrong vocabulary for their target industry. Your job is to identify both the match AND the translation opportunity.
@@ -684,31 +784,16 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             job_description=body.job_description,
         )
 
-        # Extract skills from resume and save to profile (async, non-blocking)
-        extracted_skills = []
-        try:
-            skills_prompt = f"""Extract all skills from this resume text as a JSON array of strings. Include: technical skills, tools, certifications, soft skills relevant to operations/management, and any domain expertise. Be specific — 'inventory management' not just 'management'. Return ONLY valid JSON array, no other text.
-
-Resume: {body.resume[:3000]}"""
-
-            skills_msg = anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=512,
-                messages=[{"role": "user", "content": skills_prompt}]
-            )
-            skills_raw = skills_msg.content[0].text.strip()
-            if skills_raw.startswith("```"):
-                skills_raw = re.sub(r"^```(?:json)?\s*", "", skills_raw)
-                skills_raw = re.sub(r"\s*```$", "", skills_raw)
-            extracted_skills = json.loads(skills_raw)
-            if isinstance(extracted_skills, list):
-                # Save to profile
-                sb.table("profiles").upsert({
-                    "id": user["user_id"],
-                    "skills_extracted": extracted_skills,
-                }).execute()
-        except Exception as exc:
-            print(f"[Skills extraction] Failed: {exc}")
+        # Extract skills — overhauled in Section 3.
+        # No more "operations/management" bias, no more 3000-char truncation,
+        # merges with existing skills_extracted instead of overwriting.
+        extracted_skills = _extract_and_merge_skills(
+            sb=sb,
+            user_id=user["user_id"],
+            resume=body.resume,
+            target_roles=profile.get("target_roles") or "",
+            existing_skills=profile.get("skills_extracted") or [],
+        )
 
         return {"analysis_id": analysis_id, "parsed": {
             "score": score,
