@@ -99,17 +99,19 @@ function StickyPillNav({ activePill, onPillClick }) {
   }, [activePill]);
 
   return (
-    <div className="results-pills" ref={scrollRef}>
-      {PILLS.map((pill) => (
-        <button
-          key={pill.id}
-          ref={pill.id === activePill ? activeRef : null}
-          className={`results-pills__pill ${pill.id === activePill ? 'results-pills__pill--active' : ''}`}
-          onClick={() => onPillClick(pill.id)}
-        >
-          {pill.label}
-        </button>
-      ))}
+    <div className="results-pills-wrapper">
+      <div className="results-pills" ref={scrollRef}>
+        {PILLS.map((pill) => (
+          <button
+            key={pill.id}
+            ref={pill.id === activePill ? activeRef : null}
+            className={`results-pills__pill ${pill.id === activePill ? 'results-pills__pill--active' : ''}`}
+            onClick={() => onPillClick(pill.id)}
+          >
+            {pill.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

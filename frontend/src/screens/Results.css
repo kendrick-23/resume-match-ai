@@ -15,19 +15,32 @@
   }
 }
 
-/* Sticky pill bar */
-.results-pills {
+/* Sticky pill bar — wrapped so the right-edge fade indicator can be absolutely positioned */
+.results-pills-wrapper {
   position: sticky;
   top: var(--header-height, 56px);
   z-index: 50;
-  display: flex;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
   margin: 0 calc(-1 * var(--space-4));
-  padding-left: var(--space-4);
-  padding-right: var(--space-4);
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
+}
+
+/* Right-edge teal fade — signals the row scrolls horizontally */
+.results-pills-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 32px;
+  pointer-events: none;
+  background: linear-gradient(to right, rgba(43, 181, 192, 0), rgba(43, 181, 192, 0.35));
+}
+
+.results-pills {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -51,7 +64,7 @@
   white-space: nowrap;
   transition: background var(--transition-fast), color var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
-  min-height: 36px;
+  min-height: 44px;
 }
 
 .results-pills__pill--active {
