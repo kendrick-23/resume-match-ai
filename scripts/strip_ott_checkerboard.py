@@ -34,6 +34,8 @@ FILES = [
     "ott-excited.png",
     "ott-celebrating.png",
     "ott-sleeping.png",
+    "ott-splash.png",
+    "holt-logo.png",
 ]
 
 # Tunables
