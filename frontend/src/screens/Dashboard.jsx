@@ -126,7 +126,7 @@ export default function Dashboard() {
           </Card>
           <Card>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
-              Applications logged
+              Apps logged
             </p>
             <p style={{ fontWeight: 800, fontSize: '24px' }}>
               {activity?.applications_today ?? 0}
