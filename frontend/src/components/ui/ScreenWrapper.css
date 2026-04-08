@@ -66,6 +66,39 @@
   text-transform: capitalize;
 }
 
+/* === Header left area (wordmark + persistent streak) === */
+.screen__header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.header-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-light);
+  line-height: 1;
+}
+
+.header-streak__icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
+.header-streak__count {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--color-accent-dark);
+  letter-spacing: -0.01em;
+}
+
 /* === Header right area === */
 .screen__header-right {
   display: flex;

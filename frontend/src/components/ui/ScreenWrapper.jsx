@@ -1,5 +1,6 @@
 import HoltWordmark from './HoltWordmark';
 import HeaderSettingsMenu from './HeaderSettingsMenu';
+import HeaderStreak from './HeaderStreak';
 import './ScreenWrapper.css';
 
 export default function ScreenWrapper({ children, className = '', screenName = '' }) {
@@ -9,7 +10,10 @@ export default function ScreenWrapper({ children, className = '', screenName = '
     <div className={classes}>
       {screenName && (
         <div className="screen__header">
-          <HoltWordmark />
+          <div className="screen__header-left">
+            <HoltWordmark />
+            <HeaderStreak />
+          </div>
           <div className="screen__header-right">
             <span className="screen__header-name">{screenName}</span>
             <HeaderSettingsMenu />

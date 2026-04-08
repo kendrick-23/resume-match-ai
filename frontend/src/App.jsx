@@ -2,6 +2,7 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ToastProvider } from './context/ToastContext';
 import { ActionToastProvider } from './context/ActionToastContext';
+import { StreakProvider } from './context/StreakContext';
 import BottomNav from './components/ui/BottomNav';
 import Dashboard from './screens/Dashboard';
 import Upload from './screens/Upload';
@@ -98,7 +99,9 @@ export default function App() {
     <AuthProvider>
       <ToastProvider>
         <ActionToastProvider>
-          <AppRoutes />
+          <StreakProvider>
+            <AppRoutes />
+          </StreakProvider>
         </ActionToastProvider>
       </ToastProvider>
     </AuthProvider>

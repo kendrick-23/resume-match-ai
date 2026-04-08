@@ -4,7 +4,7 @@ import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { useStreak } from '../hooks/useStreak';
+import { useStreak } from '../context/StreakContext';
 import { getActivity, listBadges } from '../services/api';
 import { FileText, ClipboardList, Search, Clock } from 'lucide-react';
 import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
