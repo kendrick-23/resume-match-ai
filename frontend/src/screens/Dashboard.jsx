@@ -21,19 +21,18 @@ export default function Dashboard() {
   const [activityError, setActivityError] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState([]);
   const [badgesError, setBadgesError] = useState(false);
-  const [applications, setApplications] = useState([]);
-  const [appsError, setAppsError] = useState(false);
-  const [hasAnalyses, setHasAnalyses] = useState(false);
-  const [profile, setProfile] = useState(null);
+  // Single batched state for everything the JourneyMap + stat cards depend on.
+  // We never set this until ALL three upstream calls have settled, so the map
+  // renders exactly once in its final state and animates from there.
+  const [journey, setJourney] = useState({
+    ready: false,
+    error: false,
+    applications: [],
+    completed: { resume: false, profile: false, applied: false, interview: false, offer: false },
+  });
 
   useEffect(() => {
-    Promise.all([
-      loadActivity(),
-      loadBadges(),
-      loadApplications(),
-      loadAnalyses(),
-      loadProfile(),
-    ]);
+    Promise.all([loadActivity(), loadBadges(), loadJourney()]);
   }, []);
 
   async function loadActivity() {
@@ -56,55 +55,57 @@ export default function Dashboard() {
     }
   }
 
-  async function loadApplications() {
-    setAppsError(false);
-    try {
-      const data = await listApplications();
-      setApplications(Array.isArray(data) ? data : []);
-    } catch {
-      setAppsError(true);
-    }
+  async function loadJourney() {
+    // Wait for ALL three sources before flipping `ready`. This is the
+    // single setState that drives both the journey map and the stat cards
+    // — anything earlier would race the entrance animation.
+    const [appsRes, analysesRes, profileRes] = await Promise.allSettled([
+      listApplications(),
+      listAnalyses(),
+      getProfile(),
+    ]);
+
+    const applications =
+      appsRes.status === 'fulfilled' && Array.isArray(appsRes.value) ? appsRes.value : [];
+    const analyses =
+      analysesRes.status === 'fulfilled' && Array.isArray(analysesRes.value) ? analysesRes.value : [];
+    const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
+
+    const APPLIED_STATUSES = new Set(['Applied', 'Responded', 'Interview', 'Offer']);
+    const INTERVIEW_STATUSES = new Set(['Interview', 'Offer']);
+    const appliedCount = applications.filter((a) => APPLIED_STATUSES.has(a.status)).length;
+    const interviewCount = applications.filter((a) => INTERVIEW_STATUSES.has(a.status)).length;
+    const offerCount = applications.filter((a) => a.status === 'Offer').length;
+
+    const profileComplete = !!(
+      profile &&
+      profile.target_roles &&
+      profile.target_salary_min &&
+      profile.location
+    );
+
+    setJourney({
+      ready: true,
+      // Treat applications failing as a stat-card error; analyses/profile
+      // failures degrade the journey to "locked" without blocking render.
+      error: appsRes.status === 'rejected',
+      applications,
+      completed: {
+        resume: analyses.length >= 1,
+        profile: profileComplete,
+        applied: appliedCount >= 1,
+        interview: interviewCount >= 1,
+        offer: offerCount >= 1,
+      },
+    });
   }
 
-  async function loadAnalyses() {
-    try {
-      const data = await listAnalyses();
-      setHasAnalyses(Array.isArray(data) && data.length > 0);
-    } catch {
-      // Silent — journey map gracefully shows resume stage as locked
-    }
-  }
-
-  async function loadProfile() {
-    try {
-      const data = await getProfile();
-      setProfile(data || null);
-    } catch {
-      // Silent — journey map shows profile stage as locked
-    }
-  }
-
-  // Stat card counts: unique applications, derived from the live tracker.
+  // Stat card counts derived from the same single state — guaranteed to
+  // match whatever the journey map is showing in the same render.
   const APPLIED_STATUSES = new Set(['Applied', 'Responded', 'Interview', 'Offer']);
   const INTERVIEW_STATUSES = new Set(['Interview', 'Offer']);
-  const appliedCount = applications.filter((a) => APPLIED_STATUSES.has(a.status)).length;
-  const interviewCount = applications.filter((a) => INTERVIEW_STATUSES.has(a.status)).length;
-  const offerCount = applications.filter((a) => a.status === 'Offer').length;
-
-  // Journey map completion — each stage true if Nicole has cleared it.
-  const profileComplete = !!(
-    profile &&
-    profile.target_roles &&
-    profile.target_salary_min &&
-    profile.location
-  );
-  const journeyCompleted = {
-    resume: hasAnalyses,
-    profile: profileComplete,
-    applied: appliedCount >= 1,
-    interview: interviewCount >= 1,
-    offer: offerCount >= 1,
-  };
+  const appliedCount = journey.applications.filter((a) => APPLIED_STATUSES.has(a.status)).length;
+  const interviewCount = journey.applications.filter((a) => INTERVIEW_STATUSES.has(a.status)).length;
 
   // Ott state based on streak
   const ottState =
@@ -183,13 +184,13 @@ export default function Dashboard() {
       </Card>
 
       {/* Pipeline summary — meaningful job-search counts */}
-      {appsError ? (
+      {journey.error ? (
         <Card style={{ textAlign: 'center', marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
           <Ott state="coaching" size={48} />
           <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
             Couldn't load your stats
           </p>
-          <Button variant="ghost" onClick={loadApplications} style={{ marginTop: 'var(--space-2)' }}>
+          <Button variant="ghost" onClick={loadJourney} style={{ marginTop: 'var(--space-2)' }}>
             Tap to retry
           </Button>
         </Card>
@@ -222,7 +223,7 @@ export default function Dashboard() {
 
       {/* Job search journey map */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Your job search</h3>
-      <JourneyMap completed={journeyCompleted} />
+      <JourneyMap completed={journey.completed} ready={journey.ready} />
 
       {/* Quick actions — trimmed to two; the journey map drives "what's next" */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Quick actions</h3>

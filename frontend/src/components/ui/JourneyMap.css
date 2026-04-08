@@ -26,6 +26,10 @@
   min-width: 64px;
   position: relative;
   z-index: 1;
+  /* Hidden until the parent gets .journey-map--ready — prevents the
+     "node by node lighting up" flash while the three data sources resolve. */
+  opacity: 0;
+  transform: translateY(8px) scale(0.92);
 }
 
 .journey-map__circle-wrap {
@@ -137,10 +141,53 @@
   background: var(--color-border);
   border-radius: var(--radius-full);
   z-index: -1;
+  /* Hidden until --ready, then fade in only after BOTH connecting nodes
+     have animated in (handled by per-nth-child delays below). */
+  opacity: 0;
 }
 
 .journey-map__node--complete:not(:last-child)::after {
   background: var(--color-accent);
+}
+
+/* === Sequential entrance — only fires when --ready is added by JS === */
+
+.journey-map--ready .journey-map__node {
+  animation: journey-node-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.journey-map--ready .journey-map__node:nth-child(1) { animation-delay: 0ms; }
+.journey-map--ready .journey-map__node:nth-child(2) { animation-delay: 150ms; }
+.journey-map--ready .journey-map__node:nth-child(3) { animation-delay: 300ms; }
+.journey-map--ready .journey-map__node:nth-child(4) { animation-delay: 450ms; }
+.journey-map--ready .journey-map__node:nth-child(5) { animation-delay: 600ms; }
+
+@keyframes journey-node-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Lines fade in AFTER the next node settles. Each line's delay equals the
+   next node's animation-delay, so node N+1 must be visible before line N
+   appears (in either teal-complete or gray-locked color). */
+.journey-map--ready .journey-map__node:not(:last-child)::after {
+  animation: journey-line-in 280ms ease-out both;
+}
+
+.journey-map--ready .journey-map__node:nth-child(1):not(:last-child)::after { animation-delay: 150ms; }
+.journey-map--ready .journey-map__node:nth-child(2):not(:last-child)::after { animation-delay: 300ms; }
+.journey-map--ready .journey-map__node:nth-child(3):not(:last-child)::after { animation-delay: 450ms; }
+.journey-map--ready .journey-map__node:nth-child(4):not(:last-child)::after { animation-delay: 600ms; }
+
+@keyframes journey-line-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @media (min-width: 768px) {
@@ -165,5 +212,12 @@
 @media (prefers-reduced-motion: reduce) {
   .journey-map__node--current .journey-map__pulse {
     animation: none;
+  }
+  /* Skip the staggered entrance — show everything immediately when ready. */
+  .journey-map--ready .journey-map__node,
+  .journey-map--ready .journey-map__node:not(:last-child)::after {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }

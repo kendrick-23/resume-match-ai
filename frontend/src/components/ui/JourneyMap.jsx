@@ -19,13 +19,21 @@ function Checkmark() {
 /**
  * @param {object} props
  * @param {object} props.completed — { resume, profile, applied, interview, offer } booleans
+ * @param {boolean} props.ready — true once ALL upstream data has loaded; gates the
+ *                                sequential entrance animation so Nicole never sees
+ *                                an intermediate state lighting up node-by-node.
  */
-export default function JourneyMap({ completed }) {
+export default function JourneyMap({ completed, ready = false }) {
   // First incomplete stage is "current". If everything is done, no current stage.
   const currentIndex = STAGES.findIndex((s) => !completed[s.key]);
 
   return (
-    <div className="journey-map" role="list" aria-label="Job search journey">
+    <div
+      className={`journey-map${ready ? ' journey-map--ready' : ''}`}
+      role="list"
+      aria-label="Job search journey"
+      aria-busy={!ready}
+    >
       {STAGES.map((stage, i) => {
         const isComplete = completed[stage.key];
         const isCurrent = !isComplete && i === currentIndex;
