@@ -315,6 +315,9 @@ export default function Results() {
   // Pagination for previous analyses list
   const [historyPage, setHistoryPage] = useState(0);
   const sectionRefs = useRef({});
+  // Guard against React StrictMode double-invoking the mount effect,
+  // which would fire two /analyze calls and create duplicate rows.
+  const analyzeCalledRef = useRef(false);
 
   // Just-in-time guided hint — first-time only, gated on localStorage.
   // Shows 400ms after mount so it lands AFTER the VerdictCard entrance animation.
@@ -324,7 +327,9 @@ export default function Results() {
 
   useEffect(() => {
     if (location.state?.analyzeRequest) {
-      // Came from Jobs "Analyze" button — run analysis with prior_holt_score.
+      // Guard: StrictMode double-invoke would fire two /analyze calls.
+      if (analyzeCalledRef.current) return;
+      analyzeCalledRef.current = true;
       runJobAnalysis(location.state.analyzeRequest);
     } else if (!location.state?.result) {
       loadAnalyses();

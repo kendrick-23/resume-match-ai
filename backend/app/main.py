@@ -871,25 +871,25 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
         ]
         summary = (result_data.get("summary") or "").strip()
 
-        # Dedup check: if the same user analyzed the same role+company with the
-        # same resume within the last hour, update that row instead of creating
-        # a duplicate. This catches re-analyses from the Jobs "Analyze" button
-        # and accidental double-submits.
+        # Dedup check: if the same user analyzed the same role+company within the
+        # last hour, update that row instead of creating a duplicate. Matches on
+        # user_id + role_name + company_name only — resume_id is intentionally
+        # excluded because the same job = same entry regardless of which resume
+        # was used. This catches re-analyses from the Jobs "Analyze" button,
+        # React StrictMode double-invokes, and accidental double-submits.
         existing_analysis_id = None
         try:
             from datetime import datetime, timedelta, timezone as tz
             one_hour_ago = (datetime.now(tz.utc) - timedelta(hours=1)).isoformat()
-            dedup_q = sb.table("analyses") \
+            dedup_res = sb.table("analyses") \
                 .select("id") \
                 .eq("user_id", user["user_id"]) \
                 .eq("role_name", final_role) \
                 .eq("company_name", final_company) \
                 .gte("created_at", one_hour_ago) \
                 .order("created_at", desc=True) \
-                .limit(1)
-            if resume_id:
-                dedup_q = dedup_q.eq("resume_id", resume_id)
-            dedup_res = dedup_q.execute()
+                .limit(1) \
+                .execute()
             if dedup_res.data:
                 existing_analysis_id = dedup_res.data[0]["id"]
         except Exception as exc:
