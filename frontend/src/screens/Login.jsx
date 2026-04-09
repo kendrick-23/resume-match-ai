@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import Ott from '../components/ott/Ott';
 import HoltWordmark from '../components/ui/HoltWordmark';
 import { useAuth } from '../hooks/useAuth.jsx';
 
@@ -33,8 +32,8 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-screen">
-      <div className="auth-screen__inner">
+    <div className="auth-screen" style={{ position: 'relative', overflow: 'hidden' }}>
+      <div className="auth-screen__inner" style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <img
             src="/ott/ott-splash.png"
@@ -47,7 +46,7 @@ export default function Login() {
           </div>
           <p style={{ fontWeight: 700, fontSize: '18px', marginTop: 'var(--space-2)' }}>Welcome back</p>
           <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-            Your job search companion
+            Your cozy corner for finding what's next.
           </p>
         </div>
 
@@ -97,6 +96,9 @@ export default function Login() {
           <Link to="/signup" style={{ fontWeight: 700 }}>Sign up</Link>
         </p>
       </div>
+      {/* Corner vegetation framing */}
+      <img src="/ott/ott-corner-left.png" alt="" aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, width: 140, pointerEvents: 'none', zIndex: 0 }} />
+      <img src="/ott/ott-corner-right.png" alt="" aria-hidden="true" style={{ position: 'absolute', bottom: 0, right: 0, width: 140, pointerEvents: 'none', zIndex: 0 }} />
     </div>
   );
 }

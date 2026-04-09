@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import Ott from '../components/ott/Ott';
 import HoltWordmark from '../components/ui/HoltWordmark';
 import { useAuth } from '../hooks/useAuth.jsx';
 
@@ -44,8 +43,8 @@ export default function Signup() {
   };
 
   return (
-    <div className="auth-screen">
-      <div className="auth-screen__inner">
+    <div className="auth-screen" style={{ position: 'relative', overflow: 'hidden' }}>
+      <div className="auth-screen__inner" style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <img
             src="/ott/ott-splash.png"
@@ -116,6 +115,9 @@ export default function Signup() {
           <Link to="/login" style={{ fontWeight: 700 }}>Sign in</Link>
         </p>
       </div>
+      {/* Corner vegetation framing */}
+      <img src="/ott/ott-corner-left.png" alt="" aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, width: 140, pointerEvents: 'none', zIndex: 0 }} />
+      <img src="/ott/ott-corner-right.png" alt="" aria-hidden="true" style={{ position: 'absolute', bottom: 0, right: 0, width: 140, pointerEvents: 'none', zIndex: 0 }} />
     </div>
   );
 }
