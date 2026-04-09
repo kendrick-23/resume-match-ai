@@ -7,7 +7,8 @@ import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses, analyzeResume } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
-import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3, X, ExternalLink } from 'lucide-react';
+import { generateCoverLetter, downloadCoverLetterAsDocx } from '../services/coverLetterGenerator';
+import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3, X, ExternalLink, Mail } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
@@ -301,6 +302,13 @@ export default function Results() {
   const [resumeError, setResumeError] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Cover Letter Generator state
+  const [coverLetter, setCoverLetter] = useState(null);
+  const [generatingCoverLetter, setGeneratingCoverLetter] = useState(false);
+  const [coverLetterError, setCoverLetterError] = useState('');
+  const [coverLetterCopied, setCoverLetterCopied] = useState(false);
+  const [clLoadingPhase, setClLoadingPhase] = useState(0);
+
   // Sticky pill nav
   const [activePill, setActivePill] = useState('overview');
   // Pagination for previous analyses list
@@ -446,6 +454,9 @@ export default function Results() {
         if (latest.generated_resume_md) {
           setResumeMd(latest.generated_resume_md);
         }
+        if (latest.cover_letter) {
+          setCoverLetter(latest.cover_letter);
+        }
         setPastAnalyses(data.slice(1));
       }
     } catch {
@@ -520,6 +531,33 @@ export default function Results() {
       setResumeError(err.message);
     } finally {
       setGeneratingResume(false);
+    }
+  }
+
+  const CL_LOADING_MESSAGES = [
+    "Reading the job description carefully...",
+    "Finding your strongest angle...",
+    "Writing your opening line...",
+    "Polishing the language...",
+  ];
+
+  async function handleGenerateCoverLetter(regenerate = false) {
+    if (!result?.analysis_id || generatingCoverLetter) return;
+    if (!regenerate && coverLetter) return;
+    setGeneratingCoverLetter(true);
+    setCoverLetterError('');
+    setClLoadingPhase(0);
+    const interval = setInterval(() => {
+      setClLoadingPhase((p) => (p + 1) % CL_LOADING_MESSAGES.length);
+    }, 4000);
+    try {
+      const data = await generateCoverLetter(result.analysis_id, { regenerate });
+      setCoverLetter(data.cover_letter);
+    } catch (err) {
+      setCoverLetterError(err.message);
+    } finally {
+      clearInterval(interval);
+      setGeneratingCoverLetter(false);
     }
   }
 
@@ -1008,6 +1046,120 @@ export default function Results() {
             )}
           </section>
 
+          {/* === COVER LETTER SECTION === */}
+          {result.analysis_id && (
+            <div style={{ marginTop: 'var(--space-6)' }}>
+              <h3 className="results-section__title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <Mail size={18} style={{ color: 'var(--color-accent)' }} /> Cover Letter
+              </h3>
+
+              {/* Not yet generated */}
+              {!coverLetter && !generatingCoverLetter && (
+                <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
+                  <Ott state="encouraging" size={80} />
+                  <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+                    Get Your Tailored Cover Letter
+                  </p>
+                  <p style={{
+                    color: 'var(--color-text-muted)',
+                    fontSize: '13px',
+                    marginTop: 'var(--space-1)',
+                    marginBottom: 'var(--space-4)',
+                  }}>
+                    I'll write it using your resume and exactly what this role is looking for. Takes about 15 seconds.
+                  </p>
+                  {coverLetterError && (
+                    <p style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+                      {coverLetterError}
+                    </p>
+                  )}
+                  <Button onClick={() => handleGenerateCoverLetter()}>
+                    Generate Cover Letter
+                  </Button>
+                </Card>
+              )}
+
+              {/* Loading */}
+              {generatingCoverLetter && (
+                <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
+                  <div className="ott-thinking-anim">
+                    <Ott state="thinking" size={80} />
+                  </div>
+                  <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
+                    {CL_LOADING_MESSAGES[clLoadingPhase]}
+                  </p>
+                </Card>
+              )}
+
+              {/* Generated */}
+              {coverLetter && !generatingCoverLetter && (
+                <div>
+                  <Card style={{ marginBottom: 'var(--space-3)' }}>
+                    <div style={{
+                      lineHeight: 1.8,
+                      fontSize: '14px',
+                      color: 'var(--color-text)',
+                      whiteSpace: 'pre-wrap',
+                      paddingLeft: 'var(--space-4)',
+                      borderLeft: '3px solid var(--color-accent)',
+                    }}>
+                      {coverLetter}
+                    </div>
+                    <p style={{
+                      color: 'var(--color-text-muted)',
+                      fontSize: '12px',
+                      marginTop: 'var(--space-3)',
+                      textAlign: 'right',
+                    }}>
+                      {coverLetter.trim().split(/\s+/).length} words
+                    </p>
+                  </Card>
+
+                  <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                    <Button
+                      full
+                      onClick={() => downloadCoverLetterAsDocx(coverLetter, result.role_name, result.company_name, (msg) => toast.error(msg))}
+                    >
+                      <Download size={16} /> Download as Word Doc
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      full
+                      onClick={() => {
+                        navigator.clipboard.writeText(coverLetter);
+                        setCoverLetterCopied(true);
+                        setTimeout(() => setCoverLetterCopied(false), 2000);
+                      }}
+                    >
+                      <Copy size={16} /> {coverLetterCopied ? 'Copied!' : 'Copy'}
+                    </Button>
+                  </div>
+
+                  <div style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
+                    <button
+                      onClick={() => {
+                        setCoverLetter(null);
+                        handleGenerateCoverLetter(true);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--color-accent)',
+                        fontFamily: "'Nunito', sans-serif",
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        padding: '4px 8px',
+                      }}
+                    >
+                      Regenerate
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Bottom actions */}
           <div style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             {(result.company_name || result.role_name) && (
@@ -1062,6 +1214,8 @@ export default function Results() {
                       });
                       setResumeMd(a.generated_resume_md || null);
                       setResumeError('');
+                      setCoverLetter(a.cover_letter || null);
+                      setCoverLetterError('');
                       setActivePill('overview');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}

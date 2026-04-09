@@ -138,11 +138,13 @@ from app.routes.applications import router as applications_router
 from app.routes.jobs import router as jobs_router
 from app.routes.profile import router as profile_router
 from app.routes.generate_resume import router as generate_resume_router
+from app.routes.generate_cover_letter import router as generate_cover_letter_router
 from app.routes.resumes import router as resumes_router
 app.include_router(applications_router)
 app.include_router(jobs_router)
 app.include_router(profile_router)
 app.include_router(generate_resume_router)
+app.include_router(generate_cover_letter_router)
 app.include_router(resumes_router)
 
 
