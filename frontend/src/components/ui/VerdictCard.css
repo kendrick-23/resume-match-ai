@@ -57,6 +57,12 @@
   display: block;
 }
 
+/* Hero-sized Ott for Apply Now — sliding = momentum */
+.verdict-card--strong .verdict-card__ott {
+  width: 120px;
+  height: 120px;
+}
+
 .verdict-card__headline {
   font-family: 'Nunito', sans-serif;
   font-weight: 800;

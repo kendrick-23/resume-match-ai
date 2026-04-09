@@ -14,8 +14,8 @@ const TIER_META = {
   strong: {
     label: 'Apply Now',
     headline: "You're ready for this one.",
-    ottState: 'encouraging',
-    ottImage: '/ott/ott-encouraging.png',
+    ottState: 'sliding',
+    ottImage: '/ott/ott-sliding.png',
     ringColor: 'var(--color-success)',
   },
   stretch: {

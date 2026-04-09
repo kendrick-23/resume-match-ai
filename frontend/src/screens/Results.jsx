@@ -8,7 +8,7 @@ import Ott from '../components/ott/Ott';
 import { listAnalyses, analyzeResume } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
 import { generateCoverLetter, downloadCoverLetterAsDocx } from '../services/coverLetterGenerator';
-import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3, X, ExternalLink, Mail } from 'lucide-react';
+import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, X, ExternalLink, Mail } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
@@ -135,7 +135,12 @@ function ScoreBreakdown({ result }) {
         gap: 'var(--space-2)',
         marginBottom: 'var(--space-3)',
       }}>
-        <BarChart3 size={16} style={{ color: 'var(--color-accent)' }} />
+        <img
+          src="/ott/ott-holding-rock.png"
+          alt=""
+          aria-hidden="true"
+          style={{ width: 32, height: 32, objectFit: 'contain' }}
+        />
         <p style={{ fontWeight: 700, fontSize: '14px' }}>Score Breakdown</p>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -614,6 +619,7 @@ export default function Results() {
 
   return (
     <ScreenWrapper>
+      <div className="dashboard-world" style={{ position: 'relative', overflow: 'hidden' }}>
       <h2 style={{ marginBottom: 'var(--space-6)' }}>Results</h2>
 
       {!hasResult ? (
@@ -1323,6 +1329,21 @@ export default function Results() {
           )}
         </>
       )}
+
+      {/* Corner vegetation framing */}
+      <img
+        src="/ott/ott-corner-left.png"
+        alt=""
+        aria-hidden="true"
+        style={{ position: 'absolute', bottom: 0, left: 0, width: 140, pointerEvents: 'none', zIndex: 0 }}
+      />
+      <img
+        src="/ott/ott-corner-right.png"
+        alt=""
+        aria-hidden="true"
+        style={{ position: 'absolute', bottom: 0, right: 0, width: 140, pointerEvents: 'none', zIndex: 0 }}
+      />
+      </div>
     </ScreenWrapper>
   );
 }
