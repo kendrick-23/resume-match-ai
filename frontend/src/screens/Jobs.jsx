@@ -74,6 +74,37 @@ export function clearJobsSearch() {
   try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
 }
 
+// --- Full page-state persistence for tab-return ---
+const PAGE_STATE_KEY = 'holt_jobs_page_state';
+
+function loadPageState() {
+  try {
+    const raw = sessionStorage.getItem(PAGE_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp) return null;
+    if (Date.now() - parsed.timestamp > CACHE_MAX_AGE_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePageState(state) {
+  try {
+    sessionStorage.setItem(PAGE_STATE_KEY, JSON.stringify({
+      ...state,
+      timestamp: Date.now(),
+    }));
+  } catch {
+    // sessionStorage full or unavailable
+  }
+}
+
+function clearPageState() {
+  try { sessionStorage.removeItem(PAGE_STATE_KEY); } catch {}
+}
+
 function makeCacheKey(searchType, keywords = '', location = '') {
   const raw = `${searchType}:${keywords}:${location}`.toLowerCase().trim();
   // Simple hash — same as backend md5 but client-side
@@ -89,7 +120,9 @@ export default function Jobs() {
   const toast = useToast();
   const showAction = useActionToast();
 
-  const saved = loadSavedSearch();
+  // Try to restore full page state first; fall back to saved search inputs.
+  const [restoredPageState] = useState(() => loadPageState());
+  const saved = restoredPageState || loadSavedSearch();
   const [keyword, setKeyword] = useState(saved?.keyword || '');
   const [location, setLocation] = useState(saved?.location || '');
   const [remoteOnly, setRemoteOnly] = useState(saved?.remoteOnly || false);
@@ -99,25 +132,25 @@ export default function Jobs() {
   const [activeTab, setActiveTab] = useState(saved?.activeTab || 'private');
 
   // Federal (USAJobs) state
-  const [fedJobs, setFedJobs] = useState([]);
-  const [fedTotal, setFedTotal] = useState(0);
-  const [fedPage, setFedPage] = useState(1);
+  const [fedJobs, setFedJobs] = useState(restoredPageState?.fedJobs || []);
+  const [fedTotal, setFedTotal] = useState(restoredPageState?.fedTotal || 0);
+  const [fedPage, setFedPage] = useState(restoredPageState?.fedPage || 1);
   const [fedLoading, setFedLoading] = useState(false);
-  const [fedSearched, setFedSearched] = useState(false);
+  const [fedSearched, setFedSearched] = useState(restoredPageState?.fedSearched || false);
   const [fedError, setFedError] = useState('');
 
   // Private (Adzuna) state
-  const [pvtJobs, setPvtJobs] = useState([]);
-  const [pvtTotal, setPvtTotal] = useState(0);
-  const [pvtPage, setPvtPage] = useState(1);
+  const [pvtJobs, setPvtJobs] = useState(restoredPageState?.pvtJobs || []);
+  const [pvtTotal, setPvtTotal] = useState(restoredPageState?.pvtTotal || 0);
+  const [pvtPage, setPvtPage] = useState(restoredPageState?.pvtPage || 1);
   const [pvtLoading, setPvtLoading] = useState(false);
-  const [pvtSearched, setPvtSearched] = useState(false);
+  const [pvtSearched, setPvtSearched] = useState(restoredPageState?.pvtSearched || false);
 
   // Smart feed state
-  const [recommended, setRecommended] = useState([]);
-  const [recLoading, setRecLoading] = useState(true);
+  const [recommended, setRecommended] = useState(restoredPageState?.recommended || []);
+  const [recLoading, setRecLoading] = useState(!restoredPageState);
   const [recError, setRecError] = useState(false);
-  const [hasAnalysis, setHasAnalysis] = useState(false);
+  const [hasAnalysis, setHasAnalysis] = useState(restoredPageState?.hasAnalysis || false);
 
   // Holt score data
   const [analysisKeywords, setAnalysisKeywords] = useState([]);
@@ -128,16 +161,18 @@ export default function Jobs() {
   const [targetCompanies, setTargetCompanies] = useState([]);
 
   // Sort and filter
-  const [sortBy, setSortBy] = useState('score');
+  const [sortBy, setSortBy] = useState(restoredPageState?.sortBy || 'score');
   const [showFilters, setShowFilters] = useState(false);
-  const [filterPostedWithin, setFilterPostedWithin] = useState('any');
-  const [filterDegree, setFilterDegree] = useState('all');
-  const [showDealbreakers, setShowDealbreakers] = useState(true);
+  const [filterPostedWithin, setFilterPostedWithin] = useState(restoredPageState?.filterPostedWithin || 'any');
+  const [filterDegree, setFilterDegree] = useState(restoredPageState?.filterDegree || 'all');
+  const [showDealbreakers, setShowDealbreakers] = useState(restoredPageState?.showDealbreakers ?? true);
 
   // Cache state
   const [cachedAt, setCachedAt] = useState(null);
+  // Whether we restored full results from page state (show indicator, skip API)
+  const [restoredFromPageState, setRestoredFromPageState] = useState(!!restoredPageState);
 
-  const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword);
+  const [restoredSearch, setRestoredSearch] = useState(!!saved?.keyword && !restoredPageState);
   const [profileMatchLoading, setProfileMatchLoading] = useState(false);
   const [profileEmpty, setProfileEmpty] = useState(false);
   const [profileTimedOut, setProfileTimedOut] = useState(false);
@@ -148,9 +183,47 @@ export default function Jobs() {
   // change anything, and Jobs unmounts.
   const [cachedProfile, setCachedProfile] = useState(null);
 
+  // Ref snapshot of state values for the unmount save — avoids stale closures.
+  const pageStateRef = useRef(null);
   useEffect(() => {
+    pageStateRef.current = {
+      keyword, location, remoteOnly, activeTab, sortBy,
+      filterPostedWithin, filterDegree, showDealbreakers,
+      fedJobs, fedTotal, fedPage, fedSearched,
+      pvtJobs, pvtTotal, pvtPage, pvtSearched,
+      recommended, hasAnalysis,
+    };
+  });
+
+  // Restore scroll position from page state
+  useEffect(() => {
+    if (restoredPageState?.scrollY) {
+      setTimeout(() => window.scrollTo(0, restoredPageState.scrollY), 100);
+    }
+  }, []);
+
+  // Save scroll position + full state on unmount
+  useEffect(() => {
+    return () => {
+      const s = pageStateRef.current;
+      if (!s) return;
+      // Only save if there are actual results to restore
+      if (s.fedSearched || s.pvtSearched || s.recommended?.length > 0) {
+        savePageState({ ...s, scrollY: window.scrollY });
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // If we restored full page state (results + inputs), skip all API calls.
+    if (restoredPageState) {
+      // Still load recommendations from their own cache (already fast/free)
+      // but do NOT re-fetch search results — they're already in state.
+      loadRecommendations();
+      return () => { profileAbortRef.current?.abort(); };
+    }
     loadRecommendations();
-    // Auto-trigger search if restoring from sessionStorage
+    // Auto-trigger search if restoring from sessionStorage (inputs only, no results)
     if (saved?.keyword) {
       searchFederal(saved.keyword, saved.location || '', 1);
       searchPrivate(saved.keyword, saved.location || '');
@@ -334,6 +407,10 @@ export default function Jobs() {
     const kw = keyword.trim();
     const loc = location.trim();
 
+    // Clear page state so this runs fresh
+    clearPageState();
+    setRestoredFromPageState(false);
+
     // Persist search state
     saveSearch({ keyword: kw, location: loc, remoteOnly, activeTab });
 
@@ -374,6 +451,8 @@ export default function Jobs() {
   }
 
   async function handleProfileMatch(forceRefresh = false) {
+    clearPageState();
+    setRestoredFromPageState(false);
     setProfileMatchLoading(true);
     setProfileEmpty(false);
     setProfileTimedOut(false);
@@ -816,6 +895,41 @@ export default function Jobs() {
               clearRecommendationsCache();
               handleProfileMatch(true);
               loadRecommendations(true);
+            }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
+              fontWeight: 600, fontSize: '12px', padding: 0,
+            }}
+          >
+            ↻ Refresh
+          </button>
+        </div>
+      )}
+
+      {/* Page-state restored indicator — shown when results came from sessionStorage */}
+      {restoredFromPageState && !cachedAt && (fedSearched || pvtSearched) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--space-2)',
+          marginBottom: 'var(--space-3)',
+          fontSize: '12px',
+          color: 'var(--color-text-muted)',
+        }}>
+          <span>Showing your last search</span>
+          <button
+            onClick={() => {
+              clearPageState();
+              setRestoredFromPageState(false);
+              if (keyword.trim()) {
+                searchFederal(keyword.trim(), location.trim(), 1);
+                searchPrivate(keyword.trim(), location.trim());
+              } else {
+                handleProfileMatch(true);
+                loadRecommendations(true);
+              }
             }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
