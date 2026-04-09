@@ -11,7 +11,7 @@ import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles,
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
-import { TIER_BREAKPOINTS, scoreBadgeVariant, subScoreColor } from '../constants/scoring';
+import { TIER_BREAKPOINTS, scoreBadgeVariant, subScoreColor, scoreColor } from '../constants/scoring';
 import './Jobs.css';
 
 const STORAGE_KEY = 'holt_jobs_search';
@@ -1319,7 +1319,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
           </button>
           {showBreakdown && (
             <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-1) var(--space-4)',
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2) var(--space-4)',
               fontSize: '12px', marginBottom: 'var(--space-3)',
               padding: 'var(--space-2)', background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)',
             }}>
@@ -1330,12 +1330,20 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
                 ['Experience', breakdown.experience_match],
                 ['Location', breakdown.location_fit],
               ].map(([label, val]) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
-                  <span style={{
-                    fontWeight: 700,
-                    color: subScoreColor(val),
-                  }}>{val}</span>
+                <div key={label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+                    <span style={{ fontWeight: 700, color: scoreColor(val) }}>{val}</span>
+                  </div>
+                  <div style={{ height: '4px', background: 'var(--color-border)', borderRadius: '2px' }}>
+                    <div style={{
+                      height: '4px',
+                      width: `${Math.max(0, Math.min(100, val || 0))}%`,
+                      background: scoreColor(val),
+                      borderRadius: '2px',
+                      transition: 'width 300ms ease-out',
+                    }} />
+                  </div>
                 </div>
               ))}
               {breakdown.degree_flag !== 'none' && (
@@ -1423,6 +1431,8 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
 
 function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary }) {
   const [expanded, setExpanded] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const breakdown = job.holt_breakdown;
   const delta = 70 - score;
   const jobGaps = job.holt_breakdown?.job_specific_gaps || [];
 
@@ -1497,6 +1507,54 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
       }}>
         {coachLabel}
       </p>
+
+      {breakdown && (
+        <>
+          <button
+            onClick={() => setShowBreakdown(!showBreakdown)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
+              fontWeight: 600, fontSize: '12px', marginBottom: 'var(--space-2)',
+            }}
+          >
+            {showBreakdown ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            Score breakdown
+          </button>
+          {showBreakdown && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2) var(--space-4)',
+              fontSize: '12px', marginBottom: 'var(--space-3)',
+              padding: 'var(--space-2)', background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)',
+            }}>
+              {[
+                ['Skills', breakdown.skills_match],
+                ['Salary', breakdown.salary_alignment],
+                ['Schedule', breakdown.schedule_fit],
+                ['Experience', breakdown.experience_match],
+                ['Location', breakdown.location_fit],
+              ].map(([label, val]) => (
+                <div key={label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+                    <span style={{ fontWeight: 700, color: scoreColor(val) }}>{val}</span>
+                  </div>
+                  <div style={{ height: '4px', background: 'var(--color-border)', borderRadius: '2px' }}>
+                    <div style={{
+                      height: '4px',
+                      width: `${Math.max(0, Math.min(100, val || 0))}%`,
+                      background: scoreColor(val),
+                      borderRadius: '2px',
+                      transition: 'width 300ms ease-out',
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {jobGaps.length > 0 ? (
         <div style={{ marginBottom: 'var(--space-3)' }}>
