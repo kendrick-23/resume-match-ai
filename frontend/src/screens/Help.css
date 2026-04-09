@@ -1,0 +1,87 @@
+/* ============================================
+   Help — How Holt Works guide
+   ============================================ */
+
+.help-page {
+  padding-bottom: var(--space-6);
+}
+
+/* Hero */
+.help-page__hero {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
+
+.help-page__hero-img {
+  width: 160px;
+  height: auto;
+  display: block;
+  margin: 0 auto var(--space-5);
+}
+
+.help-page__title {
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: var(--space-3);
+}
+
+.help-page__subtitle {
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* Section cards */
+.help-page__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.help-page__card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.help-page__card-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-page__card-title {
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.help-page__card-body {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Footer */
+.help-page__footer {
+  text-align: center;
+}
+
+.help-page__footer-img {
+  width: 80px;
+  height: auto;
+  display: block;
+  margin: 0 auto var(--space-4);
+}
