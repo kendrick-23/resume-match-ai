@@ -525,6 +525,21 @@ export default function Jobs() {
     }
   }
 
+  function handleAnalyze(job) {
+    navigate('/results', {
+      state: {
+        analyzeRequest: {
+          job_description: job.description || job.snippet || '',
+          company_name: job.department || job.company || '',
+          role_name: job.title || '',
+          posting_url: job.apply_url || job.url || '',
+          prior_holt_score: job.holt_score,
+          prior_holt_breakdown: job.holt_breakdown,
+        },
+      },
+    });
+  }
+
   function formatSalary(min, max) {
     if (!min && !max) return null;
     const fmt = (n) => '$' + n.toLocaleString();
@@ -611,6 +626,7 @@ export default function Jobs() {
                 job={job}
                 savedIds={savedIds}
                 onSave={handleSave}
+                onAnalyze={handleAnalyze}
                 formatSalary={formatSalary}
                 recommended
                 holtScore={job.holt_score}
@@ -1006,6 +1022,7 @@ export default function Jobs() {
             job={job}
             savedIds={savedIds}
             onSave={handleSave}
+            onAnalyze={handleAnalyze}
             formatSalary={formatSalary}
             holtScore={job.holt_score}
           />
@@ -1069,7 +1086,7 @@ function SourceBadge({ source }) {
 }
 
 
-function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, holtScore }) {
+function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended = false, holtScore }) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const isDealbreaker = job.dealbreaker_triggered;
   const isTarget = job.is_target_company;
@@ -1242,13 +1259,22 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <Button
           variant="ghost"
-          style={{ padding: '8px 14px', minHeight: '36px', fontSize: '13px' }}
+          style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
           onClick={() => onSave(job)}
           disabled={savedIds.has(job.id)}
         >
           <Bookmark size={14} style={savedIds.has(job.id) ? { fill: 'var(--color-accent)' } : {}} />
           {savedIds.has(job.id) ? 'Saved' : 'Save'}
         </Button>
+        {onAnalyze && (
+          <Button
+            variant="ghost"
+            style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
+            onClick={() => onAnalyze(job)}
+          >
+            <Sparkles size={14} /> Analyze
+          </Button>
+        )}
         {(job.apply_url || job.url) && (
           <a
             href={job.apply_url || job.url}

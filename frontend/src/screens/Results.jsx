@@ -5,7 +5,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { listAnalyses } from '../services/api';
+import { listAnalyses, analyzeResume } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
 import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3, X } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
@@ -291,7 +291,10 @@ export default function Results() {
   const [showStretchBanner, setShowStretchBanner] = useState(false);
 
   useEffect(() => {
-    if (!location.state?.result) {
+    if (location.state?.analyzeRequest) {
+      // Came from Jobs "Analyze" button — run analysis with prior_holt_score.
+      runJobAnalysis(location.state.analyzeRequest);
+    } else if (!location.state?.result) {
       loadAnalyses();
     } else {
       // Fresh analysis just landed from Upload — celebrate it.
@@ -435,6 +438,33 @@ export default function Results() {
       setPastAnalyses(data.length > 1 ? data.slice(1) : []);
     } catch {
       // Silently fail
+    }
+  }
+
+  async function runJobAnalysis(req) {
+    setLoading(true);
+    const timeout = setTimeout(() => setLoading(false), 45000);
+    try {
+      const data = await analyzeResume(
+        '',                // resume text — use default vault
+        req.job_description,
+        req.company_name,
+        req.role_name,
+        '',                // linkedin text
+        null,              // resume_id — use default vault
+        { priorHoltScore: req.prior_holt_score, postingUrl: req.posting_url },
+      );
+      setResult({
+        ...data,
+        posting_url: req.posting_url,
+      });
+      showAction('analysis-complete');
+      loadPastAnalyses();
+    } catch (err) {
+      toast.error(err.message || 'Analysis failed — try again.');
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
     }
   }
 

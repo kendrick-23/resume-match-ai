@@ -76,19 +76,22 @@ export async function uploadResume(file) {
  * backend will auto-save into the vault), OR a resume_id from the vault, OR
  * neither (backend falls back to the default vault entry).
  */
-export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '', linkedinText = '', resumeId = null) {
+export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '', linkedinText = '', resumeId = null, { priorHoltScore, postingUrl } = {}) {
   const headers = await authHeaders();
+  const payload = {
+    resume: resumeText || '',
+    resume_id: resumeId || undefined,
+    job_description: jobDescription,
+    company_name: companyName,
+    role_name: roleName,
+    linkedin_text: linkedinText,
+  };
+  if (priorHoltScore != null) payload.prior_holt_score = priorHoltScore;
+  if (postingUrl) payload.posting_url = postingUrl;
   const res = await fetchWithRetry(`${API_URL}/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify({
-      resume: resumeText || '',
-      resume_id: resumeId || undefined,
-      job_description: jobDescription,
-      company_name: companyName,
-      role_name: roleName,
-      linkedin_text: linkedinText,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {

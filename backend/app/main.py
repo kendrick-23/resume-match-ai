@@ -17,6 +17,7 @@ import jwt as pyjwt
 from PyPDF2 import PdfReader
 from docx import Document
 
+from app.constants.scoring import derive_tier
 from app.services.file_extraction import extract_resume_text_from_upload
 from app.services.resume_vault import (
     fetch_resume_content,
@@ -154,6 +155,10 @@ class AnalyzeRequest(BaseModel):
     company_name: str = Field(default="", max_length=200)
     role_name: str = Field(default="", max_length=200)
     linkedin_text: str = Field(default="", max_length=10000)
+    # When prior_holt_score is provided (from Jobs pipeline), it overrides the
+    # Opus-generated match_score to ensure scoring consistency across screens.
+    prior_holt_score: Optional[int] = Field(default=None, ge=0, le=100)
+    posting_url: Optional[str] = Field(default=None, max_length=2000)
 
 
 class InterviewPrepRequest(BaseModel):
@@ -791,6 +796,15 @@ async def analyze(
     if body.linkedin_text.strip():
         linkedin_section = f"\n\nLINKEDIN (supplementary):\n{body.linkedin_text.strip()}"
 
+    prior_score_note = ""
+    if body.prior_holt_score is not None:
+        prior_score_note = (
+            f"\n\nIMPORTANT: The overall match_score for this job has already been determined "
+            f"by the Holt scoring pipeline as {body.prior_holt_score}%. Do NOT override this — "
+            f"set match_score to {body.prior_holt_score}. Your job is the qualitative analysis: "
+            f"strengths, gaps, recommendations, summary, and sub_scores."
+        )
+
     user_message = f"""CANDIDATE PROFILE:
 {profile_section}
 
@@ -799,7 +813,7 @@ RESUME:
 
 JOB DESCRIPTION:
 {body.job_description}
-
+{prior_score_note}
 Analyze this match. Apply the truthfulness rules strictly. Use the gap effort tags honestly. If salary is not disclosed in the JD, set salary_alignment=null and salary_disclosed=false. Submit the result via the submit_analysis tool."""
 
     try:
@@ -828,6 +842,12 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
 
         score = int(result_data.get("match_score") or 0)
         score_tier = result_data.get("score_tier") or ""
+
+        # When prior_holt_score is provided (from Jobs pipeline), override Opus's
+        # score with the deterministic+semantic score for cross-screen consistency.
+        if body.prior_holt_score is not None:
+            score = body.prior_holt_score
+            score_tier = derive_tier(score)
 
         sub_scores = result_data.get("sub_scores") or {}
         skills_match = int(sub_scores.get("skills_match") or 0)
@@ -869,9 +889,10 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             "salary_disclosed": salary_disclosed,
             "translation_opportunities": json.dumps(translation_opportunities),
             "resume_id": resume_id,
+            "posting_url": body.posting_url,
         }
         # Newer columns may not exist on older Supabase schemas. Drop them progressively.
-        OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities", "resume_id")
+        OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities", "resume_id", "posting_url")
         OPTIONAL_SUB_SCORE_COLS = ("skills_match", "seniority_fit", "salary_alignment", "growth_potential")
         try:
             insert_res = sb.table("analyses").insert(insert_data).execute()
@@ -935,6 +956,7 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             "salary_disclosed": salary_disclosed,
             "growth_potential": growth_potential,
             "skills_extracted": extracted_skills,
+            "posting_url": body.posting_url,
         }}
     except HTTPException:
         raise
