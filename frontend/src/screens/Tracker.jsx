@@ -8,6 +8,7 @@ import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
 import { Plus, X, Trash2, ExternalLink, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { scoreBadgeVariant } from '../constants/scoring';
+import HintBubble from '../components/ui/HintBubble';
 import {
   listApplications,
   createApplication,
@@ -225,6 +226,15 @@ export default function Tracker() {
           </button>
         ))}
       </div>
+
+      {/* JIT hint — first tracker entry */}
+      {applications.length >= 1 && (
+        <HintBubble
+          storageKey="holt_hint_tracker"
+          ottImage="/ott/ott-encouraging.png"
+          text="Update your status as things move — hitting Interview unlocks a special moment."
+        />
+      )}
 
       {error && (
         <Card style={{

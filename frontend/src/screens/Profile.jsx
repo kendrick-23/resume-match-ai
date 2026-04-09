@@ -15,6 +15,7 @@ import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
 import { scoreBadgeVariant } from '../constants/scoring';
 import { clearRecommendationsCache } from '../utils/cache';
+import HintBubble from '../components/ui/HintBubble';
 import './Profile.css';
 
 export default function Profile() {
@@ -404,6 +405,13 @@ export default function Profile() {
 
       {/* My Resumes — vault management */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resumes</h3>
+      {vaultResumes.length >= 2 && (
+        <HintBubble
+          storageKey="holt_hint_resume_vault"
+          ottImage="/ott/ott-waving.png"
+          text="Your default resume is used automatically when you analyze a job. Tap 'Set as default' to switch anytime."
+        />
+      )}
       <Card style={{ marginBottom: 'var(--space-5)' }}>
         {vaultResumes.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 'var(--space-3) 0' }}>

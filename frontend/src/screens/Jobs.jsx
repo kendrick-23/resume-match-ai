@@ -9,6 +9,7 @@ import Ott from '../components/ott/Ott';
 import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
+import HintBubble from '../components/ui/HintBubble';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import { TIER_BREAKPOINTS, scoreBadgeVariant, subScoreColor, scoreColor } from '../constants/scoring';
@@ -870,6 +871,13 @@ export default function Jobs() {
           }}>
             Federal = government jobs &middot; Private = Indeed, Glassdoor, ZipRecruiter &amp; more
           </p>
+
+          {/* JIT hint — first search */}
+          <HintBubble
+            storageKey="holt_hint_jobs_search"
+            ottImage="/ott/ott-coaching.png"
+            text="Tap Analyze on any job to see exactly how your resume stacks up — no copy-pasting needed."
+          />
         </div>
       )}
 
