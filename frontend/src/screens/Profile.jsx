@@ -312,9 +312,28 @@ export default function Profile() {
         <h2>Profile</h2>
       </div>
 
-      {/* Ott + user email */}
+      {/* User avatar + email */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-        <Ott state="idle" size={56} />
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: 'rgba(43,181,192,0.15)',
+          border: '2px solid var(--color-accent)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto',
+        }}>
+          <span style={{
+            fontFamily: "'Nunito', sans-serif",
+            fontWeight: 700,
+            fontSize: '22px',
+            color: 'var(--color-accent)',
+          }}>
+            {(fullName || user?.email || 'J')[0].toUpperCase()}
+          </span>
+        </div>
         <p style={{ fontWeight: 700, marginTop: 'var(--space-2)' }}>
           {fullName || user?.email || 'Job Seeker'}
         </p>

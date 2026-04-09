@@ -168,10 +168,11 @@ export default function Dashboard() {
         marginBottom: 'var(--space-4)',
         position: 'relative',
         overflow: 'hidden',
-        backgroundImage: `
-          radial-gradient(circle at 50% 50%, rgba(43,181,192,0.06) 0%, transparent 60%),
-          radial-gradient(circle at 30% 40%, rgba(43,181,192,0.04) 0%, transparent 50%),
-          radial-gradient(circle at 70% 60%, rgba(43,181,192,0.04) 0%, transparent 55%)
+        background: `
+          radial-gradient(circle at 30% 50%, rgba(43,181,192,0.12) 0%, transparent 50%),
+          radial-gradient(circle at 70% 30%, rgba(43,181,192,0.10) 0%, transparent 40%),
+          radial-gradient(circle at 50% 80%, rgba(43,181,192,0.08) 0%, transparent 35%),
+          white
         `,
       }}>
         {/* Watermark streak icon — ambient texture, top-right */}

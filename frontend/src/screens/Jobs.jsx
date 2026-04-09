@@ -895,12 +895,6 @@ export default function Jobs() {
             Federal = government jobs &middot; Private = Indeed, Glassdoor, ZipRecruiter &amp; more
           </p>
 
-          {/* JIT hint — first search (inline popover below tabs) */}
-          <HintBubble
-            storageKey="holt_hint_jobs_search"
-            ottImage="/ott/ott-coaching.png"
-            text="Tap Analyze on any job to see exactly how your resume stacks up — no copy-pasting needed."
-          />
         </div>
       )}
 
@@ -971,6 +965,15 @@ export default function Jobs() {
             ↻ Refresh
           </button>
         </div>
+      )}
+
+      {/* JIT hint — only after results are fully loaded */}
+      {!fedLoading && !pvtLoading && (fedJobs.length > 0 || pvtJobs.length > 0) && (
+        <HintBubble
+          storageKey="holt_hint_jobs_search"
+          ottImage="/ott/ott-coaching.png"
+          text="Tap Analyze on any job to see exactly how your resume stacks up — no copy-pasting needed."
+        />
       )}
 
       {/* Sort + Filter controls */}
