@@ -16,6 +16,8 @@ import jwt as pyjwt
 from PyPDF2 import PdfReader
 from docx import Document
 
+from app.services.file_extraction import extract_resume_text_from_upload
+
 load_dotenv()
 
 
@@ -129,10 +131,12 @@ from app.routes.applications import router as applications_router
 from app.routes.jobs import router as jobs_router
 from app.routes.profile import router as profile_router
 from app.routes.generate_resume import router as generate_resume_router
+from app.routes.resumes import router as resumes_router
 app.include_router(applications_router)
 app.include_router(jobs_router)
 app.include_router(profile_router)
 app.include_router(generate_resume_router)
+app.include_router(resumes_router)
 
 
 class AnalyzeRequest(BaseModel):
@@ -324,22 +328,6 @@ def root():
     return {"status": "Holt backend running"}
 
 
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
-ALLOWED_TYPES = {
-    "application/pdf": ".pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
-}
-
-# Magic bytes (file signatures) for each declared MIME type. Validating these
-# before parsing prevents a spoofed Content-Type from feeding arbitrary bytes
-# to PdfReader / python-docx. PDFs start with "%PDF" (25 50 44 46). DOCX is
-# a ZIP container, so it starts with "PK\x03\x04" (50 4B 03 04).
-FILE_SIGNATURES = {
-    "application/pdf": b"%PDF",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": b"PK\x03\x04",
-}
-
-
 @app.post("/upload-resume")
 @limiter.limit("20/hour")
 async def upload_resume(
@@ -347,48 +335,8 @@ async def upload_resume(
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
 ):
-    if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF and Word (.docx) files are accepted.",
-        )
-
     contents = await file.read()
-
-    if len(contents) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail="File too large. Maximum size is 5 MB.",
-        )
-
-    # Magic-byte validation — runs BEFORE any parser touches the bytes.
-    expected_sig = FILE_SIGNATURES[file.content_type]
-    if not contents[: len(expected_sig)] == expected_sig:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file format. The file does not match its declared type.",
-        )
-
-    try:
-        if file.content_type == "application/pdf":
-            reader = PdfReader(io.BytesIO(contents))
-            text = "\n".join(page.extract_text() or "" for page in reader.pages)
-        else:
-            doc = Document(io.BytesIO(contents))
-            text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
-    except Exception:
-        raise HTTPException(
-            status_code=422,
-            detail="Could not extract text from this file. It may be corrupted or image-based.",
-        )
-
-    text = text.strip()
-    if not text:
-        raise HTTPException(
-            status_code=422,
-            detail="No readable text found. The file may be a scanned image — try pasting your resume text instead.",
-        )
-
+    text = extract_resume_text_from_upload(file.content_type, contents)
     return {"text": text, "filename": file.filename}
 
 
