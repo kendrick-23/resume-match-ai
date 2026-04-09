@@ -227,7 +227,7 @@ export default function Tracker() {
         ))}
       </div>
 
-      {/* JIT hint — first tracker entry */}
+      {/* JIT hint — first tracker entry (inline popover below tabs) */}
       {applications.length >= 1 && (
         <HintBubble
           storageKey="holt_hint_tracker"

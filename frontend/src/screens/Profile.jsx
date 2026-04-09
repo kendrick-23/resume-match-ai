@@ -404,13 +404,16 @@ export default function Profile() {
       </Card>
 
       {/* My Resumes — vault management */}
-      <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resumes</h3>
-      {vaultResumes.length >= 2 && (
+      {vaultResumes.length >= 2 ? (
         <HintBubble
           storageKey="holt_hint_resume_vault"
           ottImage="/ott/ott-waving.png"
           text="Your default resume is used automatically when you analyze a job. Tap 'Set as default' to switch anytime."
-        />
+        >
+          <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resumes</h3>
+        </HintBubble>
+      ) : (
+        <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resumes</h3>
       )}
       <Card style={{ marginBottom: 'var(--space-5)' }}>
         {vaultResumes.length === 0 ? (

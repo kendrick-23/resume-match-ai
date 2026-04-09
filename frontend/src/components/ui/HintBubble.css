@@ -1,0 +1,130 @@
+/* Anchor wrapper — positioned relative so hotspot and popover can anchor */
+.hint-anchor {
+  position: relative;
+  display: inline-block;
+}
+
+/* ===== HOTSPOT DOT ===== */
+.hint-hotspot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 10;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px; /* 44px effective tap target */
+  margin: -8px;
+}
+
+.hint-hotspot__dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent, #2BB5C0);
+  animation: hotspot-pulse 2s ease-out infinite;
+}
+
+@keyframes hotspot-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(43, 181, 192, 0.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(43, 181, 192, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(43, 181, 192, 0); }
+}
+
+/* ===== POPOVER ===== */
+.hint-popover {
+  position: relative;
+  z-index: 100;
+  max-width: 260px;
+  margin-bottom: var(--space-3, 12px);
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
+  transition: opacity 80ms ease-out, transform 80ms ease-out;
+}
+
+.hint-popover--visible {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+}
+
+.hint-popover--anchored {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+}
+
+/* Upward-pointing tail triangle */
+.hint-popover__tail {
+  position: absolute;
+  top: -6px;
+  right: 16px;
+  width: 12px;
+  height: 12px;
+  background: #FFFFFF;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+  transform: rotate(45deg);
+  border-radius: 2px 0 0 0;
+}
+
+.hint-popover__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.hint-popover__ott {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.hint-popover__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.hint-popover__text {
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text, #2D2A26);
+  margin: 0 0 var(--space-2, 8px);
+}
+
+.hint-popover__link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-accent-dark, #1E8F99);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 0;
+}
+
+.hint-popover__dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-accent, #2BB5C0);
+  padding: 8px;
+  margin: -8px -8px -8px 0;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

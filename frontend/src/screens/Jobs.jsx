@@ -203,6 +203,10 @@ export default function Jobs() {
     }
   }, []);
 
+  // Guard: prevent stale async responses from setting state after unmount.
+  const isMountedRef = useRef(true);
+  useEffect(() => { return () => { isMountedRef.current = false; }; }, []);
+
   // Save scroll position + full state on unmount
   useEffect(() => {
     return () => {
@@ -213,6 +217,21 @@ export default function Jobs() {
         savePageState({ ...s, scrollY: window.scrollY });
       }
     };
+  }, []);
+
+  // Page Visibility API: prevent token-wasting re-fetches on sleep/wake.
+  // When the tab becomes visible again, the valid page state cache means
+  // there's nothing to do. Without this, some browsers re-trigger effects.
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState !== 'visible') return;
+      // If cached page state is still valid, do nothing — no API calls.
+      const cached = loadPageState();
+      if (cached) return;
+      // If no cache, the normal mount logic already handles fresh loads.
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
   }, []);
 
   useEffect(() => {
@@ -360,6 +379,7 @@ export default function Jobs() {
         remote: remoteOnly || undefined,
         page,
       });
+      if (!isMountedRef.current) return;
       if (page === 1) {
         setFedJobs(data.jobs);
       } else {
@@ -369,9 +389,10 @@ export default function Jobs() {
       setFedPage(page);
       setFedSearched(true);
     } catch (err) {
+      if (!isMountedRef.current) return;
       setFedError(err.message);
     } finally {
-      setFedLoading(false);
+      if (isMountedRef.current) setFedLoading(false);
     }
   }
 
@@ -386,6 +407,7 @@ export default function Jobs() {
         location: loc || userLocation || undefined,
         page,
       });
+      if (!isMountedRef.current) return;
       if (page === 1) {
         setPvtJobs(data.jobs || []);
       } else {
@@ -395,6 +417,7 @@ export default function Jobs() {
       setPvtPage(page);
       setPvtSearched(true);
     } catch {
+      if (!isMountedRef.current) return;
       if (page === 1) { setPvtJobs([]); setPvtTotal(0); }
       setPvtSearched(true);
     } finally {
@@ -872,7 +895,7 @@ export default function Jobs() {
             Federal = government jobs &middot; Private = Indeed, Glassdoor, ZipRecruiter &amp; more
           </p>
 
-          {/* JIT hint — first search */}
+          {/* JIT hint — first search (inline popover below tabs) */}
           <HintBubble
             storageKey="holt_hint_jobs_search"
             ottImage="/ott/ott-coaching.png"

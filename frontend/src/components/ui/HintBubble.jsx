@@ -1,91 +1,80 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
+import './HintBubble.css';
 
 /**
- * One-shot contextual hint bubble with Ott image, dismissable via X.
- * Gated on localStorage — once dismissed, never returns.
+ * Two-part hotspot + popover hint system.
  *
- * @param {string} storageKey — localStorage key to gate on
- * @param {string} ottImage — path to Ott PNG (e.g. '/ott/ott-coaching.png')
- * @param {string} text — hint body text
+ * Renders as a wrapper around its children. When the hint hasn't been seen
+ * (per localStorage key), a pulsing teal hotspot dot appears in the
+ * top-right of the children. Tapping the dot opens a speech-bubble
+ * popover below. Dismissing sets the localStorage key permanently.
+ *
+ * If no children are provided, renders inline (popover only, auto-open).
  */
-export default function HintBubble({ storageKey, ottImage, text }) {
+export default function HintBubble({ storageKey, ottImage, text, children }) {
   const navigate = useNavigate();
-  const [visible, setVisible] = useState(() => {
-    try {
-      return localStorage.getItem(storageKey) !== 'true';
-    } catch {
-      return false;
-    }
+  const [seen] = useState(() => {
+    try { return localStorage.getItem(storageKey) === 'true'; } catch { return true; }
   });
+  const [popoverOpen, setPopoverOpen] = useState(!children);
+  const [dismissed, setDismissed] = useState(false);
 
-  if (!visible) return null;
-
-  function dismiss() {
-    setVisible(false);
-    try {
-      localStorage.setItem(storageKey, 'true');
-    } catch {
-      // ignore
-    }
+  if (seen || dismissed) {
+    return children || null;
   }
 
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: 'var(--space-3)',
-      padding: 'var(--space-3) var(--space-4)',
-      background: 'var(--color-surface-raised)',
-      borderLeft: '3px solid var(--color-accent)',
-      borderRadius: 'var(--radius-md)',
-      boxShadow: 'var(--shadow-md)',
-      maxWidth: '320px',
-      marginBottom: 'var(--space-3)',
-      position: 'relative',
-    }}>
-      <img src={ottImage} alt="Ott" style={{ width: '32px', flexShrink: 0, marginTop: '2px' }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{
-          fontSize: '13px',
-          lineHeight: 1.5,
-          color: 'var(--color-text)',
-          fontFamily: "'Nunito', sans-serif",
-          marginBottom: 'var(--space-2)',
-        }}>
-          {text}
-        </p>
-        <button
-          onClick={() => navigate('/help')}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--color-accent)',
-            fontFamily: "'Nunito', sans-serif",
-            fontWeight: 600,
-            fontSize: '12px',
-            padding: 0,
-          }}
-        >
-          Learn more &rarr;
-        </button>
+  function dismiss() {
+    setDismissed(true);
+    try { localStorage.setItem(storageKey, 'true'); } catch {}
+  }
+
+  // Inline mode (no children): render popover directly
+  if (!children) {
+    return (
+      <div className={`hint-popover ${popoverOpen ? 'hint-popover--visible' : ''}`}>
+        <div className="hint-popover__tail" />
+        <div className="hint-popover__body">
+          <img src={ottImage} alt="Ott" className="hint-popover__ott" />
+          <div className="hint-popover__content">
+            <p className="hint-popover__text">{text}</p>
+            <button className="hint-popover__link" onClick={() => navigate('/help')}>
+              Learn more &rarr;
+            </button>
+          </div>
+          <button className="hint-popover__dismiss" onClick={dismiss} aria-label="Dismiss hint">
+            <X size={14} />
+          </button>
+        </div>
       </div>
-      <button
-        onClick={dismiss}
-        aria-label="Dismiss hint"
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--color-text-muted)',
-          padding: '2px',
-          flexShrink: 0,
-        }}
-      >
-        <X size={14} />
+    );
+  }
+
+  // Wrapper mode: hotspot dot on children, popover below on tap
+  return (
+    <div className="hint-anchor">
+      {children}
+      <button className="hint-hotspot" onClick={() => setPopoverOpen(true)} aria-label="Show tip">
+        <span className="hint-hotspot__dot" />
       </button>
+      {popoverOpen && (
+        <div className="hint-popover hint-popover--visible hint-popover--anchored">
+          <div className="hint-popover__tail" />
+          <div className="hint-popover__body">
+            <img src={ottImage} alt="Ott" className="hint-popover__ott" />
+            <div className="hint-popover__content">
+              <p className="hint-popover__text">{text}</p>
+              <button className="hint-popover__link" onClick={() => navigate('/help')}>
+                Learn more &rarr;
+              </button>
+            </div>
+            <button className="hint-popover__dismiss" onClick={dismiss} aria-label="Dismiss hint">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

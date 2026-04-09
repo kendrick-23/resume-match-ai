@@ -14,6 +14,7 @@ import Profile from './screens/Profile';
 import Login from './screens/Login';
 import Signup from './screens/Signup';
 import Onboarding from './screens/Onboarding';
+import Help from './screens/Help';
 
 const TAB_ROUTES = {
   dashboard: '/',
@@ -88,6 +89,7 @@ function AppRoutes() {
         <Route path="/tracker" element={<ProtectedRoute><Tracker /></ProtectedRoute>} />
         <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showNav && <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />}
