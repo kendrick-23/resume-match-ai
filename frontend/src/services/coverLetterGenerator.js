@@ -95,8 +95,16 @@ export async function downloadCoverLetterAsDocx(text, roleName = '', companyName
       spacing: { after: 400 },
     }));
 
+    // Strip any existing sign-off from the body text to avoid duplication.
+    // Claude often ends with "Sincerely,\n[Name]" — we add our own formatted version.
+    const signOffRe = /\n*(Sincerely|Best regards|Warm regards|Regards|Respectfully),?\s*\n+([\s\S]*?)$/i;
+    const signOffMatch = text.match(signOffRe);
+    const bodyText = text.replace(signOffRe, '').trim();
+    // Extract the name from whatever follows the closing salutation
+    const sigName = signOffMatch?.[2]?.trim().match(/[A-Z][a-z]+ [A-Z][a-z]+/)?.[0] || '';
+
     // Body paragraphs
-    const paragraphs = text.split(/\n\n+/).filter((p) => p.trim());
+    const paragraphs = bodyText.split(/\n\n+/).filter((p) => p.trim());
     for (const para of paragraphs) {
       children.push(new Paragraph({
         children: [
@@ -110,7 +118,7 @@ export async function downloadCoverLetterAsDocx(text, roleName = '', companyName
       }));
     }
 
-    // Signature
+    // Signature — single canonical sign-off
     children.push(new Paragraph({ spacing: { before: 200 } }));
     children.push(new Paragraph({
       children: [
@@ -123,9 +131,6 @@ export async function downloadCoverLetterAsDocx(text, roleName = '', companyName
       spacing: { after: 100 },
     }));
 
-    // Try to extract name from the cover letter text (first "I" reference or sign-off)
-    const nameMatch = text.match(/^(.+),?\s*$/m);
-    const sigName = nameMatch?.[1]?.match(/[A-Z][a-z]+ [A-Z][a-z]+/)?.[0] || '';
     if (sigName) {
       children.push(new Paragraph({
         children: [

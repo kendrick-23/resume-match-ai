@@ -304,6 +304,7 @@ export default function Results() {
 
   // Cover Letter Generator state
   const [coverLetter, setCoverLetter] = useState(null);
+  const [editedCoverLetter, setEditedCoverLetter] = useState('');
   const [generatingCoverLetter, setGeneratingCoverLetter] = useState(false);
   const [coverLetterError, setCoverLetterError] = useState('');
   const [coverLetterCopied, setCoverLetterCopied] = useState(false);
@@ -456,6 +457,7 @@ export default function Results() {
         }
         if (latest.cover_letter) {
           setCoverLetter(latest.cover_letter);
+          setEditedCoverLetter(latest.cover_letter);
         }
         setPastAnalyses(data.slice(1));
       }
@@ -553,6 +555,7 @@ export default function Results() {
     try {
       const data = await generateCoverLetter(result.analysis_id, { regenerate });
       setCoverLetter(data.cover_letter);
+      setEditedCoverLetter(data.cover_letter);
     } catch (err) {
       setCoverLetterError(err.message);
     } finally {
@@ -1094,31 +1097,62 @@ export default function Results() {
               {/* Generated */}
               {coverLetter && !generatingCoverLetter && (
                 <div>
-                  <Card style={{ marginBottom: 'var(--space-3)' }}>
-                    <div style={{
-                      lineHeight: 1.8,
-                      fontSize: '14px',
-                      color: 'var(--color-text)',
-                      whiteSpace: 'pre-wrap',
-                      paddingLeft: 'var(--space-4)',
-                      borderLeft: '3px solid var(--color-accent)',
+                  {/* Ott personalization nudge */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-3)',
+                    marginBottom: 'var(--space-3)',
+                  }}>
+                    <img src="/ott/ott-coaching.png" alt="Ott coaching" style={{ width: '40px', flexShrink: 0 }} />
+                    <p style={{
+                      fontSize: '12px',
+                      color: 'var(--color-accent-dark)',
+                      fontWeight: 600,
+                      lineHeight: 1.4,
                     }}>
-                      {coverLetter}
-                    </div>
+                      Add one specific detail only you would know — a name, a number, a moment. It makes this yours.
+                    </p>
+                  </div>
+
+                  <Card style={{ marginBottom: 'var(--space-3)' }}>
+                    <textarea
+                      value={editedCoverLetter}
+                      onChange={(e) => setEditedCoverLetter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        minHeight: '320px',
+                        lineHeight: 1.8,
+                        fontSize: '14px',
+                        color: 'var(--color-text)',
+                        fontFamily: "'Nunito', sans-serif",
+                        background: 'var(--color-bg)',
+                        border: 'none',
+                        borderLeft: '3px solid var(--color-accent)',
+                        paddingLeft: 'var(--space-4)',
+                        paddingTop: 'var(--space-3)',
+                        paddingBottom: 'var(--space-3)',
+                        paddingRight: 'var(--space-2)',
+                        resize: 'vertical',
+                        outline: 'none',
+                        borderRadius: 0,
+                        boxSizing: 'border-box',
+                      }}
+                    />
                     <p style={{
                       color: 'var(--color-text-muted)',
                       fontSize: '12px',
-                      marginTop: 'var(--space-3)',
+                      marginTop: 'var(--space-2)',
                       textAlign: 'right',
                     }}>
-                      {coverLetter.trim().split(/\s+/).length} words
+                      {editedCoverLetter.trim().split(/\s+/).filter(Boolean).length} words
                     </p>
                   </Card>
 
                   <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                     <Button
                       full
-                      onClick={() => downloadCoverLetterAsDocx(coverLetter, result.role_name, result.company_name, (msg) => toast.error(msg))}
+                      onClick={() => downloadCoverLetterAsDocx(editedCoverLetter, result.role_name, result.company_name, (msg) => toast.error(msg))}
                     >
                       <Download size={16} /> Download as Word Doc
                     </Button>
@@ -1126,7 +1160,7 @@ export default function Results() {
                       variant="ghost"
                       full
                       onClick={() => {
-                        navigator.clipboard.writeText(coverLetter);
+                        navigator.clipboard.writeText(editedCoverLetter);
                         setCoverLetterCopied(true);
                         setTimeout(() => setCoverLetterCopied(false), 2000);
                       }}
@@ -1139,6 +1173,7 @@ export default function Results() {
                     <button
                       onClick={() => {
                         setCoverLetter(null);
+                        setEditedCoverLetter('');
                         handleGenerateCoverLetter(true);
                       }}
                       style={{
@@ -1215,6 +1250,7 @@ export default function Results() {
                       setResumeMd(a.generated_resume_md || null);
                       setResumeError('');
                       setCoverLetter(a.cover_letter || null);
+                      setEditedCoverLetter(a.cover_letter || '');
                       setCoverLetterError('');
                       setActivePill('overview');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
