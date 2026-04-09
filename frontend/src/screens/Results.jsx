@@ -7,7 +7,7 @@ import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
-import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3, X } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
@@ -292,6 +292,12 @@ export default function Results() {
   const [activePill, setActivePill] = useState('overview');
   const sectionRefs = useRef({});
 
+  // Just-in-time guided hint — first-time only, gated on localStorage.
+  // Shows 400ms after mount so it lands AFTER the VerdictCard entrance animation.
+  const [showHint, setShowHint] = useState(false);
+  // Per-analysis stretch upgrade banner — dismissable, never returns for the same analysis.
+  const [showStretchBanner, setShowStretchBanner] = useState(false);
+
   useEffect(() => {
     if (!location.state?.result) {
       loadAnalyses();
@@ -333,6 +339,69 @@ export default function Results() {
       observer.disconnect();
     };
   }, [result]);
+
+  // Just-in-time guided hint + stretch banner — both gated on localStorage and
+  // tied to the current result. Re-run whenever the user switches analyses.
+  useEffect(() => {
+    if (!result || typeof result.score !== 'number') {
+      setShowHint(false);
+      setShowStretchBanner(false);
+      return;
+    }
+
+    // Hint: first time only, ever. 400ms delay so it lands after VerdictCard animates.
+    let hintTimer;
+    try {
+      const seen = localStorage.getItem('holt_seen_verdict_explanation') === 'true';
+      if (!seen) {
+        hintTimer = setTimeout(() => setShowHint(true), 400);
+      } else {
+        setShowHint(false);
+      }
+    } catch {
+      // localStorage unavailable (private mode etc.) — just don't show the hint
+      setShowHint(false);
+    }
+
+    // Stretch banner: only when this is a stretch-tier match AND no resume
+    // has been generated yet AND it hasn't been dismissed for THIS analysis.
+    const tier = result.score_tier ||
+      (result.score >= 70 ? 'strong' :
+       result.score >= 45 ? 'stretch' :
+       result.score >= 20 ? 'weak' : 'wrong_domain');
+    const analysisDismissKey = `holt_dismissed_stretch_${result.analysis_id || ''}`;
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(analysisDismissKey) === 'true';
+    } catch {
+      // ignore
+    }
+    setShowStretchBanner(tier === 'stretch' && !resumeMd && !dismissed);
+
+    return () => {
+      if (hintTimer) clearTimeout(hintTimer);
+    };
+  }, [result, resumeMd]);
+
+  function dismissHint() {
+    setShowHint(false);
+    try {
+      localStorage.setItem('holt_seen_verdict_explanation', 'true');
+    } catch {
+      // ignore
+    }
+  }
+
+  function dismissStretchBanner() {
+    setShowStretchBanner(false);
+    if (result?.analysis_id) {
+      try {
+        localStorage.setItem(`holt_dismissed_stretch_${result.analysis_id}`, 'true');
+      } catch {
+        // ignore
+      }
+    }
+  }
 
   async function loadAnalyses() {
     const timeout = setTimeout(() => setLoading(false), 8000);
@@ -416,6 +485,21 @@ export default function Results() {
 
   const hasResult = result && typeof result.score === 'number';
   const score = hasResult ? result.score : 0;
+  const resolvedTier = hasResult
+    ? (result.score_tier ||
+        (score >= 70 ? 'strong' :
+         score >= 45 ? 'stretch' :
+         score >= 20 ? 'weak' : 'wrong_domain'))
+    : null;
+
+  // First-time hint copy — keyed to the resolved tier.
+  const HINT_COPY = {
+    strong: "Green means go. Your skills translate — the ATS should see it too. Hit 'Log this application' when you're ready to submit.",
+    stretch: "You've got the foundation — the language just needs translating. Generate the tailored resume and compare it side-by-side with the original.",
+    weak: "It's a real shot. The gap is specific and closeable. I've listed exactly what's missing below — none of it takes years.",
+    wrong_domain: "I'm not going to waste your time on this one. The gap is fundamental — not your skills, just the wrong field. Let's find one that fits.",
+  };
+
   const strengths = hasResult ? result.strengths : [];
   const gaps = hasResult ? result.gaps : [];
   const recommendations = hasResult ? result.recommendations : [];
@@ -469,6 +553,120 @@ export default function Results() {
             analysisId={result.analysis_id}
             onGenerateResume={handleGenerateResume}
           />
+
+          {/* First-time guided hint — appears once, ever, then never returns */}
+          {showHint && resolvedTier && HINT_COPY[resolvedTier] && (
+            <div
+              role="status"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-3) var(--space-4)',
+                marginBottom: 'var(--space-4)',
+                background: 'var(--color-accent-light)',
+                border: '1.5px solid var(--color-accent)',
+                borderRadius: 'var(--radius-md)',
+                position: 'relative',
+                animation: 'fade-up 280ms ease-out both',
+              }}
+            >
+              <Ott state="encouraging" size={36} />
+              <p style={{
+                flex: 1,
+                color: 'var(--color-accent-dark)',
+                fontSize: '13px',
+                lineHeight: 1.5,
+                fontWeight: 600,
+                paddingRight: 'var(--space-4)',
+              }}>
+                {HINT_COPY[resolvedTier]}
+              </p>
+              <button
+                onClick={dismissHint}
+                aria-label="Dismiss hint"
+                style={{
+                  position: 'absolute',
+                  top: 'var(--space-2)',
+                  right: 'var(--space-2)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--color-accent-dark)',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* Stretch upgrade banner — only on stretch tier without a generated resume */}
+          {showStretchBanner && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-3) var(--space-4)',
+                marginBottom: 'var(--space-4)',
+                background: '#FFF7E6',
+                border: '1.5px solid #F5A623',
+                borderRadius: 'var(--radius-md)',
+                position: 'relative',
+              }}
+            >
+              <div style={{ flex: 1, paddingRight: 'var(--space-4)' }}>
+                <p style={{
+                  color: 'var(--color-text)',
+                  fontSize: '13px',
+                  lineHeight: 1.5,
+                  fontWeight: 700,
+                }}>
+                  Tailoring your resume could move this to Apply Now.
+                </p>
+                <button
+                  onClick={() => { dismissStretchBanner(); handleGenerateResume(); }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#B86F00',
+                    fontFamily: "'Nunito', sans-serif",
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    padding: 0,
+                    marginTop: '4px',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Generate tailored resume →
+                </button>
+              </div>
+              <button
+                onClick={dismissStretchBanner}
+                aria-label="Dismiss banner"
+                style={{
+                  position: 'absolute',
+                  top: 'var(--space-2)',
+                  right: 'var(--space-2)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#B86F00',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* Job context card */}
           <JobContextCard result={result} />
