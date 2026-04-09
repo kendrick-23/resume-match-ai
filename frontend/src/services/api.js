@@ -72,15 +72,18 @@ export async function uploadResume(file) {
 }
 
 /**
- * Send extracted resume text + job description for AI analysis.
+ * Send a resume for AI analysis. Caller can supply EITHER raw text (which the
+ * backend will auto-save into the vault), OR a resume_id from the vault, OR
+ * neither (backend falls back to the default vault entry).
  */
-export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '', linkedinText = '') {
+export async function analyzeResume(resumeText, jobDescription, companyName = '', roleName = '', linkedinText = '', resumeId = null) {
   const headers = await authHeaders();
   const res = await fetchWithRetry(`${API_URL}/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({
-      resume: resumeText,
+      resume: resumeText || '',
+      resume_id: resumeId || undefined,
       job_description: jobDescription,
       company_name: companyName,
       role_name: roleName,
@@ -273,6 +276,62 @@ export async function deleteAllData() {
 export async function getActivity() {
   const headers = await authHeaders();
   return apiRequest(`${API_URL}/profile/activity`, { headers });
+}
+
+/* ============================================
+   Resume Vault
+   ============================================ */
+
+export async function listResumes() {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/resumes`, { headers });
+}
+
+export async function getDefaultResume() {
+  const headers = await authHeaders();
+  // 404 means "no default" — caller treats it as null rather than throwing.
+  const res = await fetchWithRetry(`${API_URL}/resumes/default`, { headers });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load default resume');
+  }
+  return res.json();
+}
+
+/**
+ * Create a new vault entry from an uploaded file OR pasted text.
+ * Pass `file` (a File object) for uploads, or `content` for paste.
+ */
+export async function createResume({ file, content, label } = {}) {
+  const headers = await authHeaders();
+  const formData = new FormData();
+  if (file) formData.append('file', file);
+  if (content) formData.append('content', content);
+  if (label) formData.append('label', label);
+
+  return apiRequest(`${API_URL}/resumes`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+}
+
+export async function updateResume(id, data) {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/resumes/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteResume(id) {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/resumes/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
 }
 
 /**

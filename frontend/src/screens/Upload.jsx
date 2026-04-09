@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
@@ -6,8 +6,8 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Ott from '../components/ott/Ott';
-import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, Info } from 'lucide-react';
-import { uploadResume, analyzeResume, checkBadges } from '../services/api';
+import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, Info, FileText } from 'lucide-react';
+import { uploadResume, analyzeResume, checkBadges, listResumes, createResume, getProfile } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 import './Upload.css';
 
@@ -17,6 +17,20 @@ const ALLOWED_MIMES = new Set([
   'application/msword',
 ]);
 const MAX_SIZE = 5 * 1024 * 1024;
+
+function formatDate(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+function truncate(str, n) {
+  if (!str) return '';
+  return str.length > n ? str.slice(0, n - 1) + '…' : str;
+}
 
 export default function Upload() {
   const [file, setFile] = useState(null);
@@ -29,15 +43,50 @@ export default function Upload() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [celebratingBadge, setCelebratingBadge] = useState(null);
+
+  // Resume Vault state
+  const [vaultResumes, setVaultResumes] = useState([]);     // list of {id, label, ...}
+  const [vaultLoading, setVaultLoading] = useState(true);
+  const [selectedResumeId, setSelectedResumeId] = useState(null);
+  const [showVaultPicker, setShowVaultPicker] = useState(false);
+  const [forceUploadMode, setForceUploadMode] = useState(false); // user opted to upload a new file
+
+  // LinkedIn pre-fill from profile
+  const [profileLinkedin, setProfileLinkedin] = useState('');
+  const [linkedinPrefilledFromProfile, setLinkedinPrefilledFromProfile] = useState(false);
+
   const fileInputRef = useRef(null);
   const linkedinInputRef = useRef(null);
   const navigate = useNavigate();
+
+  // Fetch vault + profile on mount.
+  useEffect(() => {
+    Promise.allSettled([listResumes(), getProfile()]).then(([resumesRes, profileRes]) => {
+      if (resumesRes.status === 'fulfilled' && Array.isArray(resumesRes.value)) {
+        setVaultResumes(resumesRes.value);
+        const def = resumesRes.value.find((r) => r.is_default);
+        if (def) setSelectedResumeId(def.id);
+      }
+      if (profileRes.status === 'fulfilled' && profileRes.value?.linkedin_text) {
+        setProfileLinkedin(profileRes.value.linkedin_text);
+        setLinkedinText(profileRes.value.linkedin_text);
+        setLinkedinPrefilledFromProfile(true);
+        setLinkedinMode('text');
+      }
+      setVaultLoading(false);
+    });
+  }, []);
+
+  const selectedResume = vaultResumes.find((r) => r.id === selectedResumeId) || null;
+  const hasVaultResumes = vaultResumes.length > 0;
+  // Vault mode: we have at least one saved resume AND the user hasn't opted to upload a fresh one.
+  const inVaultMode = hasVaultResumes && !forceUploadMode;
 
   const ottState = error
     ? 'coaching'
     : analyzing
       ? 'thinking'
-      : file
+      : (file || selectedResume)
         ? 'encouraging'
         : 'waiting';
 
@@ -100,32 +149,53 @@ export default function Upload() {
     }
   };
 
+  const canAnalyze = jobText.trim() && (file || (inVaultMode && selectedResumeId));
+
   const handleAnalyze = async () => {
-    if (!file || !jobText.trim()) return;
+    if (!canAnalyze) return;
 
     setAnalyzing(true);
     setError(null);
 
     try {
-      const { text: resumeText } = await uploadResume(file);
-
-      // Extract LinkedIn text from PDF if uploaded
+      // Resolve LinkedIn text first (PDF extraction if needed)
       let finalLinkedinText = linkedinText;
       if (linkedinMode === 'pdf' && linkedinFile) {
         const { text: liText } = await uploadResume(linkedinFile);
         finalLinkedinText = liText;
       }
 
-      const result = await analyzeResume(resumeText, jobText, '', '', finalLinkedinText);
+      let result;
+      let displayedResumeName = '';
+
+      if (inVaultMode && selectedResumeId) {
+        // VAULT PATH — backend fetches the resume by id
+        result = await analyzeResume('', jobText, '', '', finalLinkedinText, selectedResumeId);
+        displayedResumeName = selectedResume?.label || selectedResume?.source_filename || '';
+      } else {
+        // UPLOAD PATH — extract text, then analyze. Backend auto-saves to the vault.
+        const { text: resumeText } = await uploadResume(file);
+        result = await analyzeResume(resumeText, jobText, '', '', finalLinkedinText);
+        displayedResumeName = file.name;
+      }
 
       const badgeResult = await checkBadges();
+      const navState = {
+        result: {
+          ...result,
+          resume_filename: displayedResumeName,
+          resume_label: selectedResume?.label || null,
+          resume_used_at: new Date().toISOString(),
+        },
+      };
+
       if (badgeResult.newly_earned?.length > 0) {
         setCelebratingBadge(badgeResult.newly_earned[0]);
-        setTimeout(() => navigate('/results', { state: { result: { ...result, resume_filename: file.name } } }), 3500);
+        setTimeout(() => navigate('/results', { state: navState }), 3500);
         return;
       }
 
-      navigate('/results', { state: { result: { ...result, resume_filename: file.name } } });
+      navigate('/results', { state: navState });
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -139,58 +209,193 @@ export default function Upload() {
     <ScreenWrapper>
       <h2 style={{ marginBottom: 'var(--space-6)' }}>Analyze Resume</h2>
 
-      {/* Resume upload zone */}
-      <Card
-        style={{ textAlign: 'center', marginBottom: 'var(--space-5)', cursor: 'pointer' }}
-        onClick={() => !analyzing && fileInputRef.current?.click()}
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.docx,.doc"
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-        />
-
-        {file ? (
-          <div>
-            <Ott state={ottState} size={80} />
-            <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>{file.name}</p>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
-              {(file.size / 1024).toFixed(0)} KB
-            </p>
-            <Button
-              variant="ghost"
-              style={{ marginTop: 'var(--space-2)' }}
-              onClick={(e) => { e.stopPropagation(); setFile(null); setError(null); }}
-              disabled={analyzing}
-            >
-              Remove
-            </Button>
-          </div>
-        ) : (
-          <div style={{ marginTop: 'var(--space-2)' }}>
+      {/* Resume zone — three states: vault default / vault picker / fresh upload */}
+      {vaultLoading ? (
+        <Card style={{ textAlign: 'center', marginBottom: 'var(--space-5)', padding: 'var(--space-6)' }}>
+          <Ott state="thinking" size={60} />
+          <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '13px' }}>
+            Loading your resumes...
+          </p>
+        </Card>
+      ) : inVaultMode && selectedResume ? (
+        // STATE B/C — vault has at least one resume; show the default + optional picker
+        <Card style={{ marginBottom: 'var(--space-5)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <img
               src="/ott/ott-reading.png"
-              alt="Ott reviewing your resume"
+              alt="Ott"
               loading="lazy"
-              style={{ width: '160px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+              style={{ width: '80px', height: '80px', objectFit: 'contain', flexShrink: 0 }}
             />
-            <div style={{ marginTop: 'var(--space-3)' }}>
-              <UploadIcon
-                size={20}
-                style={{ color: 'var(--color-accent)', margin: '0 auto var(--space-1)' }}
-              />
-              <p style={{ fontWeight: 700 }}>Tap to upload or drag & drop</p>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
-                PDF or DOCX, 5 MB max
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Your Resume
+              </p>
+              <p style={{ fontWeight: 700, fontSize: '15px', marginTop: '2px' }}>
+                {truncate(selectedResume.label || selectedResume.source_filename || 'Resume', 30)}
+              </p>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>
+                Last updated: {formatDate(selectedResume.updated_at || selectedResume.created_at)}
+                {selectedResume.word_count ? ` · ${selectedResume.word_count.toLocaleString()} words` : ''}
               </p>
             </div>
           </div>
-        )}
-      </Card>
+
+          {/* Switch resume — only shown when there are 2+ saved */}
+          {vaultResumes.length >= 2 && (
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <button
+                onClick={() => setShowVaultPicker(!showVaultPicker)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--color-accent)',
+                  fontFamily: "'Nunito', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  padding: 0,
+                }}
+              >
+                {showVaultPicker ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                Switch resume
+              </button>
+              {showVaultPicker && (
+                <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                  {vaultResumes.filter((r) => r.id !== selectedResumeId).map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => { setSelectedResumeId(r.id); setShowVaultPicker(false); }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-2)',
+                        padding: 'var(--space-2)',
+                        background: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
+                        fontFamily: "'Nunito', sans-serif",
+                      }}
+                    >
+                      <FileText size={14} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '13px', fontWeight: 700 }}>
+                          {truncate(r.label || r.source_filename || 'Resume', 30)}
+                        </p>
+                        <p style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                          {formatDate(r.updated_at || r.created_at)}
+                          {r.word_count ? ` · ${r.word_count.toLocaleString()} words` : ''}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Upload a different resume — secondary text link */}
+          <div style={{ marginTop: 'var(--space-3)', textAlign: 'center' }}>
+            <button
+              onClick={() => { setForceUploadMode(true); setShowVaultPicker(false); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--color-text-muted)',
+                fontFamily: "'Nunito', sans-serif",
+                fontWeight: 600,
+                fontSize: '12px',
+                padding: 0,
+                textDecoration: 'underline',
+              }}
+            >
+              Upload a different resume
+            </button>
+          </div>
+        </Card>
+      ) : (
+        // STATE A — no saved resumes (or user clicked "upload a different one")
+        <Card
+          style={{ textAlign: 'center', marginBottom: 'var(--space-5)', cursor: 'pointer' }}
+          onClick={() => !analyzing && fileInputRef.current?.click()}
+          onDrop={handleDrop}
+          onDragOver={(e) => e.preventDefault()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.doc"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+
+          {file ? (
+            <div>
+              <Ott state={ottState} size={80} />
+              <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>{file.name}</p>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+                {(file.size / 1024).toFixed(0)} KB
+              </p>
+              <Button
+                variant="ghost"
+                style={{ marginTop: 'var(--space-2)' }}
+                onClick={(e) => { e.stopPropagation(); setFile(null); setError(null); }}
+                disabled={analyzing}
+              >
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <div style={{ marginTop: 'var(--space-2)' }}>
+              <img
+                src="/ott/ott-reading.png"
+                alt="Ott reviewing your resume"
+                loading="lazy"
+                style={{ width: '160px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+              />
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <UploadIcon
+                  size={20}
+                  style={{ color: 'var(--color-accent)', margin: '0 auto var(--space-1)' }}
+                />
+                <p style={{ fontWeight: 700 }}>Tap to upload or drag & drop</p>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+                  PDF or DOCX, 5 MB max
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Back to vault link if the user has saved resumes and chose upload mode */}
+          {hasVaultResumes && forceUploadMode && (
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setForceUploadMode(false); setFile(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--color-text-muted)',
+                  fontFamily: "'Nunito', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  padding: 0,
+                  textDecoration: 'underline',
+                }}
+              >
+                ← Use a saved resume instead
+              </button>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Job description input */}
       <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -331,13 +536,17 @@ export default function Upload() {
         </Card>
       )}
 
-      {/* Analyze button */}
+      {/* Analyze button — label adapts to mode */}
       <Button
         full
-        disabled={!file || !jobText.trim() || analyzing}
+        disabled={!canAnalyze || analyzing}
         onClick={handleAnalyze}
       >
-        {analyzing ? 'Reading through this carefully...' : 'Analyze Match'}
+        {analyzing
+          ? 'Reading through this carefully...'
+          : inVaultMode
+            ? 'Use this resume'
+            : 'Analyze Match'}
       </Button>
 
       {/* Loading state hint */}

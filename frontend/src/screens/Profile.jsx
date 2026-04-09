@@ -7,7 +7,7 @@ import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
 import { useAuth } from '../hooks/useAuth.jsx';
-import { getProfile, updateProfile, deleteAllData, listAnalyses, listBadges, uploadResume, analyzeResume } from '../services/api';
+import { getProfile, updateProfile, deleteAllData, listAnalyses, listBadges, uploadResume, analyzeResume, listResumes, createResume, updateResume, deleteResume } from '../services/api';
 import { supabase } from '../services/supabase';
 import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, TrendingUp, Upload, ChevronDown, ChevronUp, UserCircle, X, Plus } from 'lucide-react';
 import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
@@ -48,6 +48,13 @@ export default function Profile() {
   const toast = useToast();
   const [analyses, setAnalyses] = useState([]);
   const [earnedBadges, setEarnedBadges] = useState([]);
+  // Resume Vault state
+  const [vaultResumes, setVaultResumes] = useState([]);
+  const [editingLabelId, setEditingLabelId] = useState(null);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [confirmDeleteResumeId, setConfirmDeleteResumeId] = useState(null);
+  const vaultUploadRef = useRef(null);
+  const [vaultUploading, setVaultUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -58,7 +65,70 @@ export default function Profile() {
     loadProfile();
     loadAnalyses();
     loadBadges();
+    loadVaultResumes();
   }, []);
+
+  async function loadVaultResumes() {
+    try {
+      const data = await listResumes();
+      setVaultResumes(Array.isArray(data) ? data : []);
+    } catch {
+      // Silent — vault stays empty if the call fails
+    }
+  }
+
+  async function handleVaultUpload(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    setVaultUploading(true);
+    try {
+      await createResume({ file: f });
+      await loadVaultResumes();
+      toast.success('Resume saved to vault');
+    } catch (err) {
+      toast.error(err.message || "Couldn't save resume");
+    } finally {
+      setVaultUploading(false);
+      if (vaultUploadRef.current) vaultUploadRef.current.value = '';
+    }
+  }
+
+  async function handleSetDefaultResume(id) {
+    try {
+      await updateResume(id, { is_default: true });
+      await loadVaultResumes();
+    } catch (err) {
+      toast.error(err.message || "Couldn't set default");
+    }
+  }
+
+  async function handleSaveLabel(id) {
+    const trimmed = labelDraft.trim();
+    if (!trimmed) {
+      setEditingLabelId(null);
+      return;
+    }
+    try {
+      await updateResume(id, { label: trimmed });
+      setEditingLabelId(null);
+      setLabelDraft('');
+      await loadVaultResumes();
+    } catch (err) {
+      toast.error(err.message || "Couldn't update label");
+    }
+  }
+
+  async function handleDeleteResume(id) {
+    try {
+      await deleteResume(id);
+      setConfirmDeleteResumeId(null);
+      await loadVaultResumes();
+      toast.success('Resume deleted');
+    } catch (err) {
+      toast.error(err.message || "Couldn't delete resume");
+      setConfirmDeleteResumeId(null);
+    }
+  }
 
   async function loadProfile() {
     try {
@@ -323,6 +393,182 @@ export default function Profile() {
               <Button variant="secondary" onClick={() => resumeInputRef.current?.click()} style={{ marginTop: 'var(--space-2)' }}>
                 <Upload size={14} /> Upload Resume
               </Button>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* My Resumes — vault management */}
+      <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resumes</h3>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
+        {vaultResumes.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 'var(--space-3) 0' }}>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginBottom: 'var(--space-3)' }}>
+              No resumes saved yet. Upload one to skip re-uploading every time you analyze.
+            </p>
+            <input
+              ref={vaultUploadRef}
+              type="file"
+              accept=".pdf,.docx,.doc"
+              onChange={handleVaultUpload}
+              style={{ display: 'none' }}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => vaultUploadRef.current?.click()}
+              disabled={vaultUploading}
+            >
+              <Upload size={14} /> {vaultUploading ? 'Uploading...' : 'Upload your first resume'}
+            </Button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {vaultResumes.map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 'var(--space-3)',
+                  padding: 'var(--space-3)',
+                  background: r.is_default ? 'var(--color-accent-light)' : 'var(--color-bg)',
+                  border: `1.5px solid ${r.is_default ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <FileText size={16} style={{ color: 'var(--color-accent)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {editingLabelId === r.id ? (
+                    <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-1)' }}>
+                      <input
+                        type="text"
+                        value={labelDraft}
+                        onChange={(e) => setLabelDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveLabel(r.id);
+                          if (e.key === 'Escape') { setEditingLabelId(null); setLabelDraft(''); }
+                        }}
+                        autoFocus
+                        style={{
+                          flex: 1, padding: '4px 8px', fontSize: '14px', fontWeight: 700,
+                          fontFamily: "'Nunito', sans-serif",
+                          border: '1.5px solid var(--color-accent)',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'var(--color-surface-raised)',
+                        }}
+                      />
+                      <button
+                        onClick={() => handleSaveLabel(r.id)}
+                        style={{
+                          background: 'var(--color-accent)', color: 'white',
+                          border: 'none', borderRadius: 'var(--radius-sm)',
+                          padding: '4px 10px', fontSize: '12px', fontWeight: 700,
+                          cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
+                        }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  ) : (
+                    <p
+                      onClick={() => { setEditingLabelId(r.id); setLabelDraft(r.label || ''); }}
+                      style={{ fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}
+                      title="Click to rename"
+                    >
+                      {r.label || r.source_filename || 'Resume'}
+                      {r.is_default && (
+                        <Badge variant="success" style={{ fontSize: '10px', marginLeft: 'var(--space-2)', padding: '1px 6px' }}>
+                          Default
+                        </Badge>
+                      )}
+                    </p>
+                  )}
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                    {new Date(r.updated_at || r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {r.word_count ? ` · ${r.word_count.toLocaleString()} words` : ''}
+                    {r.source_format ? ` · ${r.source_format.toUpperCase()}` : ''}
+                  </p>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    {!r.is_default && (
+                      <button
+                        onClick={() => handleSetDefaultResume(r.id)}
+                        style={{
+                          background: 'none', border: '1px solid var(--color-accent)',
+                          color: 'var(--color-accent)', borderRadius: 'var(--radius-full)',
+                          padding: '3px 10px', fontSize: '12px', fontWeight: 700,
+                          cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
+                        }}
+                      >
+                        Set as default
+                      </button>
+                    )}
+                    {confirmDeleteResumeId === r.id ? (
+                      <>
+                        <button
+                          onClick={() => handleDeleteResume(r.id)}
+                          style={{
+                            background: 'var(--color-danger)', color: 'white',
+                            border: 'none', borderRadius: 'var(--radius-full)',
+                            padding: '3px 10px', fontSize: '12px', fontWeight: 700,
+                            cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
+                          }}
+                        >
+                          Confirm delete
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteResumeId(null)}
+                          style={{
+                            background: 'none', border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-muted)', borderRadius: 'var(--radius-full)',
+                            padding: '3px 10px', fontSize: '12px', fontWeight: 700,
+                            cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteResumeId(r.id)}
+                        style={{
+                          background: 'none', border: 'none',
+                          color: 'var(--color-text-muted)',
+                          padding: 0, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          fontFamily: "'Nunito', sans-serif", fontSize: '12px', fontWeight: 600,
+                        }}
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {vaultResumes.length < 5 && (
+              <div style={{ marginTop: 'var(--space-2)' }}>
+                <input
+                  ref={vaultUploadRef}
+                  type="file"
+                  accept=".pdf,.docx,.doc"
+                  onChange={handleVaultUpload}
+                  style={{ display: 'none' }}
+                />
+                <Button
+                  variant="ghost"
+                  full
+                  onClick={() => vaultUploadRef.current?.click()}
+                  disabled={vaultUploading}
+                >
+                  <Upload size={14} /> {vaultUploading ? 'Uploading...' : 'Upload new resume'}
+                </Button>
+              </div>
+            )}
+            {vaultResumes.length >= 5 && (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', textAlign: 'center', marginTop: 'var(--space-2)' }}>
+                Vault is full (5/5). Delete one to upload a new resume.
+              </p>
             )}
           </div>
         )}

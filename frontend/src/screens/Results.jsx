@@ -193,6 +193,18 @@ function JobContextCard({ result }) {
   const companyName = result.company_name;
   const jobText = result.job_description_text;
   const filename = result.resume_filename;
+  const resumeLabel = result.resume_label;
+  const resumeUsedAt = result.resume_used_at;
+
+  // "Analyzed with" line — makes the wrong-resume unhappy path visible.
+  const analyzedWithText = (() => {
+    const name = resumeLabel || filename;
+    if (!name) return null;
+    const dateStr = resumeUsedAt
+      ? new Date(resumeUsedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : null;
+    return dateStr ? `Analyzed with: ${name} · ${dateStr}` : `Analyzed with: ${name}`;
+  })();
 
   return (
     <Card style={{ marginBottom: 'var(--space-4)' }}>
@@ -205,9 +217,9 @@ function JobContextCard({ result }) {
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginTop: '2px' }}>
             {companyName || <span style={{ color: 'var(--color-text-muted)' }}>Company not detected</span>}
           </p>
-          {filename && (
+          {analyzedWithText && (
             <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
-              {filename}
+              {analyzedWithText}
             </p>
           )}
         </div>
