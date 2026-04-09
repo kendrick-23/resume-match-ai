@@ -9,6 +9,7 @@ import Ott from '../components/ott/Ott';
 import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, Info, FileText } from 'lucide-react';
 import { uploadResume, analyzeResume, checkBadges, listResumes, createResume, getProfile } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
+import { clearRecommendationsCache } from '../utils/cache';
 import './Upload.css';
 
 const ALLOWED_MIMES = new Set([
@@ -203,6 +204,7 @@ export default function Upload() {
         displayedResumeName = file.name;
       }
 
+      clearRecommendationsCache();
       const badgeResult = await checkBadges();
       const navState = {
         result: {

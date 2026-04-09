@@ -14,6 +14,7 @@ import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
 import { scoreBadgeVariant } from '../constants/scoring';
+import { clearRecommendationsCache } from '../utils/cache';
 import './Profile.css';
 
 export default function Profile() {
@@ -203,6 +204,7 @@ export default function Profile() {
       };
 
       await updateProfile(updates);
+      clearRecommendationsCache();
       setSaved(true);
       setHasChanges(false);
       toast.success('Profile updated');

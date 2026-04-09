@@ -12,6 +12,7 @@ import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
 import { deriveTier, scoreColor, scoreBadgeVariant, scoreOttState, subScoreColor } from '../constants/scoring';
+import { clearRecommendationsCache } from '../utils/cache';
 import './Results.css';
 
 const RING_SIZE = 140;
@@ -475,6 +476,7 @@ export default function Results() {
         null,              // resume_id — use default vault
         { priorHoltScore: req.prior_holt_score, postingUrl: req.posting_url },
       );
+      clearRecommendationsCache();
       setResult({
         ...data,
         posting_url: req.posting_url,
