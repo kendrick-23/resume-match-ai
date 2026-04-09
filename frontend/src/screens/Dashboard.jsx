@@ -8,7 +8,6 @@ import { useStreak } from '../context/StreakContext';
 import { getActivity, listBadges, listApplications, listAnalyses, getProfile } from '../services/api';
 import { FileText, Search, Clock } from 'lucide-react';
 import JourneyMap from '../components/ui/JourneyMap';
-import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
 import './Dashboard.css';
@@ -154,20 +153,27 @@ export default function Dashboard() {
 
   return (
     <ScreenWrapper screenName="Dashboard">
-      {/* Ott greeting + streak */}
-      <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-        <Ott state={ottState} size={120} />
-        <h2 style={{ marginTop: 'var(--space-3)' }}>
-          {greeting}
-        </h2>
+      <div className="dashboard-world">
+      {/* Greeting card — river bank scene background */}
+      <div className="dashboard-greeting">
+        {/* Water ripple rings behind Ott */}
+        <div className="dashboard-ripples" aria-hidden="true">
+          <div className="dashboard-ripple" />
+          <div className="dashboard-ripple" />
+          <div className="dashboard-ripple" />
+        </div>
+        <div className="dashboard-greeting__content">
+          <Ott state={ottState} size={120} />
+          <h2 style={{ marginTop: 'var(--space-3)' }}>
+            {greeting}
+          </h2>
+        </div>
       </div>
 
-      {/* Streak card */}
-      <Card style={{
+      {/* Streak card with kelp wrap accent */}
+      <Card className="streak-card" style={{
         textAlign: 'center',
         marginBottom: 'var(--space-4)',
-        position: 'relative',
-        overflow: 'hidden',
         background: `
           radial-gradient(circle at 30% 50%, rgba(43,181,192,0.12) 0%, transparent 50%),
           radial-gradient(circle at 70% 30%, rgba(43,181,192,0.10) 0%, transparent 40%),
@@ -209,6 +215,13 @@ export default function Dashboard() {
         <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
           {streakHint}
         </p>
+        {/* Kelp wrap — loyalty/connection ambient texture */}
+        <img
+          src="/ott/ott-kelp-wrap.png"
+          alt=""
+          aria-hidden="true"
+          className="streak-card__kelp"
+        />
       </Card>
 
       {/* Pipeline summary — meaningful job-search counts */}
@@ -253,11 +266,11 @@ export default function Dashboard() {
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Your job search</h3>
       <JourneyMap completed={journey.completed} ready={journey.ready} />
 
-      {/* Section divider */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', margin: 'var(--space-4) 0' }}>
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+      {/* Paw print section divider */}
+      <div className="paw-divider" aria-hidden="true">
+        <img src="/ott/ott-paw-print.png" alt="" className="paw-divider__print" />
+        <img src="/ott/ott-paw-print.png" alt="" className="paw-divider__print" />
+        <img src="/ott/ott-paw-print.png" alt="" className="paw-divider__print" />
       </div>
 
       {/* Quick actions — trimmed to two; the journey map drives "what's next" */}
@@ -308,7 +321,11 @@ export default function Dashboard() {
       ) : (
         <Card style={{ marginBottom: 'var(--space-6)' }}>
           <div style={{ textAlign: 'center', padding: 'var(--space-4) 0' }}>
-            <EmptyStateDashboard size={56} />
+            <img
+              src="/ott/ott-in-holt.png"
+              alt="Ott peeking from his holt"
+              style={{ width: 100, height: 'auto', display: 'block', margin: '0 auto' }}
+            />
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -378,6 +395,21 @@ export default function Dashboard() {
           })}
         </div>
       )}
+
+      {/* Corner vegetation framing */}
+      <img
+        src="/ott/ott-corner-left.png"
+        alt=""
+        aria-hidden="true"
+        className="dashboard-world__corner dashboard-world__corner--left"
+      />
+      <img
+        src="/ott/ott-corner-right.png"
+        alt=""
+        aria-hidden="true"
+        className="dashboard-world__corner dashboard-world__corner--right"
+      />
+      </div>{/* end dashboard-world */}
     </ScreenWrapper>
   );
 }
