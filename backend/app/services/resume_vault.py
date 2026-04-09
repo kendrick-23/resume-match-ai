@@ -61,23 +61,27 @@ def auto_label() -> str:
     return datetime.now(timezone.utc).strftime(fmt)
 
 
-def enforce_resume_cap(sb, user_id: str) -> None:
+def enforce_resume_cap(sb, user_id: str) -> Optional[str]:
     """If the user already has MAX_RESUMES_PER_USER resumes, delete the oldest
-    NON-default to make room. The default is never auto-deleted."""
+    NON-default to make room. The default is never auto-deleted.
+    Returns the label of the pruned resume, or None if nothing was pruned."""
     existing = sb.table("resumes") \
-        .select("id,is_default,created_at") \
+        .select("id,is_default,created_at,label") \
         .eq("user_id", user_id) \
         .order("created_at", desc=True) \
         .execute().data or []
 
     if len(existing) < MAX_RESUMES_PER_USER:
-        return
+        return None
 
     # Find the oldest non-default row
     for row in reversed(existing):  # reversed = oldest first
         if not row.get("is_default"):
+            pruned_label = row.get("label") or "Untitled resume"
             sb.table("resumes").delete().eq("id", row["id"]).execute()
-            return
+            return pruned_label
+
+    return None
 
 
 def find_or_create_vault_entry(
@@ -87,10 +91,10 @@ def find_or_create_vault_entry(
     *,
     source_filename: Optional[str] = None,
     source_format: str = "pasted",
-) -> str:
+) -> tuple[str, Optional[str]]:
     """Look up an existing resumes row with identical content for this user.
-    If found, return its id. Otherwise create a new row (enforcing the 5-cap
-    + first-resume-becomes-default rules) and return the new id.
+    If found, return (id, None). Otherwise create a new row (enforcing the 5-cap
+    + first-resume-becomes-default rules) and return (new_id, pruned_label).
 
     Used by /analyze to auto-save uploaded resume text into the vault.
     """
@@ -105,11 +109,11 @@ def find_or_create_vault_entry(
 
     for row in existing:
         if (row.get("content") or "").strip() == cleaned:
-            return row["id"]
+            return row["id"], None
 
     # Not found — create a new vault entry.
     is_first = len(existing) == 0
-    enforce_resume_cap(sb, user_id)
+    pruned_label = enforce_resume_cap(sb, user_id)
 
     insert_data = {
         "user_id": user_id,
@@ -123,7 +127,7 @@ def find_or_create_vault_entry(
     res = sb.table("resumes").insert(insert_data).execute()
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to save resume to vault")
-    return res.data[0]["id"]
+    return res.data[0]["id"], pruned_label
 
 
 def fetch_resume_content(sb, user_id: str, resume_id: str) -> Optional[str]:

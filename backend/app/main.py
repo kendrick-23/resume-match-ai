@@ -743,6 +743,7 @@ async def analyze(
     # both `resume_text` (for the prompt) and `resume_id` (for the analyses FK).
     resume_text: str = ""
     resume_id: Optional[str] = None
+    pruned_resume: Optional[str] = None
 
     if body.resume_id:
         # Caller pinned a specific vault entry — use it directly.
@@ -757,7 +758,7 @@ async def analyze(
         # entries if the content is byte-identical to what we already have.
         resume_text = body.resume
         try:
-            resume_id = find_or_create_vault_entry(
+            resume_id, pruned_resume = find_or_create_vault_entry(
                 sb,
                 user["user_id"],
                 resume_text,
@@ -957,6 +958,7 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             "growth_potential": growth_potential,
             "skills_extracted": extracted_skills,
             "posting_url": body.posting_url,
+            "pruned_resume": pruned_resume,
         }}
     except HTTPException:
         raise

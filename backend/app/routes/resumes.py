@@ -137,7 +137,7 @@ async def create_resume(
     is_first_resume = len(existing) == 0
 
     # ---- Enforce 5-resume cap (deletes oldest non-default if needed) ----
-    enforce_resume_cap(sb, user["user_id"])
+    pruned_resume = enforce_resume_cap(sb, user["user_id"])
 
     # ---- Insert ----
     insert_data = {
@@ -158,6 +158,7 @@ async def create_resume(
     # Don't echo the full content back in the response — consistent with the
     # list-view contract. The client can refetch the default if it needs the text.
     new_resume.pop("content", None)
+    new_resume["pruned_resume"] = pruned_resume
     return new_resume
 
 

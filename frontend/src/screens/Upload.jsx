@@ -10,6 +10,7 @@ import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, Inf
 import { uploadResume, analyzeResume, checkBadges, listResumes, createResume, getProfile } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 import { clearRecommendationsCache } from '../utils/cache';
+import { useToast } from '../context/ToastContext';
 import './Upload.css';
 
 const ALLOWED_MIMES = new Set([
@@ -83,6 +84,7 @@ export default function Upload() {
   const fileInputRef = useRef(null);
   const linkedinInputRef = useRef(null);
   const navigate = useNavigate();
+  const toast = useToast();
 
   // Fetch vault + profile on mount.
   useEffect(() => {
@@ -202,6 +204,10 @@ export default function Upload() {
         const { text: resumeText } = await uploadResume(file);
         result = await analyzeResume(resumeText, jobText, '', '', finalLinkedinText);
         displayedResumeName = file.name;
+      }
+
+      if (result.pruned_resume) {
+        toast.info(`Replaced your oldest resume — '${result.pruned_resume}' was removed to stay within your 5-resume limit.`);
       }
 
       clearRecommendationsCache();
