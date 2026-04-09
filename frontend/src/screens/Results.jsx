@@ -585,6 +585,7 @@ export default function Results() {
             scoreTier={result.score_tier}
             companyName={result.company_name || ''}
             roleName={result.role_name || ''}
+            postingUrl={result.posting_url || ''}
             analysisId={result.analysis_id}
             onGenerateResume={handleGenerateResume}
           />

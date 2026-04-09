@@ -58,6 +58,7 @@ export default function Tracker() {
       setPrefillData({
         company: location.state.company || '',
         role: location.state.role || '',
+        url: location.state.url || '',
         notes: location.state.notes || '',
       });
       setShowForm(true);
@@ -631,7 +632,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
 function AddApplicationModal({ onSubmit, onClose, prefill }) {
   const [company, setCompany] = useState(prefill?.company || '');
   const [role, setRole] = useState(prefill?.role || '');
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(prefill?.url || '');
   const [notes, setNotes] = useState(prefill?.notes || '');
   const [status, setStatus] = useState('Saved');
   const [appliedDate, setAppliedDate] = useState('');

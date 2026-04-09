@@ -58,6 +58,7 @@ export default function VerdictCard({
   scoreTier = null,
   companyName = '',
   roleName = '',
+  postingUrl = '',
   analysisId = null,
   onGenerateResume = () => {},
 }) {
@@ -74,6 +75,7 @@ export default function VerdictCard({
         prefill: true,
         company: companyName || '',
         role: roleName || '',
+        url: postingUrl || '',
         notes: `Holt Score: ${score}%`,
       },
     });
