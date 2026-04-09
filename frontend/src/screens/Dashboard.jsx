@@ -156,28 +156,55 @@ export default function Dashboard() {
     <ScreenWrapper screenName="Dashboard">
       {/* Ott greeting + streak */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-        <Ott state={ottState} size={96} />
+        <Ott state={ottState} size={120} />
         <h2 style={{ marginTop: 'var(--space-3)' }}>
           {greeting}
         </h2>
       </div>
 
       {/* Streak card */}
-      <Card style={{ textAlign: 'center', marginBottom: 'var(--space-4)' }}>
+      <Card style={{
+        textAlign: 'center',
+        marginBottom: 'var(--space-4)',
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundImage: `
+          radial-gradient(circle at 50% 50%, rgba(43,181,192,0.06) 0%, transparent 60%),
+          radial-gradient(circle at 30% 40%, rgba(43,181,192,0.04) 0%, transparent 50%),
+          radial-gradient(circle at 70% 60%, rgba(43,181,192,0.04) 0%, transparent 55%)
+        `,
+      }}>
+        {/* Watermark streak icon — ambient texture, top-right */}
         <img
           src={streak >= 1 ? '/ott/streak-active.png' : '/ott/streak-inactive.png'}
-          alt={streak >= 1 ? 'streak' : 'no streak'}
-          style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            width: '24px',
+            height: '24px',
+            objectFit: 'contain',
+            opacity: 0.15,
+            pointerEvents: 'none',
+          }}
         />
-        <p style={{
-          fontWeight: 800,
-          fontSize: '24px',
-          lineHeight: 1.2,
-          letterSpacing: '-0.02em',
-          marginTop: 'var(--space-1)',
-        }}>
-          {streakLabel}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+          <img
+            src={streak >= 1 ? '/ott/streak-active.png' : '/ott/streak-inactive.png'}
+            alt={streak >= 1 ? 'streak' : 'no streak'}
+            style={{ width: '28px', height: '28px', objectFit: 'contain' }}
+          />
+          <p style={{
+            fontWeight: 800,
+            fontSize: '24px',
+            lineHeight: 1.2,
+            letterSpacing: '-0.02em',
+          }}>
+            {streakLabel}
+          </p>
+        </div>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
           {streakHint}
         </p>
@@ -186,7 +213,7 @@ export default function Dashboard() {
       {/* Pipeline summary — meaningful job-search counts */}
       {journey.error ? (
         <Card style={{ textAlign: 'center', marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
-          <Ott state="coaching" size={48} />
+          <Ott state="coaching" size={56} />
           <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
             Couldn't load your stats
           </p>
@@ -224,6 +251,13 @@ export default function Dashboard() {
       {/* Job search journey map */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Your job search</h3>
       <JourneyMap completed={journey.completed} ready={journey.ready} />
+
+      {/* Section divider */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', margin: 'var(--space-4) 0' }}>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+      </div>
 
       {/* Quick actions — trimmed to two; the journey map drives "what's next" */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Quick actions</h3>
@@ -273,8 +307,20 @@ export default function Dashboard() {
       ) : (
         <Card style={{ marginBottom: 'var(--space-6)' }}>
           <div style={{ textAlign: 'center', padding: 'var(--space-4) 0' }}>
-            <EmptyStateDashboard size={180} />
-            <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-3)', fontSize: '14px' }}>
+            <EmptyStateDashboard size={56} />
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '8px',
+              marginTop: 'var(--space-3)',
+              marginBottom: 'var(--space-2)',
+            }}>
+              <div style={{ width: '60%', height: '12px', borderRadius: 'var(--radius-full)', background: 'rgba(43,181,192,0.08)' }} />
+              <div style={{ width: '80%', height: '12px', borderRadius: 'var(--radius-full)', background: 'rgba(43,181,192,0.08)' }} />
+              <div style={{ width: '45%', height: '12px', borderRadius: 'var(--radius-full)', background: 'rgba(43,181,192,0.08)' }} />
+            </div>
+            <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '14px' }}>
               Upload your first resume to get started!
             </p>
           </div>

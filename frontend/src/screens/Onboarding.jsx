@@ -70,7 +70,7 @@ export default function Onboarding() {
               <img
                 src="/ott/ott-splash.png"
                 alt="Ott"
-                style={{ width: 200, height: 'auto', display: 'block', margin: '0 auto' }}
+                style={{ width: 160, height: 'auto', display: 'block', margin: '0 auto' }}
               />
             </div>
             <div style={{ marginTop: 'var(--space-5)', display: 'flex', justifyContent: 'center' }}>
@@ -90,7 +90,7 @@ export default function Onboarding() {
         {/* Screen 1 — Identity + targeting */}
         {step === 1 && (
           <div className="onboarding__screen onboarding__screen--enter">
-            <Ott state="encouraging" size={100} />
+            <Ott state="encouraging" size={56} />
             <h2 className="onboarding__headline">Tell Ott about yourself</h2>
             <p className="onboarding__subtext">
               This helps Ott find jobs that actually match you
@@ -152,7 +152,7 @@ export default function Onboarding() {
         {/* Screen 2 — Preferences */}
         {step === 2 && (
           <div className="onboarding__screen onboarding__screen--enter">
-            <Ott state="idle" size={80} />
+            <Ott state="idle" size={56} />
             <h2 className="onboarding__headline">Your preferences</h2>
             <p className="onboarding__subtext">
               Ott uses these to filter out jobs that aren't a fit

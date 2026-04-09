@@ -34,7 +34,7 @@ export default function MilestoneCelebration({ badgeKey, onClose }) {
   return (
     <div className="milestone-overlay" onClick={onClose}>
       <div className="milestone-overlay__content">
-        <Ott state="celebrating" size={100} />
+        <Ott state="celebrating" size={160} />
         <img
           src={meta.image}
           alt={meta.name}

@@ -82,8 +82,8 @@
 }
 
 .hint-popover__ott {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;

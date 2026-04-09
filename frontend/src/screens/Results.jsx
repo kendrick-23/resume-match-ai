@@ -128,7 +128,7 @@ function ScoreBreakdown({ result }) {
   if (!hasSubScores) return null;
 
   return (
-    <Card style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
+    <Card style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)', background: 'rgba(43,181,192,0.03)' }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -603,7 +603,7 @@ export default function Results() {
       <ScreenWrapper>
         <h2 style={{ marginBottom: 'var(--space-6)' }}>Results</h2>
         <div style={{ textAlign: 'center', padding: 'var(--space-10) 0' }}>
-          <Ott state="thinking" size={100} />
+          <Ott state="thinking" size={56} />
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-3)' }}>
             Loading your results...
           </p>
@@ -660,7 +660,7 @@ export default function Results() {
                 animation: 'fade-up 280ms ease-out both',
               }}
             >
-              <Ott state="encouraging" size={36} />
+              <Ott state="encouraging" size={32} />
               <p style={{
                 flex: 1,
                 color: 'var(--color-accent-dark)',
@@ -762,7 +762,7 @@ export default function Results() {
 
           {/* Legacy score card — kept as a supporting summary (no longer the lead) */}
           <Card style={{ textAlign: 'center', marginBottom: 0, padding: 'var(--space-5)' }}>
-            <Ott state={ottState} size={80} />
+            <Ott state={ottState} size={56} />
             <div style={{ marginTop: 'var(--space-3)' }}>
               <ScoreRing score={score} />
             </div>
@@ -893,7 +893,7 @@ export default function Results() {
                 gap: 'var(--space-3)',
                 marginBottom: 'var(--space-3)',
               }}>
-                <Ott state="encouraging" size={48} />
+                <Ott state="encouraging" size={32} />
                 <p style={{ fontWeight: 700, color: 'var(--color-accent-dark)' }}>
                   {resolvedTier === 'strong' ? "You're in great shape!" : resolvedTier === 'stretch' ? "Good foundation — let's sharpen it." : "Don't worry — here's your game plan."}
                 </p>
@@ -930,7 +930,7 @@ export default function Results() {
 
             {result.analysis_id && !resumeMd && !generatingResume && (
               <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
-                <Ott state="encouraging" size={80} />
+                <Ott state="encouraging" size={56} />
                 <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
                   Get Your ATS-Ready Resume
                 </p>
@@ -955,7 +955,7 @@ export default function Results() {
 
             {generatingResume && (
               <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
-                <Ott state="thinking" size={80} />
+                <Ott state="thinking" size={56} />
                 <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
                   Tailoring your resume...
                 </p>
@@ -970,7 +970,7 @@ export default function Results() {
                 <Card style={{ marginBottom: 'var(--space-3)' }}>
                   <div style={{ position: 'relative' }}>
                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
-                      <Ott state="celebrating" size={40} />
+                      <Ott state="celebrating" size={32} />
                     </div>
                     <div style={{ lineHeight: 1.7, fontSize: '14px' }}>
                       {parseResumeMarkdown(resumeMd).map((section, i) => {
@@ -1069,7 +1069,7 @@ export default function Results() {
               {/* Not yet generated */}
               {!coverLetter && !generatingCoverLetter && (
                 <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
-                  <Ott state="encouraging" size={80} />
+                  <Ott state="encouraging" size={56} />
                   <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
                     Get Your Tailored Cover Letter
                   </p>
@@ -1096,7 +1096,7 @@ export default function Results() {
               {generatingCoverLetter && (
                 <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
                   <div className="ott-thinking-anim">
-                    <Ott state="thinking" size={80} />
+                    <Ott state="thinking" size={56} />
                   </div>
                   <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
                     {CL_LOADING_MESSAGES[clLoadingPhase]}
@@ -1114,7 +1114,7 @@ export default function Results() {
                     gap: 'var(--space-3)',
                     marginBottom: 'var(--space-3)',
                   }}>
-                    <img src="/ott/ott-coaching.png" alt="Ott coaching" style={{ width: '40px', flexShrink: 0 }} />
+                    <img src="/ott/ott-coaching.png" alt="Ott coaching" style={{ width: '32px', flexShrink: 0 }} />
                     <p style={{
                       fontSize: '12px',
                       color: 'var(--color-accent-dark)',

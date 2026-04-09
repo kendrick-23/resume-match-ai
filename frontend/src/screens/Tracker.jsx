@@ -257,7 +257,7 @@ export default function Tracker() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 'var(--space-10) 0' }}>
-          <Ott state="thinking" size={100} />
+          <Ott state="thinking" size={56} />
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-3)' }}>
             Loading your applications...
           </p>
@@ -289,7 +289,7 @@ export default function Tracker() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {celebrating && (
             <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
-              <Ott state="celebrating" size={80} />
+              <Ott state="celebrating" size={56} />
               <p style={{ fontWeight: 700, color: 'var(--color-success)', marginTop: 'var(--space-2)' }}>
                 Interview scheduled! You're making moves!
               </p>
@@ -330,7 +330,7 @@ export default function Tracker() {
             onClick={(e) => e.stopPropagation()}
           >
             <Card style={{ textAlign: 'center' }}>
-              <Ott state="celebrating" size={80} />
+              <Ott state="celebrating" size={56} />
               <h3 style={{ marginTop: 'var(--space-3)' }}>You got an interview!</h3>
               <p style={{
                 color: 'var(--color-text-secondary)',
@@ -508,7 +508,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
       {/* Interview prep questions */}
       {questionsLoading && (
         <div style={{ textAlign: 'center', marginTop: 'var(--space-3)', padding: 'var(--space-3) 0' }}>
-          <Ott state="thinking" size={48} />
+          <Ott state="thinking" size={32} />
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
             Generating interview questions...
           </p>
@@ -631,7 +631,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
             padding: 0,
           }}
         >
-          <Ott state="encouraging" size={24} /> Prep for this interview
+          <Ott state="encouraging" size={32} /> Prep for this interview
         </button>
       )}
     </Card>

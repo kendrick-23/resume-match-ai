@@ -314,7 +314,7 @@ export default function Profile() {
 
       {/* Ott + user email */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-        <Ott state="idle" size={60} />
+        <Ott state="idle" size={56} />
         <p style={{ fontWeight: 700, marginTop: 'var(--space-2)' }}>
           {fullName || user?.email || 'Job Seeker'}
         </p>
@@ -379,7 +379,7 @@ export default function Profile() {
               onChange={(e) => e.target.files[0] && setResumeFile(e.target.files[0])}
               style={{ display: 'none' }}
             />
-            <Ott state="waiting" size={48} />
+            <Ott state="waiting" size={56} />
             <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
               Upload your resume to power your job matches
             </p>
@@ -1002,7 +1002,7 @@ export default function Profile() {
           </Card>
         ) : (
           <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
-            <Ott state="encouraging" size={60} />
+            <Ott state="encouraging" size={56} />
             <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
               {analyses.length === 1
                 ? 'Run one more analysis to see your trend'
@@ -1115,6 +1115,13 @@ export default function Profile() {
           </p>
         )}
       </Card>
+
+      {/* Section divider */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', margin: 'var(--space-4) 0' }}>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+      </div>
 
       {/* Badge collection */}
       <h3 style={{

@@ -7,7 +7,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
-import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle } from 'lucide-react';
+import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
 import { useToast } from '../context/ToastContext';
@@ -751,7 +751,7 @@ export default function Jobs() {
           padding: 'var(--space-5)',
           marginBottom: 'var(--space-5)',
         }}>
-          <Ott state="coaching" size={64} />
+          <Ott state="coaching" size={56} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-3)', fontSize: '14px' }}>
             Couldn't load recommendations
           </p>
@@ -785,7 +785,7 @@ export default function Jobs() {
         <ProfileMatchLoading />
       ) : profileTimedOut ? (
         <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
-          <Ott state="coaching" size={80} />
+          <Ott state="coaching" size={56} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
             Search took too long
           </p>
@@ -798,7 +798,7 @@ export default function Jobs() {
         </Card>
       ) : profileEmpty ? (
         <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
-          <Ott state="coaching" size={80} />
+          <Ott state="coaching" size={56} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
             I need to know more about you first!
           </p>
@@ -815,7 +815,7 @@ export default function Jobs() {
           style={{ marginBottom: 0 }}
         >
           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-            <Ott state="idle" size={24} />
+            <Ott state="idle" size={32} />
             Find jobs that fit me
           </span>
         </Button>
@@ -1059,8 +1059,27 @@ export default function Jobs() {
       {/* Empty state — before any search */}
       {!fedSearched && !fedLoading && !hasAnalysis && recommended.length === 0 && !recLoading && (
         <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
-          <Ott state="waiting" size={80} />
-          <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
+          <Ott state="waiting" size={56} />
+          <div style={{
+            position: 'relative',
+            width: '160px',
+            margin: 'var(--space-3) auto',
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ width: '100%', height: '10px', borderRadius: 'var(--radius-full)', background: 'rgba(0,0,0,0.04)' }} />
+              <div style={{ width: '75%', height: '10px', borderRadius: 'var(--radius-full)', background: 'rgba(0,0,0,0.04)' }} />
+              <div style={{ width: '90%', height: '10px', borderRadius: 'var(--radius-full)', background: 'rgba(0,0,0,0.04)' }} />
+            </div>
+            <Search size={20} style={{
+              position: 'absolute',
+              right: '-4px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--color-accent)',
+              opacity: 0.6,
+            }} />
+          </div>
+          <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>
             Search for jobs to get started
           </p>
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-1)' }}>
@@ -1072,7 +1091,7 @@ export default function Jobs() {
       {/* Loading state for active tab */}
       {isLoading && activeJobs.length === 0 && (
         <Card style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
-          <Ott state="thinking" size={60} />
+          <Ott state="thinking" size={56} />
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '13px' }}>
             Searching {tabLabel.toLowerCase()} jobs...
           </p>
@@ -1082,7 +1101,7 @@ export default function Jobs() {
       {/* No results for active tab */}
       {isSearched && !isLoading && activeJobs.length === 0 && (
         <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
-          <Ott state="coaching" size={80} />
+          <Ott state="coaching" size={56} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
             No {tabLabel.toLowerCase()} jobs found
           </p>
@@ -1101,7 +1120,7 @@ export default function Jobs() {
             gap: 'var(--space-3)',
             marginBottom: 'var(--space-2)',
           }}>
-            <Ott state="encouraging" size={48} />
+            <Ott state="encouraging" size={32} />
             <div>
               <h3 style={{
                 display: 'flex',
@@ -1215,7 +1234,7 @@ function ProfileMatchLoading() {
   }, []);
   return (
     <Card style={{ textAlign: 'center', padding: 'var(--space-5)', marginBottom: 0 }}>
-      <Ott state="thinking" size={64} />
+      <Ott state="thinking" size={56} />
       <p style={{
         fontWeight: 600,
         fontSize: '14px',

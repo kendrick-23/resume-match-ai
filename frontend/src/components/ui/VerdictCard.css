@@ -24,7 +24,10 @@
 }
 
 /* Tier accents — left border + verdict pill color */
-.verdict-card--strong       { border-left-color: var(--color-accent); }
+.verdict-card--strong {
+  border-left-color: var(--color-accent);
+  background: radial-gradient(ellipse at 50% 40%, rgba(255,255,255,0.8) 0%, var(--color-surface-raised) 70%);
+}
 .verdict-card--stretch      { border-left-color: #F5A623; }
 .verdict-card--weak         { border-left-color: #E8821A; }
 .verdict-card--wrong_domain { border-left-color: var(--color-text-muted); }

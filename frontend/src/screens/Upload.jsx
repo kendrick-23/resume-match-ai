@@ -244,7 +244,7 @@ export default function Upload() {
       {/* Resume zone — three states: vault default / vault picker / fresh upload */}
       {vaultLoading ? (
         <Card style={{ textAlign: 'center', marginBottom: 'var(--space-5)', padding: 'var(--space-6)' }}>
-          <Ott state="thinking" size={60} />
+          <Ott state="thinking" size={56} />
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '13px' }}>
             Loading your resumes...
           </p>
@@ -257,7 +257,7 @@ export default function Upload() {
               src="/ott/ott-reading.png"
               alt="Ott"
               loading="lazy"
-              style={{ width: '80px', height: '80px', objectFit: 'contain', flexShrink: 0 }}
+              style={{ width: '56px', height: '56px', objectFit: 'contain', flexShrink: 0 }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -391,7 +391,7 @@ export default function Upload() {
 
           {file ? (
             <div>
-              <Ott state={ottState} size={80} />
+              <Ott state={ottState} size={56} />
               <p style={{ fontWeight: 700, marginTop: 'var(--space-3)' }}>{file.name}</p>
               <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
                 {(file.size / 1024).toFixed(0)} KB
@@ -411,7 +411,7 @@ export default function Upload() {
                 src="/ott/ott-reading.png"
                 alt="Ott reviewing your resume"
                 loading="lazy"
-                style={{ width: '160px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                style={{ width: '56px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
               />
               <div style={{ marginTop: 'var(--space-3)' }}>
                 <UploadIcon

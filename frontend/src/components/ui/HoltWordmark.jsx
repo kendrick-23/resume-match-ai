@@ -1,4 +1,4 @@
-export default function HoltWordmark({ size = 'default' }) {
+export default function HoltWordmark({ size = 'default', textOnly = false }) {
   const logoHeight = size === 'large' ? 56 : 36;
   const fontSize = size === 'large' ? 32 : 22;
 
@@ -8,23 +8,25 @@ export default function HoltWordmark({ size = 'default' }) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '10px',
+        gap: textOnly ? 0 : '10px',
         verticalAlign: 'middle',
       }}
       role="img"
       aria-label="Holt"
     >
-      <img
-        src="/ott/holt-logo.png"
-        alt="Holt"
-        style={{
-          height: logoHeight,
-          width: logoHeight,
-          borderRadius: '50%',
-          objectFit: 'cover',
-          display: 'block',
-        }}
-      />
+      {!textOnly && (
+        <img
+          src="/ott/holt-logo.png"
+          alt="Holt"
+          style={{
+            height: logoHeight,
+            width: logoHeight,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+        />
+      )}
       <span
         style={{
           fontFamily: "'Nunito', sans-serif",

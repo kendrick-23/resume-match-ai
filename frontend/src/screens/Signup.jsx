@@ -54,7 +54,7 @@ export default function Signup() {
             style={{ width: 160, height: 'auto', display: 'block', margin: '0 auto' }}
           />
           <div style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}>
-            <HoltWordmark size="large" />
+            <HoltWordmark size="large" textOnly />
           </div>
           <p style={{ fontWeight: 700, fontSize: '18px', marginTop: 'var(--space-2)' }}>Create your account</p>
           <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
