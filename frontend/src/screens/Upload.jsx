@@ -27,9 +27,33 @@ function formatDate(iso) {
   }
 }
 
-function truncate(str, n) {
+/**
+ * Middle-truncate a filename so the extension is preserved.
+ *   "Regional_Training_Manager_Resume_v3.docx" → "Regional_Training_Man...esume_v3.docx"
+ * For labels without an extension, falls back to a simple end-truncate.
+ */
+function truncate(str, n = 30) {
   if (!str) return '';
-  return str.length > n ? str.slice(0, n - 1) + '…' : str;
+  if (str.length <= n) return str;
+
+  // Detect a real extension (≤6 chars, alphanumeric) — anything else is a label, not a file.
+  const dot = str.lastIndexOf('.');
+  const ext = dot > 0 && dot > str.length - 8 ? str.slice(dot) : '';
+  if (!ext || /[^A-Za-z0-9.]/.test(ext)) {
+    return str.slice(0, n - 1) + '…';
+  }
+
+  const base = str.slice(0, dot);
+  // Reserve 1 char for the ellipsis + the extension; split the remaining budget
+  // between the leading and trailing portions of the basename.
+  const budget = n - 1 - ext.length;
+  if (budget < 4) {
+    // Extension is so long there's no room for a meaningful base — just end-truncate.
+    return str.slice(0, n - 1) + '…';
+  }
+  const head = Math.ceil(budget * 0.6);
+  const tail = budget - head;
+  return base.slice(0, head) + '…' + base.slice(base.length - tail) + ext;
 }
 
 export default function Upload() {
@@ -231,7 +255,18 @@ export default function Upload() {
               <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Your Resume
               </p>
-              <p style={{ fontWeight: 700, fontSize: '15px', marginTop: '2px' }}>
+              <p
+                title={selectedResume.label || selectedResume.source_filename || 'Resume'}
+                style={{
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  marginTop: '2px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '100%',
+                }}
+              >
                 {truncate(selectedResume.label || selectedResume.source_filename || 'Resume', 30)}
               </p>
               <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>
@@ -285,7 +320,17 @@ export default function Upload() {
                     >
                       <FileText size={14} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '13px', fontWeight: 700 }}>
+                        <p
+                          title={r.label || r.source_filename || 'Resume'}
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: '100%',
+                          }}
+                        >
                           {truncate(r.label || r.source_filename || 'Resume', 30)}
                         </p>
                         <p style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
