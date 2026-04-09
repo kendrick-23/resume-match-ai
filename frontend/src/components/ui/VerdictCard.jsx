@@ -61,6 +61,7 @@ export default function VerdictCard({
   postingUrl = '',
   analysisId = null,
   onGenerateResume = () => {},
+  onGenerateCoverLetter = null,
 }) {
   const navigate = useNavigate();
   const tier = scoreTier || deriveTier(score);
@@ -135,20 +136,44 @@ export default function VerdictCard({
         </svg>
       </div>
 
+      {/* Gap-closing message for stretch tiers */}
+      {(tier === 'stretch' || tier === 'weak') && (
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--color-text-muted)',
+          textAlign: 'center',
+          marginBottom: 'var(--space-3)',
+        }}>
+          A tailored resume + cover letter can close this gap.
+        </p>
+      )}
+
       {/* Smart CTA — the heart of verdict-first design */}
-      <div
-        className={`verdict-card__cta-row${tier === 'weak' ? ' verdict-card__cta-row--two' : ''}`}
-      >
+      <div className="verdict-card__cta-row">
         {tier === 'strong' && (
-          <Button full onClick={goToTrackerPrefilled}>
-            Log this application
-          </Button>
+          <>
+            <Button full onClick={goToTrackerPrefilled}>
+              Log this application
+            </Button>
+            {onGenerateCoverLetter && (
+              <Button variant="secondary" full onClick={onGenerateCoverLetter}>
+                Generate cover letter
+              </Button>
+            )}
+          </>
         )}
 
         {tier === 'stretch' && (
-          <Button full onClick={onGenerateResume} disabled={!analysisId}>
-            Generate tailored resume
-          </Button>
+          <>
+            <Button full onClick={onGenerateResume} disabled={!analysisId}>
+              Generate tailored resume
+            </Button>
+            {onGenerateCoverLetter && (
+              <Button variant="secondary" full onClick={onGenerateCoverLetter}>
+                Generate cover letter
+              </Button>
+            )}
+          </>
         )}
 
         {tier === 'weak' && (
@@ -156,9 +181,11 @@ export default function VerdictCard({
             <Button full onClick={onGenerateResume} disabled={!analysisId}>
               Generate tailored resume
             </Button>
-            <Button variant="secondary" full onClick={goToTrackerPrefilled}>
-              Log anyway
-            </Button>
+            {onGenerateCoverLetter && (
+              <Button variant="secondary" full onClick={onGenerateCoverLetter}>
+                Generate cover letter
+              </Button>
+            )}
           </>
         )}
 

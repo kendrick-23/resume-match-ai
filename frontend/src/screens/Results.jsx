@@ -636,6 +636,11 @@ export default function Results() {
             postingUrl={result.posting_url || ''}
             analysisId={result.analysis_id}
             onGenerateResume={handleGenerateResume}
+            onGenerateCoverLetter={() => {
+              const el = document.getElementById('cover-letter-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setActivePill('resume');
+            }}
           />
 
           {/* First-time guided hint — appears once, ever, then never returns */}
@@ -1056,7 +1061,7 @@ export default function Results() {
 
           {/* === COVER LETTER SECTION === */}
           {result.analysis_id && (
-            <div style={{ marginTop: 'var(--space-6)' }}>
+            <div id="cover-letter-section" style={{ marginTop: 'var(--space-6)', scrollMarginTop: '120px' }}>
               <h3 className="results-section__title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <Mail size={18} style={{ color: 'var(--color-accent)' }} /> Cover Letter
               </h3>
