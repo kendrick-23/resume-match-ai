@@ -326,12 +326,16 @@ async def update_profile(
 @router.delete("/data")
 @limiter.limit("100/hour")
 async def delete_all_data(request: Request, user: dict = Depends(get_current_user)):
-    """Delete all user data: analyses, applications, activity_log, badges, profile."""
+    """Delete all user data: analyses, resumes, applications, activity_log, badges, profile."""
     sb = _user_sb(user)
     user_id = user["user_id"]
 
-    # Delete from all tables
+    # Delete from all tables. Order matters: analyses references resumes via
+    # resume_id FK with ON DELETE SET NULL, so analyses can be deleted first
+    # OR resumes first — but deleting analyses first avoids leaving orphaned
+    # FK references in flight.
     sb.table("analyses").delete().eq("user_id", user_id).execute()
+    sb.table("resumes").delete().eq("user_id", user_id).execute()
     sb.table("applications").delete().eq("user_id", user_id).execute()
     sb.table("activity_log").delete().eq("user_id", user_id).execute()
     sb.table("badges").delete().eq("user_id", user_id).execute()
