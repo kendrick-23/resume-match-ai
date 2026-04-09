@@ -1,0 +1,179 @@
+import { useNavigate } from 'react-router-dom';
+import Button from './Button';
+import './VerdictCard.css';
+
+// Score ring math kept self-contained so this component doesn't depend on
+// the larger one inside Results.jsx.
+const RING_SIZE = 100;
+const RING_STROKE = 8;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+const TIER_META = {
+  strong: {
+    label: 'Apply Now',
+    headline: "You're ready for this one.",
+    ottState: 'encouraging',
+    ottImage: '/ott/ott-encouraging.png',
+    ringColor: 'var(--color-success)',
+  },
+  stretch: {
+    label: 'Polish First',
+    headline: "You're closer than you think.",
+    ottState: 'coaching',
+    ottImage: '/ott/ott-coaching.png',
+    ringColor: '#F5A623',
+  },
+  weak: {
+    label: 'Worth a Shot',
+    headline: 'Gap is closeable — here\'s how.',
+    ottState: 'thinking',
+    ottImage: '/ott/ott-thinking.png',
+    ringColor: '#E8821A',
+  },
+  wrong_domain: {
+    label: 'Not Your Path',
+    headline: "This one needs years — let's find a better fit.",
+    ottState: 'waiting',
+    ottImage: '/ott/ott-waiting.png',
+    ringColor: 'var(--color-text-muted)',
+  },
+};
+
+/**
+ * Derive a tier from a raw 0-100 score. Used as a fallback when an analysis
+ * row predates the score_tier column being added by the prompt overhaul.
+ */
+export function deriveTier(score) {
+  if (score == null) return 'stretch';
+  if (score >= 70) return 'strong';
+  if (score >= 45) return 'stretch';
+  if (score >= 20) return 'weak';
+  return 'wrong_domain';
+}
+
+/**
+ * @param {object} props
+ * @param {number} props.score
+ * @param {string|null} props.scoreTier — strong | stretch | weak | wrong_domain (or null for legacy)
+ * @param {string} props.companyName
+ * @param {string} props.roleName
+ * @param {string} props.analysisId
+ * @param {function} props.onGenerateResume — handler for the "Generate tailored resume" CTA
+ */
+export default function VerdictCard({
+  score = 0,
+  scoreTier = null,
+  companyName = '',
+  roleName = '',
+  analysisId = null,
+  onGenerateResume = () => {},
+}) {
+  const navigate = useNavigate();
+  const tier = scoreTier || deriveTier(score);
+  const meta = TIER_META[tier] || TIER_META.stretch;
+
+  const offset = RING_CIRCUMFERENCE - (Math.max(0, Math.min(100, score)) / 100) * RING_CIRCUMFERENCE;
+
+  // CTA actions are bound to the verdict — wired to existing nav targets.
+  const goToTrackerPrefilled = () => {
+    navigate('/tracker', {
+      state: {
+        prefill: true,
+        company: companyName || '',
+        role: roleName || '',
+        notes: `Holt Score: ${score}%`,
+      },
+    });
+  };
+
+  const goToJobs = () => navigate('/jobs');
+
+  return (
+    <div
+      className={`verdict-card verdict-card--${tier}`}
+      role="region"
+      aria-label={`Match verdict: ${meta.label}`}
+    >
+      <span className="verdict-card__pill">{meta.label}</span>
+      <img className="verdict-card__ott" src={meta.ottImage} alt={`Ott ${meta.ottState}`} />
+      <h2 className="verdict-card__headline">{meta.headline}</h2>
+
+      {/* Score ring — smaller than the legacy one. Supporting, not leading. */}
+      <div className="verdict-card__ring-wrap" style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+          <circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RING_RADIUS}
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth={RING_STROKE}
+          />
+          <circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RING_RADIUS}
+            fill="none"
+            stroke={meta.ringColor}
+            strokeWidth={RING_STROKE}
+            strokeLinecap="round"
+            strokeDasharray={RING_CIRCUMFERENCE}
+            strokeDashoffset={offset}
+            style={{
+              transform: 'rotate(-90deg)',
+              transformOrigin: '50% 50%',
+              transition: 'stroke-dashoffset 800ms ease-out',
+            }}
+          />
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="Nunito, sans-serif"
+            fontWeight="800"
+            fontSize="26"
+            fill="var(--color-text)"
+          >
+            {score}
+          </text>
+        </svg>
+      </div>
+
+      {/* Smart CTA — the heart of verdict-first design */}
+      <div
+        className={`verdict-card__cta-row${tier === 'weak' ? ' verdict-card__cta-row--two' : ''}`}
+      >
+        {tier === 'strong' && (
+          <Button full onClick={goToTrackerPrefilled}>
+            Log this application
+          </Button>
+        )}
+
+        {tier === 'stretch' && (
+          <Button full onClick={onGenerateResume} disabled={!analysisId}>
+            Generate tailored resume
+          </Button>
+        )}
+
+        {tier === 'weak' && (
+          <>
+            <Button full onClick={onGenerateResume} disabled={!analysisId}>
+              Generate tailored resume
+            </Button>
+            <Button variant="secondary" full onClick={goToTrackerPrefilled}>
+              Log anyway
+            </Button>
+          </>
+        )}
+
+        {tier === 'wrong_domain' && (
+          <Button full onClick={goToJobs}>
+            Find better matches
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

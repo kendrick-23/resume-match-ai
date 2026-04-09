@@ -10,6 +10,7 @@ import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../se
 import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
+import VerdictCard from '../components/ui/VerdictCard';
 import './Results.css';
 
 const RING_SIZE = 140;
@@ -341,6 +342,7 @@ export default function Results() {
         const latest = data[0];
         setResult({
           score: latest.score,
+          score_tier: latest.score_tier || null,
           strengths: typeof latest.strengths === 'string' ? JSON.parse(latest.strengths) : latest.strengths,
           gaps: typeof latest.gaps === 'string' ? JSON.parse(latest.gaps) : latest.gaps,
           recommendations: typeof latest.recommendations === 'string' ? JSON.parse(latest.recommendations) : latest.recommendations,
@@ -382,6 +384,29 @@ export default function Results() {
     const el = sectionRefs.current[id];
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  /**
+   * Trigger the ATS resume generator and scroll the user to the resume section
+   * so they see the loading state. Shared by the existing Resume-section button
+   * AND the VerdictCard CTAs (stretch / weak tiers).
+   */
+  async function handleGenerateResume() {
+    if (!result?.analysis_id || generatingResume || resumeMd) return;
+    // Scroll to the resume section first so the loading state is visible
+    const el = sectionRefs.current.resume;
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActivePill('resume');
+    setGeneratingResume(true);
+    setResumeError('');
+    try {
+      const data = await generateResume(result.analysis_id);
+      setResumeMd(data.resume_md);
+    } catch (err) {
+      setResumeError(err.message);
+    } finally {
+      setGeneratingResume(false);
     }
   }
 
@@ -435,10 +460,20 @@ export default function Results() {
         </Card>
       ) : (
         <>
+          {/* Verdict-first header — always the top of the screen */}
+          <VerdictCard
+            score={score}
+            scoreTier={result.score_tier}
+            companyName={result.company_name || ''}
+            roleName={result.role_name || ''}
+            analysisId={result.analysis_id}
+            onGenerateResume={handleGenerateResume}
+          />
+
           {/* Job context card */}
           <JobContextCard result={result} />
 
-          {/* Score card — always at top */}
+          {/* Legacy score card — kept as a supporting summary (no longer the lead) */}
           <Card style={{ textAlign: 'center', marginBottom: 0, padding: 'var(--space-5)' }}>
             <Ott state={ottState} size={80} />
             <div style={{ marginTop: 'var(--space-3)' }}>
@@ -625,18 +660,7 @@ export default function Results() {
                     {resumeError}
                   </p>
                 )}
-                <Button onClick={async () => {
-                  setGeneratingResume(true);
-                  setResumeError('');
-                  try {
-                    const data = await generateResume(result.analysis_id);
-                    setResumeMd(data.resume_md);
-                  } catch (err) {
-                    setResumeError(err.message);
-                  } finally {
-                    setGeneratingResume(false);
-                  }
-                }}>
+                <Button onClick={handleGenerateResume}>
                   Generate Resume
                 </Button>
               </Card>
@@ -787,6 +811,7 @@ export default function Results() {
                     onClick={() => {
                       setResult({
                         score: a.score,
+                        score_tier: a.score_tier || null,
                         strengths: typeof a.strengths === 'string' ? JSON.parse(a.strengths) : a.strengths,
                         gaps: typeof a.gaps === 'string' ? JSON.parse(a.gaps) : a.gaps,
                         recommendations: typeof a.recommendations === 'string' ? JSON.parse(a.recommendations) : a.recommendations,
