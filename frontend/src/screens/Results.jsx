@@ -7,7 +7,7 @@ import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
 import { listAnalyses, analyzeResume } from '../services/api';
 import { generateResume, parseResumeMarkdown, downloadResumeAsDocx } from '../services/resumeGenerator';
-import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3, X } from 'lucide-react';
+import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp, BarChart3, X, ExternalLink } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
@@ -199,8 +199,28 @@ function JobContextCard({ result }) {
     return dateStr ? `Analyzed with: ${name} · ${dateStr}` : `Analyzed with: ${name}`;
   })();
 
+  const postingUrl = result.posting_url;
+
   return (
-    <Card style={{ marginBottom: 'var(--space-4)' }}>
+    <Card style={{ marginBottom: 'var(--space-4)', position: 'relative' }}>
+      {postingUrl && (
+        <a
+          href={postingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View original job posting"
+          style={{
+            position: 'absolute',
+            top: 'var(--space-4)',
+            right: 'var(--space-4)',
+            color: 'var(--color-accent-dark)',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <ExternalLink size={16} />
+        </a>
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
         <FileText size={18} style={{ color: 'var(--color-accent)', flexShrink: 0, marginTop: '2px' }} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -418,6 +438,7 @@ export default function Results() {
           seniority_fit: latest.seniority_fit,
           salary_alignment: latest.salary_alignment,
           growth_potential: latest.growth_potential,
+          posting_url: latest.posting_url || null,
         });
         if (latest.generated_resume_md) {
           setResumeMd(latest.generated_resume_md);
