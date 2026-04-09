@@ -4,6 +4,8 @@ import time
 import asyncio
 from typing import Optional
 
+from app.logger import logger
+
 # In-memory cache: key -> (timestamp, result)
 _cache: dict[str, tuple[float, dict]] = {}
 _CACHE_TTL = 1800  # 30 minutes
@@ -45,7 +47,7 @@ def _search_sync(keywords: str, location: str, results: int) -> dict:
             country_indeed="USA",
         )
     except Exception as exc:
-        print(f"[JobSpy] Scrape failed: {exc}")
+        logger.error(f"[JobSpy] Scrape failed: {exc}", exc_info=True)
         return {"total": 0, "jobs": []}
 
     if df is None or df.empty:
@@ -127,7 +129,7 @@ async def search_jobspy(
         loop = asyncio.get_event_loop()
         data = await loop.run_in_executor(None, _search_sync, keywords, loc, results)
     except Exception as exc:
-        print(f"[JobSpy] Async wrapper failed: {exc}")
+        logger.error(f"[JobSpy] Async wrapper failed: {exc}", exc_info=True)
         data = {"total": 0, "jobs": []}
 
     _cache[key] = (time.time(), data)

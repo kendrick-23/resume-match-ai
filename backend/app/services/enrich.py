@@ -14,6 +14,7 @@ import time
 
 import anthropic
 
+from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 
 # Module-level cache: key → (timestamp, enriched_text)
@@ -112,7 +113,7 @@ async def enrich_job_description(job: dict) -> str:
         _description_cache[key] = (time.time(), combined)
         return combined
     except Exception as exc:
-        print(f"[Enrich] Haiku call failed for '{title}': {exc}")
+        logger.error(f"[Enrich] Haiku call failed for '{title}': {exc}", exc_info=True)
         return desc
 
 

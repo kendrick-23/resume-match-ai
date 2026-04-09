@@ -18,6 +18,7 @@ from PyPDF2 import PdfReader
 from docx import Document
 
 from app.constants.scoring import derive_tier
+from app.logger import logger
 from app.services.file_extraction import extract_resume_text_from_upload
 from app.services.resume_vault import (
     fetch_resume_content,
@@ -242,7 +243,7 @@ async def interview_prep(
         if latest_analysis is None and rows:
             latest_analysis = rows[0]
     except Exception as exc:
-        print(f"[/interview-prep] Profile/analysis fetch failed: {exc}")
+        logger.error(f"[/interview-prep] Profile/analysis fetch failed: {exc}", exc_info=True)
 
     # Build the candidate background section.
     target_roles = profile.get("target_roles") or "(not specified)"
@@ -328,7 +329,7 @@ Generate 5 behavioral interview questions tailored to this candidate. Each STAR 
                 break
         return {"questions": questions[:5]}
     except Exception as e:
-        print(f"[/interview-prep] Error: {e}")
+        logger.error(f"[/interview-prep] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Couldn't generate interview questions. Please try again.")
 
 
@@ -457,7 +458,7 @@ Generate 2-3 coaching tips. Apply the truthfulness rule strictly: never tell the
                 tips = block.input.get("tips") or []
                 return [t for t in tips if isinstance(t, str)][:3]
     except Exception as exc:
-        print(f"[Ott coaching] Failed: {exc}")
+        logger.error(f"[Ott coaching] Failed: {exc}", exc_info=True)
     return []
 
 
@@ -552,10 +553,10 @@ Submit the merged, deduplicated, canonical list via the submit_skills tool."""
                     "skills_extracted": merged,
                 }).execute()
             except Exception as exc:
-                print(f"[Skills extraction] Upsert failed: {exc}")
+                logger.error(f"[Skills extraction] Upsert failed: {exc}", exc_info=True)
             return merged
     except Exception as exc:
-        print(f"[Skills extraction] Failed: {exc}")
+        logger.error(f"[Skills extraction] Failed: {exc}", exc_info=True)
 
     # On any failure, preserve the existing list rather than wiping it.
     return existing_skills
@@ -771,7 +772,7 @@ async def analyze(
             raise
         except Exception as exc:
             # Vault save shouldn't block analysis — log and continue without an FK.
-            print(f"[/analyze] Vault auto-save failed: {exc}")
+            logger.error(f"[/analyze] Vault auto-save failed: {exc}", exc_info=True)
     else:
         # Neither a resume_id nor raw text — fall back to the user's default vault entry.
         default_row = fetch_default_resume_content(sb, user["user_id"])
@@ -893,7 +894,7 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             if dedup_res.data:
                 existing_analysis_id = dedup_res.data[0]["id"]
         except Exception as exc:
-            print(f"[/analyze] Dedup check failed (proceeding with insert): {exc}")
+            logger.warning(f"[/analyze] Dedup check failed (proceeding with insert): {exc}")
 
         # Save analysis to Supabase (include original inputs for resume generation).
         # The sb client was created at the top of the function for the profile fetch.
@@ -1010,5 +1011,5 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[/analyze] Error: {e}")
+        logger.error(f"[/analyze] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Something went wrong during analysis. Please try again.")

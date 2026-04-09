@@ -7,6 +7,7 @@ from supabase import create_client
 import os
 
 from app.main import get_current_user, limiter
+from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 
 router = APIRouter(tags=["generate-cover-letter"])
@@ -144,14 +145,14 @@ Write the cover letter now."""
                 .execute()
         except Exception as exc:
             # cover_letter column may not exist yet — log and continue
-            print(f"[/generate-cover-letter] Cache save failed (column may not exist): {exc}")
+            logger.warning(f"[/generate-cover-letter] Cache save failed (column may not exist): {exc}")
 
         return {"cover_letter": cover_letter, "cached": False}
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[/generate-cover-letter] Error: {e}")
+        logger.error(f"[/generate-cover-letter] Error: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Something went wrong generating your cover letter. Please try again."

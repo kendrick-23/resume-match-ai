@@ -2,6 +2,8 @@ import httpx
 import os
 from typing import Optional
 
+from app.logger import logger
+
 ADZUNA_BASE_URL = "https://api.adzuna.com/v1/api/jobs/us/search"
 
 
@@ -17,7 +19,7 @@ async def search_adzuna_jobs(
     app_key = os.environ.get("ADZUNA_APP_KEY", "")
 
     if not app_id or not app_key:
-        print("[Adzuna] Warning: ADZUNA_APP_ID or ADZUNA_APP_KEY not set — skipping")
+        logger.warning("[Adzuna] ADZUNA_APP_ID or ADZUNA_APP_KEY not set — skipping")
         return {"total": 0, "jobs": []}
 
     params: dict = {
@@ -37,11 +39,11 @@ async def search_adzuna_jobs(
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(url, params=params)
             if resp.status_code != 200:
-                print(f"[Adzuna] Non-200 response: {resp.status_code} — {resp.text[:200]}")
+                logger.warning(f"[Adzuna] Non-200 response: {resp.status_code} — {resp.text[:200]}")
                 return {"total": 0, "jobs": []}
             data = resp.json()
     except Exception as exc:
-        print(f"[Adzuna] Request failed: {exc}")
+        logger.error(f"[Adzuna] Request failed: {exc}", exc_info=True)
         return {"total": 0, "jobs": []}
 
     return _normalize(data)

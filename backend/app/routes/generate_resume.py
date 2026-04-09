@@ -5,6 +5,7 @@ from supabase import create_client
 import os
 
 from app.main import get_current_user, limiter
+from app.logger import logger
 
 router = APIRouter(tags=["generate-resume"])
 
@@ -158,7 +159,7 @@ Rewrite the resume per the system rules. Output only the markdown — no comment
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[/generate-resume] Error: {e}")
+        logger.error(f"[/generate-resume] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Something went wrong generating your resume. Please try again.")
 
 

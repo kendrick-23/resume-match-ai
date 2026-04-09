@@ -15,6 +15,7 @@ from typing import Optional
 
 import anthropic
 
+from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 
 # Cache: cache_key → (timestamp, result_dict)
@@ -160,7 +161,7 @@ Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practica
         _semantic_cache[key] = (time.time(), result)
         return result
     except Exception as exc:
-        print(f"[SemanticScore] Failed for '{j_title}': {exc}")
+        logger.error(f"[SemanticScore] Failed for '{j_title}': {exc}", exc_info=True)
         return None
 
 

@@ -15,6 +15,7 @@ import anthropic
 
 from app.constants.scoring import TIER_BREAKPOINTS
 
+from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 
 _semaphore = asyncio.Semaphore(5)
@@ -111,7 +112,7 @@ async def get_job_specific_gaps(
                 _gap_cache[cache_key] = (time.time(), result)
                 return result
         except Exception as exc:
-            print(f"[GapAnalyzer] Failed for '{title}': {exc}")
+            logger.error(f"[GapAnalyzer] Failed for '{title}': {exc}", exc_info=True)
     return []
 
 

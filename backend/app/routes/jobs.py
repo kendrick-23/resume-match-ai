@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from supabase import create_client
 
 from app.main import limiter, get_current_user
+from app.logger import logger
 from app.constants.scoring import DOMAIN_PENALTY_CAP, SALARY_FLOOR_CAP, TIER_BREAKPOINTS
 from app.services.token_budget import is_budget_exhausted
 from app.services.usajobs import search_usajobs
@@ -37,7 +38,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     try:
         await enrich_jobs_batch(jobs)
     except Exception as exc:
-        print(f"[Enrich] Batch enrichment failed: {exc}")
+        logger.error(f"[Enrich] Batch enrichment failed: {exc}")
 
     # Step 2: Fetch profile + analysis data with a SINGLE Supabase client
     profile = {}
@@ -65,7 +66,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             raw_gaps = latest.get("gaps", "[]")
             analysis_gaps = json.loads(raw_gaps) if isinstance(raw_gaps, str) else raw_gaps or []
     except Exception as exc:
-        print(f"[HoltScore] Profile/analysis fetch failed: {exc}")
+        logger.error(f"[HoltScore] Profile/analysis fetch failed: {exc}")
 
     # Step 3: Score each job
     for job in jobs:
@@ -81,7 +82,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["salary_floor_violation"] = score_data.get("salary_floor_violation", False)
             job["salary_not_disclosed"] = score_data.get("salary_not_disclosed", False)
         except Exception as exc:
-            print(f"[HoltScore] Scoring failed for job {job.get('id', '?')}: {exc}")
+            logger.error(f"[HoltScore] Scoring failed for job {job.get('id', '?')}: {exc}")
             job["holt_score"] = 50
             job["holt_breakdown"] = {
                 "skills_match": 50, "salary_alignment": 50, "schedule_fit": 50,
@@ -99,7 +100,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     try:
         await semantic_rescore_batch(jobs, profile, user.get("user_id", ""))
     except Exception as exc:
-        print(f"[SemanticScore] Batch re-scoring failed: {exc}")
+        logger.error(f"[SemanticScore] Batch re-scoring failed: {exc}")
 
     # Step 5: Claude-powered gap analysis — SKIP domain-penalized jobs entirely.
     # Pass target_roles so the gap analyzer knows what direction the candidate
@@ -107,7 +108,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     try:
         await analyze_gaps_batch(jobs, resume_skills, profile.get("target_roles") or "")
     except Exception as exc:
-        print(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
+        logger.error(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
 
     # Step 6: FINAL domain penalty enforcement — 15% cap cannot be overridden.
     # This runs LAST so semantic re-scoring can never lift a domain-mismatched
@@ -175,7 +176,7 @@ async def search_jobs(
                 timeout=30.0,
             )
         except asyncio.TimeoutError:
-            print("[/jobs/search] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/search] Scoring pipeline timed out after 30s")
             scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
@@ -206,13 +207,13 @@ async def search_adzuna(
                 timeout=30.0,
             )
         except asyncio.TimeoutError:
-            print("[/jobs/adzuna] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/adzuna] Scoring pipeline timed out after 30s")
             scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
         return results
     except Exception as e:
-        print(f"[/jobs/adzuna] Error: {e}")
+        logger.error(f"[/jobs/adzuna] Error: {e}", exc_info=True)
         return {"total": 0, "jobs": []}
 
 
@@ -260,7 +261,7 @@ async def search_aggregated(
                 timeout=30.0,
             )
         except asyncio.TimeoutError:
-            print("[/jobs/aggregated] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/aggregated] Scoring pipeline timed out after 30s")
 
         # Sort by Holt Score descending (best matches first)
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
@@ -268,7 +269,7 @@ async def search_aggregated(
         return {"total": len(unique_jobs), "jobs": unique_jobs, "degraded": is_budget_exhausted()}
 
     except Exception as e:
-        print(f"[/jobs/aggregated] Error: {e}")
+        logger.error(f"[/jobs/aggregated] Error: {e}", exc_info=True)
         return {"total": 0, "jobs": [], "degraded": False}
 
 
@@ -351,5 +352,5 @@ async def save_search_cache(
             .execute()
         return {"ok": True}
     except Exception as exc:
-        print(f"[Cache] Save failed: {exc}")
+        logger.error(f"[Cache] Save failed: {exc}", exc_info=True)
         return {"ok": False}
