@@ -1,7 +1,7 @@
 """
 Job-specific gap analysis using Claude Haiku.
 
-For Within Reach jobs (50-69%), asks Haiku to identify 2-3 specific
+For Within Reach jobs (stretch tier), asks Haiku to identify 2-3 specific
 skills or qualifications the job requires that the candidate lacks.
 """
 
@@ -12,6 +12,8 @@ import time
 from typing import Optional
 
 import anthropic
+
+from app.constants.scoring import TIER_BREAKPOINTS
 
 from app.services.token_budget import check_budget, estimate_tokens
 
@@ -127,11 +129,11 @@ async def analyze_gaps_batch(
     user_skills: list[str],
     target_roles: str = "",
 ) -> None:
-    """Run gap analysis on Within Reach jobs (50-69%) in parallel."""
+    """Run gap analysis on Within Reach (stretch tier) jobs in parallel."""
     within_reach = [
         j for j in jobs
         if j.get("holt_score") is not None
-        and 50 <= j["holt_score"] <= 69
+        and TIER_BREAKPOINTS["stretch"] <= j["holt_score"] < TIER_BREAKPOINTS["strong"]
         and not j.get("domain_penalized")
         and j.get("coaching_label") != "Different specialization"
     ]

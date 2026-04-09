@@ -11,6 +11,7 @@ import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles,
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
+import { TIER_BREAKPOINTS, scoreBadgeVariant, subScoreColor } from '../constants/scoring';
 import './Jobs.css';
 
 const STORAGE_KEY = 'holt_jobs_search';
@@ -252,12 +253,12 @@ export default function Jobs() {
           page: 1,
         });
         // Filter recommendations to high-confidence, in-domain matches only:
-        //   1. holt_score >= 70 (Strong Match floor — never recommend a stretch)
+        //   1. holt_score >= strong threshold (Strong Match floor — never recommend a stretch)
         //   2. NOT domain_penalized — corrections / clinical / legal mismatches
         //      and other out-of-domain roles are excluded outright, regardless
         //      of how the keyword matcher scored them.
         const filtered = (data.jobs || []).filter(
-          (j) => (j.holt_score ?? 0) >= 70 && !j.domain_penalized
+          (j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !j.domain_penalized
         );
         const top = filtered.slice(0, 5);
         setRecommended(top);
@@ -579,7 +580,7 @@ export default function Jobs() {
   ];
 
   const withinReachJobs = activeJobs.filter(
-    (j) => j.holt_score != null && j.holt_score >= 50 && j.holt_score <= 69
+    (j) => j.holt_score != null && j.holt_score >= TIER_BREAKPOINTS.stretch && j.holt_score < TIER_BREAKPOINTS.strong
   );
 
   // Tab labels with counts
@@ -1133,7 +1134,7 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
         <div style={{ display: 'flex', gap: 'var(--space-1)', flexShrink: 0 }}>
           {recommended && <Badge variant="success">Recommended</Badge>}
           {holtScore != null && (
-            <Badge variant={holtScore >= 70 ? 'success' : holtScore >= 40 ? 'warning' : 'danger'}>
+            <Badge variant={scoreBadgeVariant(holtScore)}>
               {holtScore}% Holt
             </Badge>
           )}
@@ -1196,7 +1197,7 @@ function JobCard({ job, savedIds, onSave, formatSalary, recommended = false, hol
                   <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
                   <span style={{
                     fontWeight: 700,
-                    color: val >= 70 ? 'var(--color-success)' : val >= 50 ? 'var(--color-warning)' : 'var(--color-accent)',
+                    color: subScoreColor(val),
                   }}>{val}</span>
                 </div>
               ))}

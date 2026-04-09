@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import Button from './Button';
+import { deriveTier } from '../../constants/scoring';
 import './VerdictCard.css';
 
 // Score ring math kept self-contained so this component doesn't depend on
@@ -40,17 +41,8 @@ const TIER_META = {
   },
 };
 
-/**
- * Derive a tier from a raw 0-100 score. Used as a fallback when an analysis
- * row predates the score_tier column being added by the prompt overhaul.
- */
-export function deriveTier(score) {
-  if (score == null) return 'stretch';
-  if (score >= 70) return 'strong';
-  if (score >= 45) return 'stretch';
-  if (score >= 20) return 'weak';
-  return 'wrong_domain';
-}
+// Re-export so existing imports from VerdictCard still work.
+export { deriveTier } from '../../constants/scoring';
 
 /**
  * @param {object} props

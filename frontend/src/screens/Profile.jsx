@@ -13,6 +13,7 @@ import { User, FileText, Award, Settings, Trash2, LogOut, Save, ChevronLeft, Tre
 import ScoreTrendChart, { TrendBadge } from '../components/ui/ScoreTrendChart';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
+import { scoreBadgeVariant } from '../constants/scoring';
 import './Profile.css';
 
 export default function Profile() {
@@ -334,7 +335,7 @@ export default function Profile() {
                   Last analyzed: {new Date(analyses[0].created_at).toLocaleDateString()}
                 </p>
               </div>
-              <Badge variant={analyses[0].score >= 70 ? 'success' : analyses[0].score >= 40 ? 'warning' : 'danger'}>
+              <Badge variant={scoreBadgeVariant(analyses[0].score)}>
                 {analyses[0].score}%
               </Badge>
             </div>
@@ -1045,7 +1046,7 @@ export default function Profile() {
                     {new Date(a.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Badge variant={a.score >= 70 ? 'success' : a.score >= 40 ? 'warning' : 'danger'}>
+                <Badge variant={scoreBadgeVariant(a.score)}>
                   {a.score}%
                 </Badge>
               </div>

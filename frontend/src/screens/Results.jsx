@@ -11,6 +11,7 @@ import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
+import { deriveTier, scoreColor, scoreBadgeVariant, scoreOttState, subScoreColor } from '../constants/scoring';
 import './Results.css';
 
 const RING_SIZE = 140;
@@ -28,12 +29,7 @@ const PILLS = [
 
 function ScoreRing({ score }) {
   const offset = RING_CIRCUMFERENCE - (score / 100) * RING_CIRCUMFERENCE;
-  const color =
-    score >= 70
-      ? 'var(--color-success)'
-      : score >= 40
-        ? 'var(--color-warning)'
-        : 'var(--color-danger)';
+  const color = scoreColor(score);
 
   return (
     <div className="score-ring" style={{ position: 'relative', margin: '0 auto' }}>
@@ -143,11 +139,7 @@ function ScoreBreakdown({ result }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {SUB_SCORE_LABELS.map((s, i) => {
           const value = result[s.key] ?? 0;
-          const barColor = value >= 70
-            ? 'var(--color-success)'
-            : value >= 50
-              ? 'var(--color-warning)'
-              : 'var(--color-accent)';
+          const barColor = subScoreColor(value);
           return (
             <div key={s.key}>
               <div style={{
@@ -365,10 +357,7 @@ export default function Results() {
 
     // Stretch banner: only when this is a stretch-tier match AND no resume
     // has been generated yet AND it hasn't been dismissed for THIS analysis.
-    const tier = result.score_tier ||
-      (result.score >= 70 ? 'strong' :
-       result.score >= 45 ? 'stretch' :
-       result.score >= 20 ? 'weak' : 'wrong_domain');
+    const tier = result.score_tier || deriveTier(result.score);
     const analysisDismissKey = `holt_dismissed_stretch_${result.analysis_id || ''}`;
     let dismissed = false;
     try {
@@ -486,10 +475,7 @@ export default function Results() {
   const hasResult = result && typeof result.score === 'number';
   const score = hasResult ? result.score : 0;
   const resolvedTier = hasResult
-    ? (result.score_tier ||
-        (score >= 70 ? 'strong' :
-         score >= 45 ? 'stretch' :
-         score >= 20 ? 'weak' : 'wrong_domain'))
+    ? (result.score_tier || deriveTier(score))
     : null;
 
   // First-time hint copy — keyed to the resolved tier.
@@ -509,11 +495,7 @@ export default function Results() {
     ? 'thinking'
     : !hasResult
       ? 'waving'
-      : score >= 70
-        ? 'celebrating'
-        : score >= 40
-          ? 'encouraging'
-          : 'coaching';
+      : scoreOttState(score);
 
   if (loading) {
     return (
@@ -806,7 +788,7 @@ export default function Results() {
               }}>
                 <Ott state="encouraging" size={48} />
                 <p style={{ fontWeight: 700, color: 'var(--color-accent-dark)' }}>
-                  {score >= 70 ? "You're in great shape!" : score >= 40 ? "Good foundation — let's sharpen it." : "Don't worry — here's your game plan."}
+                  {resolvedTier === 'strong' ? "You're in great shape!" : resolvedTier === 'stretch' ? "Good foundation — let's sharpen it." : "Don't worry — here's your game plan."}
                 </p>
               </div>
               {result.coaching_tips?.length > 0 ? (
@@ -825,9 +807,9 @@ export default function Results() {
                 </div>
               ) : (
                 <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6, fontSize: '14px' }}>
-                  {score >= 70
+                  {resolvedTier === 'strong'
                     ? "Your resume is a strong match. Focus on tailoring your cover letter and preparing for behavioral interviews."
-                    : score >= 40
+                    : resolvedTier === 'stretch'
                       ? "You have transferable skills. Try rewording your experience to use the same language as the job description."
                       : "Start by addressing the gaps above. Even small keyword additions can significantly improve your ATS score."}
                 </p>
@@ -1036,7 +1018,7 @@ export default function Results() {
                           {new Date(a.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <Badge variant={a.score >= 70 ? 'success' : a.score >= 40 ? 'warning' : 'danger'}>
+                      <Badge variant={scoreBadgeVariant(a.score)}>
                         {a.score}%
                       </Badge>
                     </div>

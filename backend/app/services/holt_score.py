@@ -14,6 +14,8 @@ import json
 import re
 from typing import Optional
 
+from app.constants.scoring import TIER_BREAKPOINTS, DOMAIN_PENALTY_CAP
+
 
 # Hospitality / retail / food-service vocabulary → corporate operations vocabulary.
 # Holt's primary user (Nicole) is pivoting from F&B / retail ops into corporate
@@ -534,16 +536,16 @@ def calculate_holt_score(
     # Cap is 15% (lowered from 28) so domain-mismatched roles drop to the very bottom
     # of the list and never appear in "Within Reach" or "Strong Match" buckets.
     if domain_penalty_applied:
-        total_score = min(total_score, 15)
+        total_score = min(total_score, DOMAIN_PENALTY_CAP)
 
     # Coaching label
     if domain_penalty_applied:
         coaching_label = "Different specialization"
     elif salary_floor_violation:
         coaching_label = "Below your salary range"
-    elif total_score >= 70:
+    elif total_score >= TIER_BREAKPOINTS["strong"]:
         coaching_label = "Strong match"
-    elif total_score >= 50:
+    elif total_score >= TIER_BREAKPOINTS["stretch"]:
         coaching_label = "Within Reach"
     else:
         coaching_label = "Growth opportunity"

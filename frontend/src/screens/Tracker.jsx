@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Ott from '../components/ott/Ott';
 import { Plus, X, Trash2, ExternalLink, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { scoreBadgeVariant } from '../constants/scoring';
 import {
   listApplications,
   createApplication,
@@ -446,7 +447,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
           </span>
         )}
         {app.match_score != null && (
-          <Badge variant={app.match_score >= 70 ? 'success' : app.match_score >= 40 ? 'warning' : 'danger'}>
+          <Badge variant={scoreBadgeVariant(app.match_score)}>
             {app.match_score}% match
           </Badge>
         )}

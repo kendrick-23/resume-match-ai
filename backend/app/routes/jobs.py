@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from supabase import create_client
 
 from app.main import limiter, get_current_user
+from app.constants.scoring import DOMAIN_PENALTY_CAP, SALARY_FLOOR_CAP, TIER_BREAKPOINTS
 from app.services.usajobs import search_usajobs
 from app.services.adzuna import search_adzuna_jobs
 from app.services.jobspy_service import search_jobspy
@@ -113,7 +114,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     # roles drop to the bottom of the list.
     for job in jobs:
         if job.get("domain_penalized"):
-            job["holt_score"] = min(job["holt_score"], 15)
+            job["holt_score"] = min(job["holt_score"], DOMAIN_PENALTY_CAP)
             job["coaching_label"] = "Different specialization"
 
     # Step 7: FINAL salary-floor enforcement — composite cap @ 25 for jobs that
@@ -123,7 +124,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     # jobs that aren't already domain-capped at 15.
     for job in jobs:
         if job.get("salary_floor_violation") and not job.get("domain_penalized"):
-            job["holt_score"] = min(job["holt_score"], 25)
+            job["holt_score"] = min(job["holt_score"], SALARY_FLOOR_CAP)
             job["coaching_label"] = "Below your salary range"
 
     # Step 8: Hard exclusion when the user has explicitly set salary as a
