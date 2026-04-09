@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ToastProvider } from './context/ToastContext';
 import { ActionToastProvider } from './context/ActionToastContext';
 import { StreakProvider } from './context/StreakContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import BottomNav from './components/ui/BottomNav';
 import Dashboard from './screens/Dashboard';
 import Upload from './screens/Upload';
@@ -96,14 +97,16 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <ActionToastProvider>
-          <StreakProvider>
-            <AppRoutes />
-          </StreakProvider>
-        </ActionToastProvider>
-      </ToastProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <ActionToastProvider>
+            <StreakProvider>
+              <AppRoutes />
+            </StreakProvider>
+          </ActionToastProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
