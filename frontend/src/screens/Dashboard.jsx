@@ -154,7 +154,7 @@ export default function Dashboard() {
   return (
     <ScreenWrapper screenName="Dashboard">
       <div className="dashboard-world">
-      {/* Greeting card — river bank scene background */}
+      {/* Greeting card — river bank scene at bottom */}
       <div className="dashboard-greeting">
         {/* Water ripple rings behind Ott */}
         <div className="dashboard-ripples" aria-hidden="true">
@@ -168,6 +168,13 @@ export default function Dashboard() {
             {greeting}
           </h2>
         </div>
+        {/* Bank scene — sits at bottom of card, transparent sky shows card bg */}
+        <img
+          src="/ott/ott-bank-header.png"
+          alt=""
+          aria-hidden="true"
+          className="dashboard-greeting__bank"
+        />
       </div>
 
       {/* Streak card with kelp wrap accent */}

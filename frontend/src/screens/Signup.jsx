@@ -116,8 +116,8 @@ export default function Signup() {
         </p>
       </div>
       {/* Corner vegetation framing */}
-      <img src="/ott/ott-corner-left.png" alt="" aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, width: 140, pointerEvents: 'none', zIndex: 0 }} />
-      <img src="/ott/ott-corner-right.png" alt="" aria-hidden="true" style={{ position: 'absolute', bottom: 0, right: 0, width: 140, pointerEvents: 'none', zIndex: 0 }} />
+      <img src="/ott/ott-corner-left.png" alt="" aria-hidden="true" style={{ position: 'fixed', bottom: 60, left: 0, width: 120, pointerEvents: 'none', zIndex: 0, opacity: 0.85 }} />
+      <img src="/ott/ott-corner-right.png" alt="" aria-hidden="true" style={{ position: 'fixed', bottom: 60, right: 0, width: 120, pointerEvents: 'none', zIndex: 0, opacity: 0.85 }} />
     </div>
   );
 }

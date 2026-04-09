@@ -9,11 +9,12 @@
 }
 
 .dashboard-world__corner {
-  position: absolute;
-  bottom: 0;
-  width: 140px;
+  position: fixed;
+  bottom: 60px;
+  width: 120px;
   pointer-events: none;
   z-index: 0;
+  opacity: 0.85;
 }
 
 .dashboard-world__corner--left {
@@ -27,9 +28,8 @@
 /* === Greeting card — river bank scene === */
 .dashboard-greeting {
   position: relative;
-  background-image: url('/ott/ott-bank-header.png');
-  background-size: cover;
-  background-position: bottom center;
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
   min-height: 180px;
@@ -40,15 +40,19 @@
   text-align: center;
   padding: var(--space-6) var(--space-4);
   margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Readability overlay */
-.dashboard-greeting::before {
-  content: '';
+/* Bank header scene image at bottom of card */
+.dashboard-greeting__bank {
   position: absolute;
-  inset: 0;
-  background: rgba(250, 247, 242, 0.3);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: auto;
   z-index: 0;
+  pointer-events: none;
 }
 
 /* Greeting content sits above overlay */
