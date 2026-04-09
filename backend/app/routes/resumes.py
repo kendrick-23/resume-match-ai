@@ -21,18 +21,18 @@ import os
 
 from app.main import get_current_user, limiter
 from app.services.file_extraction import extract_resume_text_from_upload
+from app.services.resume_vault import (
+    validate_resume_text,
+    word_count,
+    auto_label,
+    enforce_resume_cap,
+    MAX_RESUMES_PER_USER,
+)
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
-
-# Constraints — must mirror what the migration enforces
-MIN_RESUME_CHARS = 50
-MAX_RESUME_CHARS = 50_000
-MAX_RESUMES_PER_USER = 5
-
-VALID_FORMATS = {"pdf", "docx", "pasted"}
 
 # MIME → format tag for the resumes.source_format column
 MIME_TO_FORMAT = {
@@ -46,79 +46,6 @@ def _user_sb(user: dict):
     sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     sb.postgrest.auth(user["token"])
     return sb
-
-
-def _validate_resume_text(text: str) -> str:
-    """Validate extracted resume text. Returns the cleaned text or raises 422.
-
-    Rules:
-    - Minimum 50 chars (anything shorter is almost certainly garbage)
-    - Maximum 50,000 chars (matches AnalyzeRequest cap)
-    - Must contain at least some printable characters (not all whitespace/control)
-    """
-    if not text:
-        raise HTTPException(status_code=422, detail="Couldn't read this resume — empty content.")
-
-    cleaned = text.strip()
-
-    if len(cleaned) < MIN_RESUME_CHARS:
-        raise HTTPException(
-            status_code=422,
-            detail="Couldn't read this resume — try a different file. The extracted text was too short.",
-        )
-
-    if len(cleaned) > MAX_RESUME_CHARS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Resume is too long. Maximum is {MAX_RESUME_CHARS:,} characters.",
-        )
-
-    # Reject if there are no printable, non-whitespace characters at all.
-    has_printable = any(c.isprintable() and not c.isspace() for c in cleaned)
-    if not has_printable:
-        raise HTTPException(
-            status_code=422,
-            detail="Couldn't read this resume — try a different file.",
-        )
-
-    return cleaned
-
-
-def _word_count(text: str) -> int:
-    return len(text.split())
-
-
-def _auto_label() -> str:
-    """Default label like 'Resume from Apr 8' if the user didn't provide one."""
-    return datetime.now(timezone.utc).strftime("Resume from %b %-d") if os.name != "nt" \
-        else datetime.now(timezone.utc).strftime("Resume from %b %#d")
-
-
-def _enforce_resume_cap(sb, user_id: str) -> None:
-    """If the user already has MAX_RESUMES_PER_USER resumes, delete the oldest
-    NON-default to make room. The default is never auto-deleted."""
-    existing = sb.table("resumes") \
-        .select("id,is_default,created_at") \
-        .eq("user_id", user_id) \
-        .order("created_at", desc=True) \
-        .execute().data or []
-
-    if len(existing) < MAX_RESUMES_PER_USER:
-        return
-
-    # Find the oldest non-default row
-    non_default_oldest = None
-    for row in reversed(existing):  # reversed = oldest first
-        if not row.get("is_default"):
-            non_default_oldest = row
-            break
-
-    if non_default_oldest is None:
-        # All slots are taken by the default (impossible — only 1 can be default)
-        # but defensive: don't delete anything in this edge case.
-        return
-
-    sb.table("resumes").delete().eq("id", non_default_oldest["id"]).execute()
 
 
 # ============================================================
@@ -198,8 +125,8 @@ async def create_resume(
             detail="Provide either a file or pasted resume content.",
         )
 
-    cleaned = _validate_resume_text(extracted_text)
-    wc = _word_count(cleaned)
+    cleaned = validate_resume_text(extracted_text)
+    wc = word_count(cleaned)
 
     # ---- Determine if this should be the default ----
     existing = sb.table("resumes") \
@@ -210,12 +137,12 @@ async def create_resume(
     is_first_resume = len(existing) == 0
 
     # ---- Enforce 5-resume cap (deletes oldest non-default if needed) ----
-    _enforce_resume_cap(sb, user["user_id"])
+    enforce_resume_cap(sb, user["user_id"])
 
     # ---- Insert ----
     insert_data = {
         "user_id": user["user_id"],
-        "label": (label or "").strip() or _auto_label(),
+        "label": (label or "").strip() or auto_label(),
         "content": cleaned,
         "word_count": wc,
         "source_filename": source_filename,

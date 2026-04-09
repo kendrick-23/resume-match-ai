@@ -12,11 +12,17 @@ import os
 import io
 import re
 import json
+from typing import Optional
 import jwt as pyjwt
 from PyPDF2 import PdfReader
 from docx import Document
 
 from app.services.file_extraction import extract_resume_text_from_upload
+from app.services.resume_vault import (
+    fetch_resume_content,
+    fetch_default_resume_content,
+    find_or_create_vault_entry,
+)
 
 load_dotenv()
 
@@ -140,7 +146,10 @@ app.include_router(resumes_router)
 
 
 class AnalyzeRequest(BaseModel):
-    resume: str = Field(..., max_length=50000)
+    # resume is now optional — caller can provide raw text, a resume_id from
+    # the vault, or neither (in which case the user's default vault resume is used).
+    resume: str = Field(default="", max_length=50000)
+    resume_id: Optional[str] = Field(default=None, max_length=100)
     job_description: str = Field(..., max_length=20000)
     company_name: str = Field(default="", max_length=200)
     role_name: str = Field(default="", max_length=200)
@@ -719,10 +728,60 @@ async def analyze(
     body: AnalyzeRequest,
     user: dict = Depends(get_current_user),
 ):
-    if not body.resume.strip() or not body.job_description.strip():
-        raise HTTPException(status_code=400, detail="Resume and job description are required.")
+    if not body.job_description.strip():
+        raise HTTPException(status_code=400, detail="Job description is required.")
 
     sb = _user_sb(user)
+
+    # ---- Resume cascade: resume_id → raw resume text → default vault resume ----
+    # The first source that yields content wins. Whichever wins, we end up with
+    # both `resume_text` (for the prompt) and `resume_id` (for the analyses FK).
+    resume_text: str = ""
+    resume_id: Optional[str] = None
+
+    if body.resume_id:
+        # Caller pinned a specific vault entry — use it directly.
+        fetched = fetch_resume_content(sb, user["user_id"], body.resume_id)
+        if not fetched:
+            raise HTTPException(status_code=404, detail="Selected resume not found")
+        resume_text = fetched
+        resume_id = body.resume_id
+    elif body.resume.strip():
+        # Caller pasted/uploaded fresh text — auto-save it to the vault so the
+        # next analysis can pick it up without re-uploading. Reuses existing
+        # entries if the content is byte-identical to what we already have.
+        resume_text = body.resume
+        try:
+            resume_id = find_or_create_vault_entry(
+                sb,
+                user["user_id"],
+                resume_text,
+                source_format="pasted",
+            )
+        except HTTPException:
+            # Validation failure (too short, garbage, etc.) — surface to client.
+            raise
+        except Exception as exc:
+            # Vault save shouldn't block analysis — log and continue without an FK.
+            print(f"[/analyze] Vault auto-save failed: {exc}")
+    else:
+        # Neither a resume_id nor raw text — fall back to the user's default vault entry.
+        default_row = fetch_default_resume_content(sb, user["user_id"])
+        if not default_row:
+            raise HTTPException(
+                status_code=422,
+                detail="Please upload a resume first.",
+            )
+        resume_text = default_row.get("content") or ""
+        resume_id = default_row.get("id")
+
+    if not resume_text.strip():
+        raise HTTPException(status_code=422, detail="Selected resume is empty.")
+
+    # Make body.resume reflect the resolved text so downstream code (which references
+    # body.resume in several places) sees the actual content even when the caller
+    # passed only a resume_id.
+    body.resume = resume_text
 
     # Fetch the candidate's profile BEFORE the Claude call so the prompt is personalized.
     profile = _fetch_profile_for_analysis(sb, user["user_id"])
@@ -809,9 +868,10 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             "score_tier": score_tier,
             "salary_disclosed": salary_disclosed,
             "translation_opportunities": json.dumps(translation_opportunities),
+            "resume_id": resume_id,
         }
         # Newer columns may not exist on older Supabase schemas. Drop them progressively.
-        OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities")
+        OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities", "resume_id")
         OPTIONAL_SUB_SCORE_COLS = ("skills_match", "seniority_fit", "salary_alignment", "growth_potential")
         try:
             insert_res = sb.table("analyses").insert(insert_data).execute()
