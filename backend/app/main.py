@@ -869,6 +869,30 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
         ]
         summary = (result_data.get("summary") or "").strip()
 
+        # Dedup check: if the same user analyzed the same role+company with the
+        # same resume within the last hour, update that row instead of creating
+        # a duplicate. This catches re-analyses from the Jobs "Analyze" button
+        # and accidental double-submits.
+        existing_analysis_id = None
+        try:
+            from datetime import datetime, timedelta, timezone as tz
+            one_hour_ago = (datetime.now(tz.utc) - timedelta(hours=1)).isoformat()
+            dedup_q = sb.table("analyses") \
+                .select("id") \
+                .eq("user_id", user["user_id"]) \
+                .eq("role_name", final_role) \
+                .eq("company_name", final_company) \
+                .gte("created_at", one_hour_ago) \
+                .order("created_at", desc=True) \
+                .limit(1)
+            if resume_id:
+                dedup_q = dedup_q.eq("resume_id", resume_id)
+            dedup_res = dedup_q.execute()
+            if dedup_res.data:
+                existing_analysis_id = dedup_res.data[0]["id"]
+        except Exception as exc:
+            print(f"[/analyze] Dedup check failed (proceeding with insert): {exc}")
+
         # Save analysis to Supabase (include original inputs for resume generation).
         # The sb client was created at the top of the function for the profile fetch.
         insert_data = {
@@ -895,19 +919,40 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
         # Newer columns may not exist on older Supabase schemas. Drop them progressively.
         OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities", "resume_id", "posting_url")
         OPTIONAL_SUB_SCORE_COLS = ("skills_match", "seniority_fit", "salary_alignment", "growth_potential")
-        try:
-            insert_res = sb.table("analyses").insert(insert_data).execute()
-        except Exception:
-            for col in OPTIONAL_NEW_COLS:
-                insert_data.pop(col, None)
-            try:
-                insert_res = sb.table("analyses").insert(insert_data).execute()
-            except Exception:
-                for col in OPTIONAL_SUB_SCORE_COLS:
-                    insert_data.pop(col, None)
-                insert_res = sb.table("analyses").insert(insert_data).execute()
 
-        analysis_id = insert_res.data[0]["id"] if insert_res.data else None
+        def _try_insert(data):
+            try:
+                return sb.table("analyses").insert(data).execute()
+            except Exception:
+                for col in OPTIONAL_NEW_COLS:
+                    data.pop(col, None)
+                try:
+                    return sb.table("analyses").insert(data).execute()
+                except Exception:
+                    for col in OPTIONAL_SUB_SCORE_COLS:
+                        data.pop(col, None)
+                    return sb.table("analyses").insert(data).execute()
+
+        def _try_update(row_id, data):
+            data.pop("user_id", None)  # Don't update the owner
+            try:
+                return sb.table("analyses").update(data).eq("id", row_id).execute()
+            except Exception:
+                for col in OPTIONAL_NEW_COLS:
+                    data.pop(col, None)
+                try:
+                    return sb.table("analyses").update(data).eq("id", row_id).execute()
+                except Exception:
+                    for col in OPTIONAL_SUB_SCORE_COLS:
+                        data.pop(col, None)
+                    return sb.table("analyses").update(data).eq("id", row_id).execute()
+
+        if existing_analysis_id:
+            insert_res = _try_update(existing_analysis_id, insert_data)
+            analysis_id = existing_analysis_id
+        else:
+            insert_res = _try_insert(insert_data)
+            analysis_id = insert_res.data[0]["id"] if insert_res.data else None
 
         # Log activity
         sb.table("activity_log").insert({

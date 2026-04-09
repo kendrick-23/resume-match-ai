@@ -1093,6 +1093,7 @@ export default function Jobs() {
                 score={job.holt_score}
                 savedIds={savedIds}
                 onSave={handleSave}
+                onAnalyze={handleAnalyze}
                 formatSalary={formatSalary}
               />
             ))}
@@ -1420,7 +1421,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
 }
 
 
-function WithinReachCard({ job, score, savedIds, onSave, formatSalary }) {
+function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary }) {
   const [expanded, setExpanded] = useState(false);
   const delta = 70 - score;
   const jobGaps = job.holt_breakdown?.job_specific_gaps || [];
@@ -1533,6 +1534,15 @@ function WithinReachCard({ job, score, savedIds, onSave, formatSalary }) {
           <Bookmark size={14} style={savedIds.has(job.id) ? { fill: 'var(--color-accent)' } : {}} />
           {savedIds.has(job.id) ? 'Saved' : 'Save'}
         </Button>
+        {onAnalyze && (
+          <Button
+            variant="ghost"
+            style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
+            onClick={() => onAnalyze(job)}
+          >
+            <Sparkles size={14} /> Analyze
+          </Button>
+        )}
         {(job.apply_url || job.url) && (
           <a
             href={job.apply_url || job.url}

@@ -303,6 +303,8 @@ export default function Results() {
 
   // Sticky pill nav
   const [activePill, setActivePill] = useState('overview');
+  // Pagination for previous analyses list
+  const [historyPage, setHistoryPage] = useState(0);
   const sectionRefs = useRef({});
 
   // Just-in-time guided hint — first-time only, gated on localStorage.
@@ -1038,7 +1040,7 @@ export default function Results() {
             <div style={{ marginTop: 'var(--space-8)' }}>
               <h3 style={{ marginBottom: 'var(--space-3)' }}>Previous Analyses</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {pastAnalyses.slice(0, 5).map((a) => (
+                {pastAnalyses.slice(historyPage * 5, historyPage * 5 + 5).map((a) => (
                   <Card
                     key={a.id}
                     interactive
@@ -1056,6 +1058,7 @@ export default function Results() {
                         analysis_id: a.id,
                         coaching_tips: a.coaching_tips,
                         job_description_text: a.job_description_text,
+                        posting_url: a.posting_url || null,
                       });
                       setResumeMd(a.generated_resume_md || null);
                       setResumeError('');
@@ -1079,6 +1082,43 @@ export default function Results() {
                   </Card>
                 ))}
               </div>
+              {pastAnalyses.length > 5 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 'var(--space-4)',
+                  marginTop: 'var(--space-3)',
+                  fontSize: '13px',
+                }}>
+                  <button
+                    disabled={historyPage === 0}
+                    onClick={() => setHistoryPage((p) => p - 1)}
+                    style={{
+                      background: 'none', border: 'none', cursor: historyPage === 0 ? 'default' : 'pointer',
+                      color: historyPage === 0 ? 'var(--color-text-muted)' : 'var(--color-accent)',
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                    }}
+                  >
+                    Prev
+                  </button>
+                  <span style={{ color: 'var(--color-text-muted)' }}>
+                    {historyPage + 1} / {Math.ceil(pastAnalyses.length / 5)}
+                  </span>
+                  <button
+                    disabled={historyPage >= Math.ceil(pastAnalyses.length / 5) - 1}
+                    onClick={() => setHistoryPage((p) => p + 1)}
+                    style={{
+                      background: 'none', border: 'none',
+                      cursor: historyPage >= Math.ceil(pastAnalyses.length / 5) - 1 ? 'default' : 'pointer',
+                      color: historyPage >= Math.ceil(pastAnalyses.length / 5) - 1 ? 'var(--color-text-muted)' : 'var(--color-accent)',
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                    }}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>

@@ -49,6 +49,7 @@ export default function Profile() {
   const [hasChanges, setHasChanges] = useState(false);
   const toast = useToast();
   const [analyses, setAnalyses] = useState([]);
+  const [vaultPage, setVaultPage] = useState(0);
   const [earnedBadges, setEarnedBadges] = useState([]);
   // Resume Vault state
   const [vaultResumes, setVaultResumes] = useState([]);
@@ -1023,37 +1024,76 @@ export default function Profile() {
       </h3>
       <Card style={{ marginBottom: 'var(--space-5)' }}>
         {analyses.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {analyses.slice(0, 10).map((a) => (
-              <div
-                key={a.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: 'var(--space-2) 0',
-                  borderBottom: '1px solid var(--color-border)',
-                }}
-              >
-                <div>
-                  <p style={{ fontWeight: 600, fontSize: '14px' }}>
-                    {a.role_name || 'Resume Analysis'}
-                  </p>
-                  {a.company_name && (
-                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>
-                      {a.company_name}
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {analyses.slice(vaultPage * 5, vaultPage * 5 + 5).map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--space-2) 0',
+                    borderBottom: '1px solid var(--color-border)',
+                  }}
+                >
+                  <div>
+                    <p style={{ fontWeight: 600, fontSize: '14px' }}>
+                      {a.role_name || 'Resume Analysis'}
                     </p>
-                  )}
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>
-                    {new Date(a.created_at).toLocaleDateString()}
-                  </p>
+                    {a.company_name && (
+                      <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+                        {a.company_name}
+                      </p>
+                    )}
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>
+                      {new Date(a.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Badge variant={scoreBadgeVariant(a.score)}>
+                    {a.score}%
+                  </Badge>
                 </div>
-                <Badge variant={scoreBadgeVariant(a.score)}>
-                  {a.score}%
-                </Badge>
+              ))}
+            </div>
+            {analyses.length > 5 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 'var(--space-4)',
+                marginTop: 'var(--space-3)',
+                fontSize: '13px',
+              }}>
+                <button
+                  disabled={vaultPage === 0}
+                  onClick={() => setVaultPage((p) => p - 1)}
+                  style={{
+                    background: 'none', border: 'none', cursor: vaultPage === 0 ? 'default' : 'pointer',
+                    color: vaultPage === 0 ? 'var(--color-text-muted)' : 'var(--color-accent)',
+                    fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                  }}
+                >
+                  Prev
+                </button>
+                <span style={{ color: 'var(--color-text-muted)' }}>
+                  {vaultPage + 1} / {Math.ceil(analyses.length / 5)}
+                </span>
+                <button
+                  disabled={vaultPage >= Math.ceil(analyses.length / 5) - 1}
+                  onClick={() => setVaultPage((p) => p + 1)}
+                  style={{
+                    background: 'none', border: 'none',
+                    cursor: vaultPage >= Math.ceil(analyses.length / 5) - 1 ? 'default' : 'pointer',
+                    color: vaultPage >= Math.ceil(analyses.length / 5) - 1 ? 'var(--color-text-muted)' : 'var(--color-accent)',
+                    fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                  }}
+                >
+                  Next
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         ) : (
           <p style={{
             color: 'var(--color-text-muted)',
