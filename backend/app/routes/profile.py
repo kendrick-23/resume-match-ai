@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from supabase import create_client
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 import os
 
 from app.main import get_current_user, limiter
@@ -42,15 +43,18 @@ async def get_streak(request: Request, user: dict = Depends(get_current_user)):
     if not res.data:
         return {"streak": 0}
 
-    # Get unique dates (in UTC) sorted descending
+    # Convert timestamps to Eastern Time before bucketing into calendar days.
+    # Evening actions in ET were being stamped as "tomorrow" in UTC, causing
+    # false streak gaps for users in US Eastern timezone.
+    ET = ZoneInfo("America/New_York")
     dates = set()
     for row in res.data:
         dt = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
-        dates.add(dt.date())
+        dates.add(dt.astimezone(ET).date())
 
     sorted_dates = sorted(dates, reverse=True)
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(ET).date()
 
     # Streak must include today or yesterday to be active
     if sorted_dates[0] != today and sorted_dates[0] != today - timedelta(days=1):
@@ -80,14 +84,15 @@ async def get_activity(request: Request, user: dict = Depends(get_current_user))
         .limit(50) \
         .execute()
 
-    today = datetime.now(timezone.utc).date()
+    ET = ZoneInfo("America/New_York")
+    today = datetime.now(ET).date()
     analyses_today = 0
     applied_today = 0
     interviews_today = 0
 
     for row in res.data:
         dt = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
-        if dt.date() != today:
+        if dt.astimezone(ET).date() != today:
             continue
         action = row["action_type"]
         if action == "analysis":
