@@ -236,7 +236,7 @@ export default function Tracker() {
           </p>
           <Button
             variant="ghost"
-            style={{ marginTop: 'var(--space-2)', fontSize: '13px', padding: '6px 12px', minHeight: '32px' }}
+            style={{ marginTop: 'var(--space-2)', fontSize: '13px', padding: '6px 12px', minHeight: '44px' }}
             onClick={() => setError(null)}
           >
             Dismiss
@@ -464,12 +464,18 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
         )}
         <button
           onClick={() => onDelete(app.id)}
+          aria-label="Delete application"
           style={{
             background: 'none',
             border: 'none',
             cursor: 'pointer',
             color: 'var(--color-text-muted)',
             padding: '4px',
+            minHeight: '44px',
+            minWidth: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             marginLeft: 'auto',
           }}
         >

@@ -10,6 +10,7 @@ from supabase import create_client
 
 from app.main import limiter, get_current_user
 from app.constants.scoring import DOMAIN_PENALTY_CAP, SALARY_FLOOR_CAP, TIER_BREAKPOINTS
+from app.services.token_budget import is_budget_exhausted
 from app.services.usajobs import search_usajobs
 from app.services.adzuna import search_adzuna_jobs
 from app.services.jobspy_service import search_jobspy
@@ -264,11 +265,11 @@ async def search_aggregated(
         # Sort by Holt Score descending (best matches first)
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
 
-        return {"total": len(unique_jobs), "jobs": unique_jobs}
+        return {"total": len(unique_jobs), "jobs": unique_jobs, "degraded": is_budget_exhausted()}
 
     except Exception as e:
         print(f"[/jobs/aggregated] Error: {e}")
-        return {"total": 0, "jobs": []}
+        return {"total": 0, "jobs": [], "degraded": False}
 
 
 # --- Search result caching ---

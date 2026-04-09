@@ -34,6 +34,14 @@ def estimate_tokens(prompt: str) -> int:
     return len(prompt) // 4
 
 
+def is_budget_exhausted() -> bool:
+    """Return True if the daily budget has been exceeded."""
+    today = datetime.date.today().isoformat()
+    if _daily_tokens["date"] != today:
+        return False
+    return _daily_tokens["count"] >= DAILY_TOKEN_LIMIT
+
+
 def get_usage() -> dict:
     """Return current budget status for logging."""
     return {

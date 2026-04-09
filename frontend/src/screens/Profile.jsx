@@ -354,7 +354,7 @@ export default function Profile() {
                   <p style={{ fontSize: '13px', flex: 1 }}>{resumeFile.name}</p>
                   <Button
                     variant="primary"
-                    style={{ padding: '8px 16px', minHeight: '36px', fontSize: '13px' }}
+                    style={{ padding: '8px 16px', minHeight: '44px', fontSize: '13px' }}
                     onClick={handleResumeUpload}
                     disabled={resumeAnalyzing}
                   >
@@ -385,7 +385,7 @@ export default function Profile() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                 <p style={{ fontSize: '13px' }}>{resumeFile.name}</p>
                 <Button
-                  style={{ padding: '8px 16px', minHeight: '36px', fontSize: '13px' }}
+                  style={{ padding: '8px 16px', minHeight: '44px', fontSize: '13px' }}
                   onClick={handleResumeUpload}
                   disabled={resumeAnalyzing}
                 >
@@ -859,7 +859,7 @@ export default function Profile() {
         <h3>Your Skills</h3>
         <Button
           variant="ghost"
-          style={{ padding: '6px 12px', minHeight: '32px', fontSize: '13px' }}
+          style={{ padding: '6px 12px', minHeight: '44px', fontSize: '13px' }}
           onClick={() => setEditingSkills(!editingSkills)}
         >
           {editingSkills ? 'Done' : 'Edit skills'}

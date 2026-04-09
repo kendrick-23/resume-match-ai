@@ -6,10 +6,30 @@ export default function MilestoneCelebration({ badgeKey, onClose }) {
   const meta = BADGES[badgeKey];
   if (!meta) return null;
 
+  // Idempotency: only show each milestone once per badge key.
+  const storageKey = `holt_milestone_${badgeKey}`;
+  let alreadySeen = false;
+  try {
+    alreadySeen = localStorage.getItem(storageKey) === 'true';
+  } catch {
+    // localStorage unavailable
+  }
+
   useEffect(() => {
+    if (alreadySeen) {
+      onClose();
+      return;
+    }
+    try {
+      localStorage.setItem(storageKey, 'true');
+    } catch {
+      // ignore
+    }
     const timer = setTimeout(onClose, 3500);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [onClose, alreadySeen, storageKey]);
+
+  if (alreadySeen) return null;
 
   return (
     <div className="milestone-overlay" onClick={onClose}>

@@ -452,6 +452,11 @@ export default function Jobs() {
       const fedMerged = _dedup(fedResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||j.department||'').toLowerCase()}`);
       const pvtMerged = _dedup(pvtResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}`);
 
+      // Check if any aggregated response signaled token budget exhaustion
+      if (pvtResults.some((r) => r.degraded)) {
+        toast.warning("Running on cached intelligence today — results may be less specific.");
+      }
+
       _applyResults(fedMerged, pvtMerged, loc);
 
       // Save to cache in background
@@ -1407,7 +1412,7 @@ function WithinReachCard({ job, score, savedIds, onSave, formatSalary }) {
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         <Button
           variant="ghost"
-          style={{ padding: '8px 14px', minHeight: '36px', fontSize: '13px' }}
+          style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
           onClick={() => onSave(job)}
           disabled={savedIds.has(job.id)}
         >
