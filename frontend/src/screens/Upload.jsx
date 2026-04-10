@@ -9,6 +9,7 @@ import Ott from '../components/ott/Ott';
 import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, Info, FileText } from 'lucide-react';
 import { uploadResume, analyzeResume, checkBadges, listResumes, createResume, getProfile } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
+import EmptyStateUpload from '../components/ui/EmptyStateUpload';
 import { clearRecommendationsCache } from '../utils/cache';
 import { useToast } from '../context/ToastContext';
 import './Upload.css';
@@ -406,14 +407,9 @@ export default function Upload() {
               </Button>
             </div>
           ) : (
-            <div style={{ marginTop: 'var(--space-2)' }}>
-              <img
-                src="/ott/ott-reading.png"
-                alt="Ott reviewing your resume"
-                loading="lazy"
-                style={{ width: '56px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
-              />
-              <div style={{ marginTop: 'var(--space-3)' }}>
+            <div>
+              <EmptyStateUpload size={80} />
+              <div style={{ marginTop: 'var(--space-2)' }}>
                 <UploadIcon
                   size={20}
                   style={{ color: 'var(--color-accent)', margin: '0 auto var(--space-1)' }}

@@ -9,6 +9,7 @@ import Ott from '../components/ott/Ott';
 import { Plus, X, Trash2, ExternalLink, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { scoreBadgeVariant } from '../constants/scoring';
 import HintBubble from '../components/ui/HintBubble';
+import EmptyStateTracker from '../components/ui/EmptyStateTracker';
 import {
   listApplications,
   createApplication,
@@ -263,28 +264,24 @@ export default function Tracker() {
           </p>
         </div>
       ) : filtered.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
-          <Ott state={ottState} size={120} />
-          <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
-            {activeStage
-              ? `No applications in "${activeStage}"`
-              : 'No applications tracked yet'}
-          </p>
-          <p style={{
-            color: 'var(--color-text-muted)',
-            marginTop: 'var(--space-1)',
-            marginBottom: 'var(--space-4)',
-          }}>
-            {activeStage
-              ? 'Try selecting a different stage'
-              : 'Tap "Add" to log your first application'}
-          </p>
-          {!activeStage && (
-            <Button variant="secondary" onClick={() => setShowForm(true)}>
-              <Plus size={18} /> Log Your First Application
-            </Button>
-          )}
-        </Card>
+        activeStage ? (
+          <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
+            <Ott state="idle" size={120} />
+            <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
+              {`No applications in "${activeStage}"`}
+            </p>
+            <p style={{
+              color: 'var(--color-text-muted)',
+              marginTop: 'var(--space-1)',
+            }}>
+              Try selecting a different stage
+            </p>
+          </Card>
+        ) : (
+          <Card style={{ textAlign: 'center', padding: 'var(--space-5)' }}>
+            <EmptyStateTracker />
+          </Card>
+        )
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {celebrating && (

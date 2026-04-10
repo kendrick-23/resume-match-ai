@@ -8,6 +8,7 @@ import { useStreak } from '../context/StreakContext';
 import { getActivity, listBadges, listApplications, listAnalyses, getProfile } from '../services/api';
 import { FileText, Search, Clock } from 'lucide-react';
 import JourneyMap from '../components/ui/JourneyMap';
+import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
 import './Dashboard.css';
@@ -303,28 +304,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <Card style={{ marginBottom: 'var(--space-6)' }}>
-          <div style={{ textAlign: 'center', padding: 'var(--space-4) 0' }}>
-            <img
-              src="/ott/ott-in-holt.png"
-              alt="Ott peeking from his holt"
-              style={{ width: 100, height: 'auto', display: 'block', margin: '0 auto' }}
-            />
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '8px',
-              marginTop: 'var(--space-3)',
-              marginBottom: 'var(--space-2)',
-            }}>
-              <div style={{ width: '60%', height: '12px', borderRadius: 'var(--radius-full)', background: 'rgba(43,181,192,0.08)' }} />
-              <div style={{ width: '80%', height: '12px', borderRadius: 'var(--radius-full)', background: 'rgba(43,181,192,0.08)' }} />
-              <div style={{ width: '45%', height: '12px', borderRadius: 'var(--radius-full)', background: 'rgba(43,181,192,0.08)' }} />
-            </div>
-            <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '14px' }}>
-              Upload your first resume to get started!
-            </p>
-          </div>
+          <EmptyStateDashboard />
         </Card>
       )}
 

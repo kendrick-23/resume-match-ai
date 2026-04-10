@@ -12,6 +12,7 @@ import { Copy, Download, ClipboardList, Search, FileText, ChevronDown, ChevronUp
 import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
+import EmptyStateResults from '../components/ui/EmptyStateResults';
 import { deriveTier, scoreColor, scoreBadgeVariant, scoreOttState, subScoreColor } from '../constants/scoring';
 import { clearRecommendationsCache } from '../utils/cache';
 import './Results.css';
@@ -623,13 +624,8 @@ export default function Results() {
       <h2 style={{ marginBottom: 'var(--space-6)' }}>Results</h2>
 
       {!hasResult ? (
-        <Card style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-5)' }}>
-          <Ott state="waving" size={120} />
-          <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>No results yet</p>
-          <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-1)', marginBottom: 'var(--space-4)' }}>
-            Upload a resume and job description to see your match score
-          </p>
-          <Button onClick={() => navigate('/upload')}>Analyze a Resume</Button>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-5)' }}>
+          <EmptyStateResults />
         </Card>
       ) : (
         <>

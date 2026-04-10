@@ -1,9 +1,14 @@
-export default function EmptyStateUpload({ size = 120 }) {
+import { useNavigate } from 'react-router-dom';
+import Button from './Button';
+
+export default function EmptyStateTracker({ size = 120 }) {
+  const navigate = useNavigate();
+
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
       <img
-        src="/ott/ott-waiting.png"
-        alt="Ott waiting"
+        src="/ott/ott-idle.png"
+        alt="Ott idle"
         width={size}
         style={{ display: 'block', margin: '0 auto' }}
       />
@@ -15,9 +20,11 @@ export default function EmptyStateUpload({ size = 120 }) {
         maxWidth: '280px',
         marginLeft: 'auto',
         marginRight: 'auto',
+        marginBottom: 'var(--space-4)',
       }}>
-        Drop your resume here and I'll find roles that actually fit.
+        No applications yet. Log a job from Results to start your journey.
       </p>
+      <Button onClick={() => navigate('/jobs')}>Find Jobs</Button>
     </div>
   );
 }
