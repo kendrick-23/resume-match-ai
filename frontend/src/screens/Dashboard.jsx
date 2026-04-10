@@ -154,39 +154,22 @@ export default function Dashboard() {
   return (
     <ScreenWrapper screenName="Dashboard">
       <div className="dashboard-world">
-      {/* Greeting card — river bank scene at bottom */}
+      {/* Greeting card */}
       <div className="dashboard-greeting">
-        {/* Water ripple rings behind Ott */}
-        <div className="dashboard-ripples" aria-hidden="true">
-          <div className="dashboard-ripple" />
-          <div className="dashboard-ripple" />
-          <div className="dashboard-ripple" />
-        </div>
         <div className="dashboard-greeting__content">
           <Ott state={ottState} size={120} />
           <h2 style={{ marginTop: 'var(--space-3)' }}>
             {greeting}
           </h2>
         </div>
-        {/* Bank scene — sits at bottom of card, transparent sky shows card bg */}
-        <img
-          src="/ott/ott-bank-header.png"
-          alt=""
-          aria-hidden="true"
-          className="dashboard-greeting__bank"
-        />
       </div>
 
-      {/* Streak card with kelp wrap accent */}
-      <Card className="streak-card" style={{
+      {/* Streak card */}
+      <Card style={{
         textAlign: 'center',
         marginBottom: 'var(--space-4)',
-        background: `
-          radial-gradient(circle at 30% 50%, rgba(43,181,192,0.12) 0%, transparent 50%),
-          radial-gradient(circle at 70% 30%, rgba(43,181,192,0.10) 0%, transparent 40%),
-          radial-gradient(circle at 50% 80%, rgba(43,181,192,0.08) 0%, transparent 35%),
-          white
-        `,
+        position: 'relative',
+        overflow: 'hidden',
       }}>
         {/* Watermark streak icon — ambient texture, top-right */}
         <img
@@ -222,13 +205,6 @@ export default function Dashboard() {
         <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
           {streakHint}
         </p>
-        {/* Kelp wrap — loyalty/connection ambient texture */}
-        <img
-          src="/ott/ott-kelp-wrap.png"
-          alt=""
-          aria-hidden="true"
-          className="streak-card__kelp"
-        />
       </Card>
 
       {/* Pipeline summary — meaningful job-search counts */}
@@ -403,19 +379,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Corner vegetation framing */}
-      <img
-        src="/ott/ott-corner-left.png"
-        alt=""
-        aria-hidden="true"
-        className="dashboard-world__corner dashboard-world__corner--left"
-      />
-      <img
-        src="/ott/ott-corner-right.png"
-        alt=""
-        aria-hidden="true"
-        className="dashboard-world__corner dashboard-world__corner--right"
-      />
       </div>{/* end dashboard-world */}
     </ScreenWrapper>
   );

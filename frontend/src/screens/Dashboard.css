@@ -2,27 +2,9 @@
    Dashboard — responsive layout tweaks
    ============================================ */
 
-/* === Otter world — outer wrapper for corner framing === */
+/* === Otter world — outer wrapper === */
 .dashboard-world {
   position: relative;
-  overflow: hidden;
-}
-
-.dashboard-world__corner {
-  position: fixed;
-  bottom: 60px;
-  width: 120px;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.85;
-}
-
-.dashboard-world__corner--left {
-  left: 0;
-}
-
-.dashboard-world__corner--right {
-  right: 0;
 }
 
 /* === Greeting card — river bank scene === */
@@ -41,76 +23,6 @@
   padding: var(--space-6) var(--space-4);
   margin-bottom: var(--space-6);
   box-shadow: var(--shadow-sm);
-}
-
-/* Bank header scene image at bottom of card */
-.dashboard-greeting__bank {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  height: auto;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* Greeting content sits above overlay */
-.dashboard-greeting__content {
-  position: relative;
-  z-index: 1;
-}
-
-/* === Water ripple rings === */
-.dashboard-ripples {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.dashboard-ripple {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 60px;
-  height: 60px;
-  margin-top: -30px;
-  margin-left: -30px;
-  border: 2px solid rgba(43, 181, 192, 0.3);
-  border-radius: 50%;
-  animation: dashboard-ripple 3s infinite ease-out;
-}
-
-.dashboard-ripple:nth-child(2) {
-  animation-delay: 0.8s;
-}
-
-.dashboard-ripple:nth-child(3) {
-  animation-delay: 1.6s;
-}
-
-@keyframes dashboard-ripple {
-  0%   { transform: scale(0.8); opacity: 0.6; }
-  100% { transform: scale(2.5); opacity: 0; }
-}
-
-/* === Streak card — kelp accent === */
-.streak-card {
-  position: relative;
-  overflow: hidden;
-}
-
-.streak-card__kelp {
-  position: absolute;
-  bottom: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80px;
-  opacity: 0.4;
-  pointer-events: none;
 }
 
 /* === Paw print divider === */
