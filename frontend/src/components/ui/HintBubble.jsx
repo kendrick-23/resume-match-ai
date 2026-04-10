@@ -7,16 +7,16 @@ import './HintBubble.css';
  * Two-part hotspot + popover hint system.
  *
  * Renders as a wrapper around its children. When the hint hasn't been seen
- * (per localStorage key), a pulsing teal hotspot dot appears in the
+ * (per sessionStorage key), a pulsing teal hotspot dot appears in the
  * top-right of the children. Tapping the dot opens a speech-bubble
- * popover below. Dismissing sets the localStorage key permanently.
+ * popover below. Dismissing sets the sessionStorage key permanently.
  *
  * If no children are provided, renders inline (popover only, auto-open).
  */
 export default function HintBubble({ storageKey, ottImage, text, children }) {
   const navigate = useNavigate();
   const [seen] = useState(() => {
-    try { return localStorage.getItem(storageKey) === 'true'; } catch { return true; }
+    try { return sessionStorage.getItem(storageKey) === 'true'; } catch { return true; }
   });
   const [popoverOpen, setPopoverOpen] = useState(!children);
   const [dismissed, setDismissed] = useState(false);
@@ -27,7 +27,7 @@ export default function HintBubble({ storageKey, ottImage, text, children }) {
 
   function dismiss() {
     setDismissed(true);
-    try { localStorage.setItem(storageKey, 'true'); } catch {}
+    try { sessionStorage.setItem(storageKey, 'true'); } catch {}
   }
 
   // Inline mode (no children): render popover directly
