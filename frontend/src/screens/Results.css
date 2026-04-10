@@ -104,3 +104,15 @@
     animation: none;
   }
 }
+
+/* Corner vegetation — responsive sizing */
+.results-corner {
+  width: 80px;
+}
+
+@media (max-width: 480px) {
+  .results-corner {
+    width: 65px;
+    bottom: 70px;
+  }
+}
