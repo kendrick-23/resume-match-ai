@@ -137,8 +137,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
+  margin: -8px;
   border-radius: var(--radius-full);
   background: none;
   border: none;

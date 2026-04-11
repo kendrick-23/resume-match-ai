@@ -69,7 +69,8 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
+  padding: var(--space-2) 0;
+  min-height: 44px;
   -webkit-tap-highlight-color: transparent;
   transition: color var(--transition-fast);
 }
@@ -81,6 +82,7 @@
 /* Filter chips */
 .jobs-filter-chip {
   padding: 6px 14px;
+  min-height: 44px;
   border-radius: var(--radius-full);
   border: 1.5px solid var(--color-border);
   background: transparent;
