@@ -286,7 +286,26 @@ export default function Dashboard() {
 
       {/* Recent activity */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Recent activity</h3>
-      {activity?.recent?.length > 0 ? (
+      {activityError ? (
+        <Card style={{ textAlign: 'center', marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
+          <Ott state="coaching" size={56} />
+          <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
+            Couldn't load recent activity
+          </p>
+          <Button variant="ghost" onClick={loadActivity} style={{ marginTop: 'var(--space-2)' }}>
+            Tap to retry
+          </Button>
+        </Card>
+      ) : !activity ? (
+        <Card style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
+          <div style={{ textAlign: 'center' }}>
+            <Ott state="thinking" size={56} />
+            <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '14px' }}>
+              Loading your activity...
+            </p>
+          </div>
+        </Card>
+      ) : activity?.recent?.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-6)' }}>
           {activity.recent.map((item) => (
             <Card key={item.id}>

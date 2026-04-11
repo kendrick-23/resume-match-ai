@@ -60,6 +60,8 @@ export default function Profile() {
   const vaultUploadRef = useRef(null);
   const [vaultUploading, setVaultUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -135,6 +137,8 @@ export default function Profile() {
   }
 
   async function loadProfile() {
+    setProfileLoading(true);
+    setProfileError(false);
     try {
       const data = await getProfile();
       setFullName(data.full_name || '');
@@ -160,7 +164,9 @@ export default function Profile() {
       setLinkedinText(data.linkedin_text || '');
       setAboutMe(data.about_me || '');
     } catch {
-      // Profile will be created on first save
+      setProfileError(true);
+    } finally {
+      setProfileLoading(false);
     }
   }
 
@@ -312,6 +318,30 @@ export default function Profile() {
         <h2>Profile</h2>
       </div>
 
+      {/* Loading / error states */}
+      {profileLoading ? (
+        <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', marginBottom: 'var(--space-6)' }}>
+          <Ott state="thinking" size={56} />
+          <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-3)', fontSize: '14px' }}>
+            Loading your profile...
+          </p>
+        </Card>
+      ) : profileError ? (
+        <Card style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-4)', marginBottom: 'var(--space-6)' }}>
+          <Ott state="coaching" size={56} />
+          <p style={{ fontWeight: 600, fontSize: '14px', marginTop: 'var(--space-2)' }}>
+            Couldn't load your profile
+          </p>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
+            Your data is safe — just a hiccup on our end.
+          </p>
+          <Button variant="ghost" onClick={loadProfile} style={{ marginTop: 'var(--space-3)' }}>
+            Tap to retry
+          </Button>
+        </Card>
+      ) : null}
+
+      {!profileLoading && !profileError && (<>
       {/* User avatar + email */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <div style={{
@@ -1135,11 +1165,11 @@ export default function Profile() {
         )}
       </Card>
 
-      {/* Section divider */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', margin: 'var(--space-4) 0' }}>
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(43,181,192,0.2)' }} />
+      {/* Paw print section divider */}
+      <div className="paw-divider" aria-hidden="true">
+        <img src="/ott/ott-paw-print.png" alt="" className="paw-divider__print" />
+        <img src="/ott/ott-paw-print.png" alt="" className="paw-divider__print" />
+        <img src="/ott/ott-paw-print.png" alt="" className="paw-divider__print" />
       </div>
 
       {/* Badge collection */}
@@ -1302,6 +1332,7 @@ export default function Profile() {
           </Button>
         </div>
       )}
+      </>)}
     </ScreenWrapper>
   );
 }
