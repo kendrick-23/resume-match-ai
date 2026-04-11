@@ -194,6 +194,7 @@ def calculate_holt_score(
                          "psychiatrist", "psychiatry", "pathologist", "pathology",
                          "neurologist", "neurology", "cardiologist", "cardiology",
                          "podiatrist", "podiatry",
+                         "clinical design", "clinical integration", "clinical informatics",
                          "md", "do", "dpm"],
             "signals": ["medical degree", "md", "do", "dpm", "residency",
                         "board certified", "physician assistant"],
@@ -329,31 +330,64 @@ def calculate_holt_score(
         ops_bonus = min(20, ops_keyword_count * 3)
         skills_match = min(100, skills_match + ops_bonus)
 
-    # Sales-title demotion: titles like "Account Executive" or "Sales Manager"
-    # are off-target for ops/training/compliance profiles unless the JD has
-    # strong operations language. Only fires when the user's target roles do
-    # NOT include sales terms — a user targeting "Sales Manager" won't be penalized.
+    # Vocational/trade role exclusion — these roles require specific
+    # certifications or physical skills unrelated to ops/training/compliance.
+    # Same cap as domain penalty (15%). Runs after the ops bonus so it
+    # overrides any floor/bonus that may have applied.
+    _VOCATIONAL_TRIGGERS = [
+        "truck driver", "cdl", "owner operator", "class a driver",
+        "grounds maintenance", "groundskeeper", "custodian",
+        "security officer", "security guard", "janitor", "janitorial",
+    ]
+    if not domain_penalty_applied and any(vt in job_title for vt in _VOCATIONAL_TRIGGERS):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Off-target title demotion: sales & recruitment roles are off-target for
+    # ops/training/compliance profiles unless the JD has strong operations language.
+    # Uses both exact-phrase matches AND word-boundary checks for "sales" to catch
+    # titles like "Sales and Marketing Coordinator" that don't match any full phrase.
+    _OFFTARGET_OVERRIDE_KEYWORDS = {
+        "scheduling", "compliance", "process improvement", "training",
+        "team management", "operations", "inventory", "logistics",
+    }
+
+    # --- Sales demotion ---
     _SALES_TITLES = {
         "account executive", "account manager",
         "business development representative", "bdr",
         "sales manager", "sales representative", "sales associate",
         "sales director", "sales engineer", "sales consultant",
     }
-    _SALES_OVERRIDE_KEYWORDS = {
-        "scheduling", "compliance", "process improvement", "training",
-        "team management", "operations", "inventory", "logistics",
-    }
     _USER_TARGETS_SALES = any(
         st in (target_roles or "").lower()
         for st in ("sales", "account executive", "business development", "bdr")
     )
     if not _USER_TARGETS_SALES and not domain_penalty_applied:
-        is_sales_title = any(st in job_title for st in _SALES_TITLES)
+        # Check exact phrases OR "sales" as a standalone word in the title
+        is_sales_title = (
+            any(st in job_title for st in _SALES_TITLES)
+            or bool(re.search(r"\bsales\b", job_title))
+        )
         if is_sales_title:
-            # Check if JD has enough ops language to override
-            ops_override_count = sum(1 for kw in _SALES_OVERRIDE_KEYWORDS if kw in job_desc)
+            ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
             if ops_override_count < 2:
-                # Demote: reduce skills_match significantly — this is a wrong-fit role
+                skills_match = max(0, skills_match - 35)
+
+    # --- Recruitment/HR demotion ---
+    _RECRUITMENT_TITLES = {
+        "recruitment specialist", "recruiter", "talent acquisition",
+        "staffing specialist", "staffing coordinator", "recruiting manager",
+    }
+    _USER_TARGETS_HR = any(
+        st in (target_roles or "").lower()
+        for st in ("recruiter", "recruitment", "talent acquisition", "hr ", "human resources")
+    )
+    if not _USER_TARGETS_HR and not domain_penalty_applied:
+        is_recruitment_title = any(rt in job_title for rt in _RECRUITMENT_TITLES)
+        if is_recruitment_title:
+            ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
+            if ops_override_count < 2:
                 skills_match = max(0, skills_match - 35)
 
     # --- 2. Salary Alignment (20%) — sigmoid curve, hard floor, overpay penalty ---
