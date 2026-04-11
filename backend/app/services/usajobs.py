@@ -1,10 +1,82 @@
 import httpx
 import os
+import re
 from typing import Optional
+
+from app.logger import logger
 
 USAJOBS_BASE_URL = "https://data.usajobs.gov/api/search"
 USAJOBS_API_KEY = os.getenv("USAJOBS_API_KEY", "")
 USAJOBS_EMAIL = os.getenv("USAJOBS_EMAIL", "")
+
+# State name → abbreviation mapping for location filtering
+_STATE_ABBREV = {
+    "alabama": "al", "alaska": "ak", "arizona": "az", "arkansas": "ar",
+    "california": "ca", "colorado": "co", "connecticut": "ct", "delaware": "de",
+    "florida": "fl", "georgia": "ga", "hawaii": "hi", "idaho": "id",
+    "illinois": "il", "indiana": "in", "iowa": "ia", "kansas": "ks",
+    "kentucky": "ky", "louisiana": "la", "maine": "me", "maryland": "md",
+    "massachusetts": "ma", "michigan": "mi", "minnesota": "mn", "mississippi": "ms",
+    "missouri": "mo", "montana": "mt", "nebraska": "ne", "nevada": "nv",
+    "new hampshire": "nh", "new jersey": "nj", "new mexico": "nm", "new york": "ny",
+    "north carolina": "nc", "north dakota": "nd", "ohio": "oh", "oklahoma": "ok",
+    "oregon": "or", "pennsylvania": "pa", "rhode island": "ri", "south carolina": "sc",
+    "south dakota": "sd", "tennessee": "tn", "texas": "tx", "utah": "ut",
+    "vermont": "vt", "virginia": "va", "washington": "wa", "west virginia": "wv",
+    "wisconsin": "wi", "wyoming": "wy", "district of columbia": "dc",
+}
+_ABBREV_TO_FULL = {v: k for k, v in _STATE_ABBREV.items()}
+_ALL_ABBREVS = set(_STATE_ABBREV.values())
+
+
+def _extract_state(location_str: str) -> Optional[str]:
+    """Extract the 2-letter state abbreviation from a location string.
+
+    Handles: 'Casselberry, FL', 'Florida', 'Orlando, Florida', 'FL'
+    Returns lowercase 2-letter code or None if not parseable.
+    """
+    loc = location_str.strip().lower()
+    if not loc:
+        return None
+
+    # Try last token as 2-letter state abbreviation
+    parts = re.split(r"[,\s]+", loc)
+    last = parts[-1].strip().rstrip(".")
+    if last in _ALL_ABBREVS:
+        return last
+
+    # Try full state name anywhere in the string
+    for full_name, abbrev in _STATE_ABBREV.items():
+        if full_name in loc:
+            return abbrev
+
+    return None
+
+
+def _job_matches_state(job: dict, target_state: str) -> bool:
+    """Check if a job's location matches the target state.
+
+    Always keeps: remote jobs, 'Anywhere in the U.S.', negotiable,
+    or jobs with no meaningful location.
+    """
+    job_loc = (job.get("location") or "").lower()
+
+    # Always keep remote / nationwide / unspecified
+    if job.get("is_remote"):
+        return True
+    if not job_loc or job_loc == "location not specified":
+        return True
+    if "anywhere" in job_loc or "negotiable" in job_loc or "multiple" in job_loc:
+        return True
+
+    # Check all location strings (some jobs have multiple)
+    for loc_str in job.get("locations", [job.get("location", "")]):
+        loc_lower = loc_str.lower()
+        state = _extract_state(loc_lower)
+        if state == target_state:
+            return True
+
+    return False
 
 
 async def search_usajobs(
@@ -46,7 +118,21 @@ async def search_usajobs(
         resp.raise_for_status()
         data = resp.json()
 
-    return _normalize(data)
+    result = _normalize(data)
+
+    # Post-fetch location filter — USAJobs returns jobs from anywhere in the
+    # US even when a location is specified. Filter to the searched state.
+    if location:
+        target_state = _extract_state(location)
+        if target_state:
+            before = len(result["jobs"])
+            result["jobs"] = [j for j in result["jobs"] if _job_matches_state(j, target_state)]
+            after = len(result["jobs"])
+            if before != after:
+                logger.info(f"[USAJobs] Location filter: {before} → {after} jobs (state={target_state})")
+            result["total"] = len(result["jobs"])
+
+    return result
 
 
 def _normalize(raw: dict) -> dict:

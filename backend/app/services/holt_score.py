@@ -329,6 +329,33 @@ def calculate_holt_score(
         ops_bonus = min(20, ops_keyword_count * 3)
         skills_match = min(100, skills_match + ops_bonus)
 
+    # Sales-title demotion: titles like "Account Executive" or "Sales Manager"
+    # are off-target for ops/training/compliance profiles unless the JD has
+    # strong operations language. Only fires when the user's target roles do
+    # NOT include sales terms — a user targeting "Sales Manager" won't be penalized.
+    _SALES_TITLES = {
+        "account executive", "account manager",
+        "business development representative", "bdr",
+        "sales manager", "sales representative", "sales associate",
+        "sales director", "sales engineer", "sales consultant",
+    }
+    _SALES_OVERRIDE_KEYWORDS = {
+        "scheduling", "compliance", "process improvement", "training",
+        "team management", "operations", "inventory", "logistics",
+    }
+    _USER_TARGETS_SALES = any(
+        st in (target_roles or "").lower()
+        for st in ("sales", "account executive", "business development", "bdr")
+    )
+    if not _USER_TARGETS_SALES and not domain_penalty_applied:
+        is_sales_title = any(st in job_title for st in _SALES_TITLES)
+        if is_sales_title:
+            # Check if JD has enough ops language to override
+            ops_override_count = sum(1 for kw in _SALES_OVERRIDE_KEYWORDS if kw in job_desc)
+            if ops_override_count < 2:
+                # Demote: reduce skills_match significantly — this is a wrong-fit role
+                skills_match = max(0, skills_match - 35)
+
     # --- 2. Salary Alignment (20%) — sigmoid curve, hard floor, overpay penalty ---
     # Replaces the old 3-bucket cliff with a continuous curve grounded in
     # reservation-wage theory (Krueger & Mueller, NBER WP 19870): acceptance
