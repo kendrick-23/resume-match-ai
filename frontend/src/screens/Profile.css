@@ -18,3 +18,17 @@
     page-break-inside: avoid;
   }
 }
+
+/* === Paw print divider === */
+.paw-divider {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: var(--space-4) 0;
+}
+
+.paw-divider__print {
+  width: 20px;
+  opacity: 0.2;
+  display: block;
+}
