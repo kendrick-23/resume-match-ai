@@ -17,7 +17,7 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 anthropic_client = Anthropic()
 
-OPUS_MODEL = "claude-opus-4-6"
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
 
 def _user_sb(user: dict):
@@ -129,7 +129,7 @@ Write the cover letter now."""
 
     try:
         message = anthropic_client.messages.create(
-            model=OPUS_MODEL,
+            model=HAIKU_MODEL,
             max_tokens=1024,
             system=COVER_LETTER_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],
