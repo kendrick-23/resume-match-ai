@@ -456,7 +456,7 @@ export default function Results() {
           role_name: latest.role_name,
           created_at: latest.created_at,
           analysis_id: latest.id,
-          coaching_tips: latest.coaching_tips,
+          coaching_tips: typeof latest.coaching_tips === 'string' ? JSON.parse(latest.coaching_tips) : (latest.coaching_tips || []),
           job_description_text: latest.job_description_text,
           skills_match: latest.skills_match,
           seniority_fit: latest.seniority_fit,
@@ -1263,7 +1263,7 @@ export default function Results() {
                         role_name: a.role_name,
                         created_at: a.created_at,
                         analysis_id: a.id,
-                        coaching_tips: a.coaching_tips,
+                        coaching_tips: typeof a.coaching_tips === 'string' ? JSON.parse(a.coaching_tips) : (a.coaching_tips || []),
                         job_description_text: a.job_description_text,
                         posting_url: a.posting_url || null,
                       });

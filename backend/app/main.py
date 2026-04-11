@@ -919,8 +919,21 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             "resume_id": resume_id,
             "posting_url": body.posting_url,
         }
+        # Ott's Take coaching tips — generate before insert so they're saved with the analysis.
+        coaching_tips = _generate_coaching_tips(
+            score=score,
+            score_tier=score_tier,
+            strengths=strengths,
+            gaps_structured=gaps_structured,
+            translation_opportunities=translation_opportunities,
+            profile=profile,
+            resume=body.resume,
+            job_description=body.job_description,
+        )
+        insert_data["coaching_tips"] = json.dumps(coaching_tips)
+
         # Newer columns may not exist on older Supabase schemas. Drop them progressively.
-        OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities", "resume_id", "posting_url")
+        OPTIONAL_NEW_COLS = ("score_tier", "salary_disclosed", "translation_opportunities", "resume_id", "posting_url", "coaching_tips")
         OPTIONAL_SUB_SCORE_COLS = ("skills_match", "seniority_fit", "salary_alignment", "growth_potential")
 
         def _try_insert(data):
@@ -962,19 +975,6 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
             "user_id": user["user_id"],
             "action_type": "analysis",
         }).execute()
-
-        # Ott's Take coaching tips — overhauled in Section 2.
-        # Profile-aware, tiered tone, full context, truthfulness guardrail.
-        coaching_tips = _generate_coaching_tips(
-            score=score,
-            score_tier=score_tier,
-            strengths=strengths,
-            gaps_structured=gaps_structured,
-            translation_opportunities=translation_opportunities,
-            profile=profile,
-            resume=body.resume,
-            job_description=body.job_description,
-        )
 
         # Extract skills — overhauled in Section 3.
         # No more "operations/management" bias, no more 3000-char truncation,
