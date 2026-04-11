@@ -9,11 +9,9 @@ save ~60-70% of Haiku calls.
 """
 
 import asyncio
-import os
 import time
 
-import anthropic
-
+from app.clients import async_client as anthropic_async
 from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 
@@ -74,10 +72,6 @@ async def enrich_job_description(job: dict) -> str:
         if time.time() - ts < _CACHE_TTL:
             return cached
 
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return desc
-
     prompt_text = (
         f"Job title: {title}\n"
         f"Company: {company}\n"
@@ -95,8 +89,7 @@ async def enrich_job_description(job: dict) -> str:
         return desc
 
     try:
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        response = await client.messages.create(
+        response = await anthropic_async.messages.create(
             model=HAIKU_MODEL,
             max_tokens=200,
             messages=[{"role": "user", "content": prompt_text}],

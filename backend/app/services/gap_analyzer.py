@@ -7,12 +7,10 @@ skills or qualifications the job requires that the candidate lacks.
 
 import asyncio
 import json
-import os
 import time
 from typing import Optional
 
-import anthropic
-
+from app.clients import async_client as anthropic_async
 from app.constants.scoring import TIER_BREAKPOINTS
 
 from app.logger import logger
@@ -49,10 +47,6 @@ async def get_job_specific_gaps(
         if time.time() - ts < _CACHE_TTL:
             return cached
 
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return []
-
     # Send the FULL skill list (was capped at 10) and full target_roles for context.
     skills_str = ", ".join(user_skills) if user_skills else "(no extracted skills)"
     target_text = target_roles.strip() or "(target roles not specified)"
@@ -84,8 +78,7 @@ async def get_job_specific_gaps(
 
     async with _semaphore:
         try:
-            client = anthropic.AsyncAnthropic(api_key=api_key)
-            response = await client.messages.create(
+            response = await anthropic_async.messages.create(
                 model=HAIKU_MODEL,
                 max_tokens=400,
                 messages=[{"role": "user", "content": prompt}],

@@ -1,18 +1,16 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
-from anthropic import Anthropic
 from supabase import create_client
 import os
 
 from app.main import get_current_user, limiter
 from app.logger import logger
+from app.clients import sync_client as anthropic_client
 
 router = APIRouter(tags=["generate-resume"])
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
-
-anthropic_client = Anthropic()
 
 OPUS_MODEL = "claude-opus-4-6"
 

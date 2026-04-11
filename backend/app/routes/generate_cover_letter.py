@@ -2,20 +2,18 @@ import json
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 from typing import Optional
-from anthropic import Anthropic
 from supabase import create_client
 import os
 
 from app.main import get_current_user, limiter
 from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
+from app.clients import sync_client as anthropic_client
 
 router = APIRouter(tags=["generate-cover-letter"])
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
-
-anthropic_client = Anthropic()
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 

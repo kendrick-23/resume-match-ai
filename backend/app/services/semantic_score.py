@@ -9,12 +9,10 @@ Only runs on jobs with relevant titles to save API costs.
 
 import asyncio
 import json
-import os
 import time
 from typing import Optional
 
-import anthropic
-
+from app.clients import async_client as anthropic_async
 from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 
@@ -100,10 +98,6 @@ async def semantic_rescore(job: dict, profile: dict, user_id: str) -> Optional[d
         if time.time() - ts < _CACHE_TTL:
             return cached
 
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return None
-
     candidate = _build_candidate_section(profile)
     j_title = job.get("title") or ""
     j_company = job.get("company") or ""
@@ -143,8 +137,7 @@ Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practica
         return None
 
     try:
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        response = await client.messages.create(
+        response = await anthropic_async.messages.create(
             model=HAIKU_MODEL,
             max_tokens=250,
             messages=[{"role": "user", "content": prompt}],
