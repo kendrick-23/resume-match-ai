@@ -171,6 +171,7 @@ export default function Jobs() {
 
   // Unified search results (profile match only)
   const [unifiedJobs, setUnifiedJobs] = useState(restoredPageState?.unifiedJobs || []);
+  const [isProfileMatch, setIsProfileMatch] = useState(restoredPageState?.isProfileMatch || false);
 
   // Cache state
   const [cachedAt, setCachedAt] = useState(null);
@@ -196,7 +197,7 @@ export default function Jobs() {
       filterPostedWithin, filterDegree, showDealbreakers, filterSource,
       fedJobs, fedTotal, fedPage, fedSearched,
       pvtJobs, pvtTotal, pvtPage, pvtSearched,
-      recommended, hasAnalysis, unifiedJobs,
+      recommended, hasAnalysis, unifiedJobs, isProfileMatch,
     };
   });
 
@@ -438,6 +439,8 @@ export default function Jobs() {
     // Clear page state so this runs fresh
     clearPageState();
     setRestoredFromPageState(false);
+    setIsProfileMatch(false);
+    setUnifiedJobs([]);
 
     // Persist search state
     saveSearch({ keyword: kw, location: loc, remoteOnly, activeTab });
@@ -482,6 +485,7 @@ export default function Jobs() {
     clearPageState();
     setRestoredFromPageState(false);
     setProfileMatchLoading(true);
+    setIsProfileMatch(true);
     setProfileEmpty(false);
     setProfileTimedOut(false);
     setCachedAt(null);
@@ -700,12 +704,22 @@ export default function Jobs() {
     });
   }
 
-  // Active tab data
-  const isSearched = activeTab === 'federal' ? fedSearched : pvtSearched;
-  const isLoading = activeTab === 'federal' ? fedLoading : pvtLoading;
-  const rawJobs = activeTab === 'federal' ? fedJobs : pvtJobs;
-  const activeTotal = activeTab === 'federal' ? fedTotal : pvtTotal;
-  const tabLabel = activeTab === 'federal' ? 'Federal' : 'Private';
+  // Active tab data — keyword search uses tabs, profile match uses unified list
+  const isSearched = isProfileMatch
+    ? (fedSearched || pvtSearched)
+    : (activeTab === 'federal' ? fedSearched : pvtSearched);
+  const isLoading = isProfileMatch
+    ? (fedLoading || pvtLoading)
+    : (activeTab === 'federal' ? fedLoading : pvtLoading);
+  const rawJobs = isProfileMatch
+    ? unifiedJobs
+    : (activeTab === 'federal' ? fedJobs : pvtJobs);
+  const activeTotal = isProfileMatch
+    ? unifiedJobs.length
+    : (activeTab === 'federal' ? fedTotal : pvtTotal);
+  const tabLabel = isProfileMatch
+    ? 'all sources'
+    : (activeTab === 'federal' ? 'Federal' : 'Private');
 
   // Apply filters then sort — target companies always first within sort
   const filteredJobs = filterJobs(rawJobs);
@@ -715,11 +729,22 @@ export default function Jobs() {
     ...sortedJobs.filter((j) => !j.is_target_company),
   ];
 
+  // Profile match: Ott recommends (top 5 strong, any source, not penalized)
+  const ottRecommends = isProfileMatch
+    ? activeJobs.filter((j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !j.domain_penalized).slice(0, 5)
+    : [];
+  const ottRecommendsIds = new Set(ottRecommends.map((j) => j.id));
+
+  // Profile match: main list (score >= 70, not in recommends, capped at 25)
+  const mainJobs = isProfileMatch
+    ? activeJobs.filter((j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !ottRecommendsIds.has(j.id)).slice(0, 25)
+    : activeJobs;
+
   const withinReachJobs = activeJobs.filter(
     (j) => j.holt_score != null && j.holt_score >= TIER_BREAKPOINTS.stretch && j.holt_score < TIER_BREAKPOINTS.strong
   );
 
-  // Tab labels with counts
+  // Tab labels with counts (keyword search only)
   const fmtCount = (n) => n > 1000 ? '1,000+' : n.toLocaleString();
   const fedLabel = fedSearched ? `Federal (${fmtCount(fedTotal)})` : 'Federal';
   const pvtLabel = pvtSearched ? `Private (${fmtCount(pvtTotal)})` : 'Private';
@@ -728,8 +753,8 @@ export default function Jobs() {
     <ScreenWrapper screenName="Jobs">
       <h2 style={{ marginBottom: 'var(--space-5)' }}>Find Jobs</h2>
 
-      {/* Recommended for You — only on Federal tab before search */}
-      {activeTab === 'federal' && !recLoading && hasAnalysis && recommended.length > 0 && !fedSearched && (
+      {/* Ott Recommends — profile match: from unified results; pre-search: from recommendations cache */}
+      {(isProfileMatch ? ottRecommends.length > 0 : (!recLoading && hasAnalysis && recommended.length > 0 && !fedSearched)) && (
         <div style={{ marginBottom: 'var(--space-6)' }}>
           <h3 style={{
             display: 'flex',
@@ -738,10 +763,10 @@ export default function Jobs() {
             marginBottom: 'var(--space-3)',
           }}>
             <Sparkles size={18} style={{ color: 'var(--color-accent)' }} />
-            Recommended for You
+            Ott Recommends
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {recommended.map((job) => (
+            {(isProfileMatch ? ottRecommends : recommended).map((job) => (
               <JobCard
                 key={'rec-' + job.id + job.title}
                 job={job}
@@ -880,8 +905,8 @@ export default function Jobs() {
         </Button>
       </form>
 
-      {/* Source tabs */}
-      {(fedSearched || pvtSearched || fedLoading || pvtLoading) && (
+      {/* Source tabs — keyword search only (profile match uses unified list) */}
+      {!isProfileMatch && (fedSearched || pvtSearched || fedLoading || pvtLoading) && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
           <div className="jobs-tabs">
             <button
@@ -1127,7 +1152,7 @@ export default function Jobs() {
         <Card style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
           <Ott state="thinking" size={56} />
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-2)', fontSize: '13px' }}>
-            Searching {tabLabel.toLowerCase()} jobs...
+            {isProfileMatch ? 'Scoring your matches across all sources...' : `Searching ${tabLabel.toLowerCase()} jobs...`}
           </p>
         </Card>
       )}
@@ -1137,7 +1162,7 @@ export default function Jobs() {
         <Card style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
           <Ott state="coaching" size={56} />
           <p style={{ fontWeight: 700, marginTop: 'var(--space-4)' }}>
-            No {tabLabel.toLowerCase()} jobs found
+            {isProfileMatch ? 'No matching jobs found' : `No ${tabLabel.toLowerCase()} jobs found`}
           </p>
           <p style={{ color: 'var(--color-text-muted)', marginTop: 'var(--space-1)' }}>
             Try different keywords or a broader location
@@ -1162,7 +1187,7 @@ export default function Jobs() {
                 gap: 'var(--space-2)',
               }}>
                 <Target size={18} style={{ color: 'var(--color-warning)' }} />
-                Within Reach — {tabLabel}
+                Within Reach{!isProfileMatch ? ` — ${tabLabel}` : ''}
               </h3>
               <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '2px' }}>
                 These roles are closer than you think. Close these gaps to hit 70%+
@@ -1217,13 +1242,13 @@ export default function Jobs() {
           fontSize: '13px',
           marginBottom: 'var(--space-3)',
         }}>
-          {activeTotal > 1000 ? '1,000+' : activeTotal.toLocaleString()} {tabLabel.toLowerCase()} jobs found
+          {activeTotal > 1000 ? '1,000+' : activeTotal.toLocaleString()} {isProfileMatch ? 'jobs found across all sources' : `${tabLabel.toLowerCase()} jobs found`}
         </p>
       )}
 
       {/* Job cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        {activeJobs
+        {(isProfileMatch ? mainJobs : activeJobs)
           .filter((job) => showDealbreakers || !job.dealbreaker_triggered)
           .map((job) => (
           <JobCard
@@ -1238,15 +1263,15 @@ export default function Jobs() {
         ))}
       </div>
 
-      {/* Load more */}
-      {activeTab === 'federal' && fedSearched && fedJobs.length > 0 && fedJobs.length < fedTotal && (
+      {/* Load more — keyword search only */}
+      {!isProfileMatch && activeTab === 'federal' && fedSearched && fedJobs.length > 0 && fedJobs.length < fedTotal && (
         <div style={{ marginTop: 'var(--space-5)', textAlign: 'center' }}>
           <Button variant="secondary" onClick={handleLoadMoreFed} disabled={fedLoading}>
             {fedLoading ? 'Loading...' : 'Load more federal jobs'}
           </Button>
         </div>
       )}
-      {activeTab === 'private' && pvtSearched && pvtJobs.length > 0 && pvtJobs.length < pvtTotal && (
+      {!isProfileMatch && activeTab === 'private' && pvtSearched && pvtJobs.length > 0 && pvtJobs.length < pvtTotal && (
         <div style={{ marginTop: 'var(--space-5)', textAlign: 'center' }}>
           <Button variant="secondary" onClick={handleLoadMorePvt} disabled={pvtLoading}>
             {pvtLoading ? 'Loading...' : 'Load more private jobs'}
