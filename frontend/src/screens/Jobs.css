@@ -46,14 +46,14 @@
 .within-reach-progress__score {
   font-family: 'Nunito', sans-serif;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-warning);
 }
 
 .within-reach-progress__delta {
   font-family: 'Nunito', sans-serif;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-accent);
 }
 

@@ -906,7 +906,7 @@ export default function Jobs() {
           justifyContent: 'center',
           gap: 'var(--space-2)',
           marginBottom: 'var(--space-3)',
-          fontSize: '12px',
+          fontSize: '13px',
           color: 'var(--color-text-muted)',
         }}>
           <span>Showing saved results from {(() => {
@@ -924,7 +924,7 @@ export default function Jobs() {
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
-              fontWeight: 600, fontSize: '12px', padding: 0,
+              fontWeight: 600, fontSize: '13px', padding: 0,
             }}
           >
             ↻ Refresh
@@ -940,7 +940,7 @@ export default function Jobs() {
           justifyContent: 'center',
           gap: 'var(--space-2)',
           marginBottom: 'var(--space-3)',
-          fontSize: '12px',
+          fontSize: '13px',
           color: 'var(--color-text-muted)',
         }}>
           <span>Showing your last search</span>
@@ -959,7 +959,7 @@ export default function Jobs() {
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
-              fontWeight: 600, fontSize: '12px', padding: 0,
+              fontWeight: 600, fontSize: '13px', padding: 0,
             }}
           >
             ↻ Refresh
@@ -1278,7 +1278,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
           background: 'var(--color-warning-light)',
           borderRadius: 'var(--radius-full)',
           width: 'fit-content',
-          fontSize: '12px',
+          fontSize: '13px',
           fontWeight: 700,
           color: 'var(--color-warning)',
         }}>
@@ -1293,7 +1293,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
           alignItems: 'center',
           gap: 'var(--space-1)',
           marginBottom: 'var(--space-2)',
-          fontSize: '12px',
+          fontSize: '13px',
           fontWeight: 600,
           color: 'var(--color-text-muted)',
         }}>
@@ -1364,7 +1364,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
               display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
               background: 'none', border: 'none', cursor: 'pointer', padding: 0,
               color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
-              fontWeight: 600, fontSize: '12px', marginBottom: 'var(--space-2)',
+              fontWeight: 600, fontSize: '13px', marginBottom: 'var(--space-2)',
             }}
           >
             {showBreakdown ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -1373,7 +1373,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
           {showBreakdown && (
             <div style={{
               display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2) var(--space-4)',
-              fontSize: '12px', marginBottom: 'var(--space-3)',
+              fontSize: '13px', marginBottom: 'var(--space-3)',
               padding: 'var(--space-2)', background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)',
             }}>
               {[
@@ -1412,7 +1412,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
                   borderTop: '1px solid var(--color-border)',
                 }}>
                   <p style={{
-                    fontSize: '12px',
+                    fontSize: '13px',
                     fontStyle: 'italic',
                     color: 'var(--color-text-muted)',
                     lineHeight: 1.4,
@@ -1428,7 +1428,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
 
       {job.closing && (
         <p style={{
-          fontSize: '12px',
+          fontSize: '13px',
           color: 'var(--color-warning)',
           fontWeight: 600,
           marginBottom: 'var(--space-3)',
@@ -1440,7 +1440,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <Button
           variant="ghost"
-          style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
+          style={{ padding: 'var(--space-2) var(--space-3)', minHeight: '44px', fontSize: '13px' }}
           onClick={() => onSave(job)}
           disabled={savedIds.has(job.id)}
         >
@@ -1450,7 +1450,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
         {onAnalyze && (
           <Button
             variant="ghost"
-            style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
+            style={{ padding: 'var(--space-2) var(--space-3)', minHeight: '44px', fontSize: '13px' }}
             onClick={() => onAnalyze(job)}
           >
             <Sparkles size={14} /> Analyze
@@ -1465,7 +1465,7 @@ function JobCard({ job, savedIds, onSave, onAnalyze, formatSalary, recommended =
               display: 'inline-flex',
               alignItems: 'center',
               gap: 'var(--space-1)',
-              padding: '8px 14px',
+              padding: 'var(--space-2) var(--space-3)',
               fontSize: '13px',
               fontWeight: 600,
               fontFamily: "'Nunito', sans-serif",
@@ -1569,7 +1569,7 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
               display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
               background: 'none', border: 'none', cursor: 'pointer', padding: 0,
               color: 'var(--color-accent)', fontFamily: "'Nunito', sans-serif",
-              fontWeight: 600, fontSize: '12px', marginBottom: 'var(--space-2)',
+              fontWeight: 600, fontSize: '13px', marginBottom: 'var(--space-2)',
             }}
           >
             {showBreakdown ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -1578,7 +1578,7 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
           {showBreakdown && (
             <div style={{
               display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2) var(--space-4)',
-              fontSize: '12px', marginBottom: 'var(--space-3)',
+              fontSize: '13px', marginBottom: 'var(--space-3)',
               padding: 'var(--space-2)', background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)',
             }}>
               {[
@@ -1613,7 +1613,7 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
         <div style={{ marginBottom: 'var(--space-3)' }}>
           {jobGaps.map((gap, i) => (
             <p key={i} style={{
-              fontSize: '12px',
+              fontSize: '13px',
               color: 'var(--color-text-secondary)',
               lineHeight: 1.4,
               paddingLeft: 'var(--space-3)',
@@ -1626,7 +1626,7 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
         </div>
       ) : (
         <p style={{
-          fontSize: '12px',
+          fontSize: '13px',
           color: 'var(--color-text-muted)',
           marginBottom: 'var(--space-3)',
           fontStyle: 'italic',
@@ -1638,7 +1638,7 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         <Button
           variant="ghost"
-          style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
+          style={{ padding: 'var(--space-2) var(--space-3)', minHeight: '44px', fontSize: '13px' }}
           onClick={() => onSave(job)}
           disabled={savedIds.has(job.id)}
         >
@@ -1648,7 +1648,7 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
         {onAnalyze && (
           <Button
             variant="ghost"
-            style={{ padding: '8px 14px', minHeight: '44px', fontSize: '13px' }}
+            style={{ padding: 'var(--space-2) var(--space-3)', minHeight: '44px', fontSize: '13px' }}
             onClick={() => onAnalyze(job)}
           >
             <Sparkles size={14} /> Analyze
@@ -1663,7 +1663,7 @@ function WithinReachCard({ job, score, savedIds, onSave, onAnalyze, formatSalary
               display: 'inline-flex',
               alignItems: 'center',
               gap: 'var(--space-1)',
-              padding: '8px 14px',
+              padding: 'var(--space-2) var(--space-3)',
               fontSize: '13px',
               fontWeight: 600,
               fontFamily: "'Nunito', sans-serif",

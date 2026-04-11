@@ -180,8 +180,8 @@ export default function Dashboard() {
           aria-hidden="true"
           style={{
             position: 'absolute',
-            top: '8px',
-            right: '8px',
+            top: 'var(--space-2)',
+            right: 'var(--space-2)',
             width: '24px',
             height: '24px',
             objectFit: 'contain',
@@ -323,7 +323,7 @@ export default function Dashboard() {
                 <Clock size={16} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontWeight: 600, fontSize: '14px' }}>{item.label}</p>
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
                     {new Date(item.created_at).toLocaleString()}
                   </p>
                 </div>

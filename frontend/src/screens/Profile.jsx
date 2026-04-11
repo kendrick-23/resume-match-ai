@@ -384,7 +384,7 @@ export default function Profile() {
                 <p style={{ fontWeight: 600, fontSize: '14px' }}>
                   {analyses[0].role_name || 'Resume analyzed'}
                 </p>
-                <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
                   Last analyzed: {new Date(analyses[0].created_at).toLocaleDateString()}
                 </p>
               </div>
@@ -405,7 +405,7 @@ export default function Profile() {
                   <p style={{ fontSize: '13px', flex: 1 }}>{resumeFile.name}</p>
                   <Button
                     variant="primary"
-                    style={{ padding: '8px 16px', minHeight: '44px', fontSize: '13px' }}
+                    style={{ padding: 'var(--space-2) var(--space-4)', minHeight: '44px', fontSize: '13px' }}
                     onClick={handleResumeUpload}
                     disabled={resumeAnalyzing}
                   >
@@ -436,7 +436,7 @@ export default function Profile() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                 <p style={{ fontSize: '13px' }}>{resumeFile.name}</p>
                 <Button
-                  style={{ padding: '8px 16px', minHeight: '44px', fontSize: '13px' }}
+                  style={{ padding: 'var(--space-2) var(--space-4)', minHeight: '44px', fontSize: '13px' }}
                   onClick={handleResumeUpload}
                   disabled={resumeAnalyzing}
                 >
@@ -514,7 +514,7 @@ export default function Profile() {
                         }}
                         autoFocus
                         style={{
-                          flex: 1, padding: '4px 8px', fontSize: '14px', fontWeight: 700,
+                          flex: 1, padding: 'var(--space-1) var(--space-2)', fontSize: '14px', fontWeight: 700,
                           fontFamily: "'Nunito', sans-serif",
                           border: '1.5px solid var(--color-accent)',
                           borderRadius: 'var(--radius-sm)',
@@ -526,7 +526,7 @@ export default function Profile() {
                         style={{
                           background: 'var(--color-accent)', color: 'white',
                           border: 'none', borderRadius: 'var(--radius-sm)',
-                          padding: '4px 10px', fontSize: '12px', fontWeight: 700,
+                          padding: '4px 10px', fontSize: '13px', fontWeight: 700,
                           cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
                         }}
                       >
@@ -547,7 +547,7 @@ export default function Profile() {
                       )}
                     </p>
                   )}
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
                     {new Date(r.updated_at || r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     {r.word_count ? ` · ${r.word_count.toLocaleString()} words` : ''}
                     {r.source_format ? ` · ${r.source_format.toUpperCase()}` : ''}
@@ -559,7 +559,7 @@ export default function Profile() {
                         style={{
                           background: 'none', border: '1px solid var(--color-accent)',
                           color: 'var(--color-accent)', borderRadius: 'var(--radius-full)',
-                          padding: '3px 10px', fontSize: '12px', fontWeight: 700,
+                          padding: '3px 10px', fontSize: '13px', fontWeight: 700,
                           cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
                         }}
                       >
@@ -573,7 +573,7 @@ export default function Profile() {
                           style={{
                             background: 'var(--color-danger)', color: 'white',
                             border: 'none', borderRadius: 'var(--radius-full)',
-                            padding: '3px 10px', fontSize: '12px', fontWeight: 700,
+                            padding: '3px 10px', fontSize: '13px', fontWeight: 700,
                             cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
                           }}
                         >
@@ -584,7 +584,7 @@ export default function Profile() {
                           style={{
                             background: 'none', border: '1px solid var(--color-border)',
                             color: 'var(--color-text-muted)', borderRadius: 'var(--radius-full)',
-                            padding: '3px 10px', fontSize: '12px', fontWeight: 700,
+                            padding: '3px 10px', fontSize: '13px', fontWeight: 700,
                             cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
                           }}
                         >
@@ -598,8 +598,8 @@ export default function Profile() {
                           background: 'none', border: 'none',
                           color: 'var(--color-text-muted)',
                           padding: 0, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: '4px',
-                          fontFamily: "'Nunito', sans-serif", fontSize: '12px', fontWeight: 600,
+                          display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                          fontFamily: "'Nunito', sans-serif", fontSize: '13px', fontWeight: 600,
                         }}
                       >
                         <Trash2 size={12} /> Delete
@@ -630,7 +630,7 @@ export default function Profile() {
               </div>
             )}
             {vaultResumes.length >= 5 && (
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', textAlign: 'center', marginTop: 'var(--space-2)' }}>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', textAlign: 'center', marginTop: 'var(--space-2)' }}>
                 Vault is full (5/5). Delete one to upload a new resume.
               </p>
             )}
@@ -667,7 +667,7 @@ export default function Profile() {
               maxLength={10000}
               style={{ minHeight: '100px' }}
             />
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
               Helps Ott understand your full professional background
             </p>
           </div>
@@ -775,7 +775,7 @@ export default function Profile() {
               onChange={(e) => { setDegreeStatus(e.target.value); setHasChanges(true); }}
               style={{
                 width: '100%',
-                padding: '12px var(--space-4)',
+                padding: 'var(--space-3) var(--space-4)',
                 fontFamily: "'Nunito', sans-serif",
                 fontSize: '15px',
                 border: '1.5px solid var(--color-border)',
@@ -799,7 +799,7 @@ export default function Profile() {
               onChange={(e) => { setWorkAuth(e.target.value); setHasChanges(true); }}
               style={{
                 width: '100%',
-                padding: '12px var(--space-4)',
+                padding: 'var(--space-3) var(--space-4)',
                 fontFamily: "'Nunito', sans-serif",
                 fontSize: '15px',
                 border: '1.5px solid var(--color-border)',
@@ -828,7 +828,7 @@ export default function Profile() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 'var(--space-1)',
-                padding: '4px 12px',
+                padding: 'var(--space-1) var(--space-3)',
                 background: 'var(--color-accent-light)',
                 color: 'var(--color-accent-dark)',
                 borderRadius: 'var(--radius-full)',
@@ -935,7 +935,7 @@ export default function Profile() {
                   key={i}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)',
-                    padding: '4px 12px', background: 'var(--color-accent-light)',
+                    padding: 'var(--space-1) var(--space-3)', background: 'var(--color-accent-light)',
                     color: 'var(--color-accent-dark)', borderRadius: 'var(--radius-full)',
                     fontSize: '13px', fontWeight: 600,
                   }}
@@ -982,7 +982,7 @@ export default function Profile() {
                         style={{
                           padding: '3px 10px', border: '1px dashed var(--color-border-strong)',
                           borderRadius: 'var(--radius-full)', background: 'none', cursor: 'pointer',
-                          fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)',
+                          fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)',
                           fontFamily: "'Nunito', sans-serif",
                         }}
                       >
@@ -1008,7 +1008,7 @@ export default function Profile() {
                     style={{
                       padding: '3px 10px', border: '1px dashed var(--color-border-strong)',
                       borderRadius: 'var(--radius-full)', background: 'none', cursor: 'pointer',
-                      fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)',
+                      fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)',
                       fontFamily: "'Nunito', sans-serif",
                     }}
                   >
@@ -1044,7 +1044,7 @@ export default function Profile() {
 
         {analyses.length >= 2 ? (
           <Card>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginBottom: 'var(--space-2)' }}>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginBottom: 'var(--space-2)' }}>
               Your last {Math.min(analyses.length, 5)} analyses
             </p>
             <ScoreTrendChart analyses={analyses.slice(0, 5)} />
@@ -1106,7 +1106,7 @@ export default function Profile() {
                         {a.company_name}
                       </p>
                     )}
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '2px' }}>
                       {new Date(a.created_at).toLocaleDateString()}
                     </p>
                   </div>
@@ -1131,7 +1131,7 @@ export default function Profile() {
                   style={{
                     background: 'none', border: 'none', cursor: vaultPage === 0 ? 'default' : 'pointer',
                     color: vaultPage === 0 ? 'var(--color-text-muted)' : 'var(--color-accent)',
-                    fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                    fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: 'var(--space-1) var(--space-2)',
                   }}
                 >
                   Prev
@@ -1146,7 +1146,7 @@ export default function Profile() {
                     background: 'none', border: 'none',
                     cursor: vaultPage >= Math.ceil(analyses.length / 5) - 1 ? 'default' : 'pointer',
                     color: vaultPage >= Math.ceil(analyses.length / 5) - 1 ? 'var(--color-text-muted)' : 'var(--color-accent)',
-                    fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                    fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: 'var(--space-1) var(--space-2)',
                   }}
                 >
                   Next

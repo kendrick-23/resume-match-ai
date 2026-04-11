@@ -428,8 +428,8 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
                 background: stage === app.status ? 'var(--color-accent-light)' : 'none',
                 border: stage === app.status ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
                 borderRadius: 'var(--radius-full)',
-                padding: '4px 12px',
-                fontSize: '12px',
+                padding: 'var(--space-1) var(--space-3)',
+                fontSize: '13px',
                 fontWeight: 600,
                 fontFamily: 'Nunito, sans-serif',
                 cursor: 'pointer',
@@ -450,7 +450,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
         flexWrap: 'wrap',
       }}>
         {app.applied_date && (
-          <span style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
             {new Date(app.applied_date).toLocaleDateString()}
           </span>
         )}
@@ -464,7 +464,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
             href={app.url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: '13px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink size={12} /> Link
@@ -478,7 +478,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
             border: 'none',
             cursor: 'pointer',
             color: 'var(--color-text-muted)',
-            padding: '4px',
+            padding: 'var(--space-1)',
             minHeight: '44px',
             minWidth: '44px',
             display: 'flex',
@@ -565,12 +565,12 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
                         {questionText}
                       </p>
                       {competency && (
-                        <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', marginTop: '4px' }}>
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', marginTop: 'var(--space-1)' }}>
                           {competency}
                         </p>
                       )}
                       {starScaffold && (
-                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: 1.5, marginTop: '4px', fontStyle: 'italic' }}>
+                        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: 1.5, marginTop: 'var(--space-1)', fontStyle: 'italic' }}>
                           {starScaffold}
                         </p>
                       )}
@@ -598,7 +598,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
                   color: 'var(--color-accent)',
                   fontFamily: "'Nunito', sans-serif",
                   fontWeight: 600,
-                  fontSize: '12px',
+                  fontSize: '13px',
                   padding: 'var(--space-1) 0',
                 }}
               >
@@ -683,7 +683,7 @@ function AddApplicationModal({ onSubmit, onClose, prefill }) {
             <h3>Add Application</h3>
             <button
               onClick={onClose}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: '4px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 'var(--space-1)' }}
             >
               <X size={20} />
             </button>

@@ -155,7 +155,7 @@ function ScoreBreakdown({ result }) {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '4px',
+                marginBottom: 'var(--space-1)',
               }}>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
                   {s.label}
@@ -240,7 +240,7 @@ function JobContextCard({ result }) {
             {companyName || <span style={{ color: 'var(--color-text-muted)' }}>Company not detected</span>}
           </p>
           {analyzedWithText && (
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
               {analyzedWithText}
             </p>
           )}
@@ -685,7 +685,7 @@ export default function Results() {
                   border: 'none',
                   cursor: 'pointer',
                   color: 'var(--color-accent-dark)',
-                  padding: '4px',
+                  padding: 'var(--space-1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -731,7 +731,7 @@ export default function Results() {
                     fontWeight: 800,
                     fontSize: '13px',
                     padding: 0,
-                    marginTop: '4px',
+                    marginTop: 'var(--space-1)',
                     textDecoration: 'underline',
                   }}
                 >
@@ -749,7 +749,7 @@ export default function Results() {
                   border: 'none',
                   cursor: 'pointer',
                   color: 'var(--color-stretch-dark)',
-                  padding: '4px',
+                  padding: 'var(--space-1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -871,7 +871,7 @@ export default function Results() {
                         <div style={{ flex: 1 }}>
                           <p style={{ color: 'var(--color-text-secondary)' }}>{gapText}</p>
                           {effort && EFFORT_LABEL[effort] && (
-                            <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 600, marginTop: '4px' }}>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600, marginTop: 'var(--space-1)' }}>
                               {EFFORT_LABEL[effort]}
                             </p>
                           )}
@@ -1126,7 +1126,7 @@ export default function Results() {
                   }}>
                     <img src="/ott/ott-coaching.png" alt="Ott coaching" style={{ width: '32px', flexShrink: 0 }} />
                     <p style={{
-                      fontSize: '12px',
+                      fontSize: '13px',
                       color: 'var(--color-accent-dark)',
                       fontWeight: 600,
                       lineHeight: 1.4,
@@ -1161,7 +1161,7 @@ export default function Results() {
                     />
                     <p style={{
                       color: 'var(--color-text-muted)',
-                      fontSize: '12px',
+                      fontSize: '13px',
                       marginTop: 'var(--space-2)',
                       textAlign: 'right',
                     }}>
@@ -1204,7 +1204,7 @@ export default function Results() {
                         fontFamily: "'Nunito', sans-serif",
                         fontWeight: 600,
                         fontSize: '13px',
-                        padding: '4px 8px',
+                        padding: 'var(--space-1) var(--space-2)',
                       }}
                     >
                       Regenerate
@@ -1281,7 +1281,7 @@ export default function Results() {
                         <p style={{ fontWeight: 700, fontSize: '14px' }}>
                           {a.role_name || a.company_name || 'Analysis'}
                         </p>
-                        <p style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                        <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
                           {new Date(a.created_at).toLocaleDateString()}
                         </p>
                       </div>
@@ -1307,7 +1307,7 @@ export default function Results() {
                     style={{
                       background: 'none', border: 'none', cursor: historyPage === 0 ? 'default' : 'pointer',
                       color: historyPage === 0 ? 'var(--color-text-muted)' : 'var(--color-accent)',
-                      fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: 'var(--space-1) var(--space-2)',
                     }}
                   >
                     Prev
@@ -1322,7 +1322,7 @@ export default function Results() {
                       background: 'none', border: 'none',
                       cursor: historyPage >= Math.ceil(pastAnalyses.length / 5) - 1 ? 'default' : 'pointer',
                       color: historyPage >= Math.ceil(pastAnalyses.length / 5) - 1 ? 'var(--color-text-muted)' : 'var(--color-accent)',
-                      fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: '4px 8px',
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '13px', padding: 'var(--space-1) var(--space-2)',
                     }}
                   >
                     Next

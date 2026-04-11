@@ -269,7 +269,7 @@ export default function Upload() {
               style={{ width: '56px', height: '56px', objectFit: 'contain', flexShrink: 0 }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Your Resume
               </p>
               <p
@@ -286,7 +286,7 @@ export default function Upload() {
               >
                 {truncate(selectedResume.label || selectedResume.source_filename || 'Resume', 30)}
               </p>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '2px' }}>
                 Last updated: {formatDate(selectedResume.updated_at || selectedResume.created_at)}
                 {selectedResume.word_count ? ` · ${selectedResume.word_count.toLocaleString()} words` : ''}
               </p>
@@ -373,7 +373,7 @@ export default function Upload() {
                 color: 'var(--color-text-muted)',
                 fontFamily: "'Nunito', sans-serif",
                 fontWeight: 600,
-                fontSize: '12px',
+                fontSize: '13px',
                 padding: 0,
                 textDecoration: 'underline',
               }}
@@ -442,7 +442,7 @@ export default function Upload() {
                   color: 'var(--color-text-muted)',
                   fontFamily: "'Nunito', sans-serif",
                   fontWeight: 600,
-                  fontSize: '12px',
+                  fontSize: '13px',
                   padding: 0,
                   textDecoration: 'underline',
                 }}
@@ -538,7 +538,7 @@ export default function Upload() {
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: 'var(--space-1)',
-                      fontSize: '12px',
+                      fontSize: '13px',
                       color: 'var(--color-text-muted)',
                       lineHeight: 1.4,
                       marginTop: 'var(--space-1)',
@@ -550,7 +550,7 @@ export default function Upload() {
                 )}
 
                 {linkedinError && (
-                  <p style={{ color: 'var(--color-danger)', fontSize: '12px', fontWeight: 600, marginTop: 'var(--space-2)' }}>
+                  <p style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600, marginTop: 'var(--space-2)' }}>
                     {linkedinError}
                   </p>
                 )}
@@ -568,7 +568,7 @@ export default function Upload() {
                   style={{ minHeight: '80px' }}
                   disabled={analyzing}
                 />
-                <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: 'var(--space-1)' }}>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 'var(--space-1)' }}>
                   More text = better analysis
                 </p>
               </div>

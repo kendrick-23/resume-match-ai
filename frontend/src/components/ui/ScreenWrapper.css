@@ -185,7 +185,7 @@
 }
 
 .header-settings__email {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;

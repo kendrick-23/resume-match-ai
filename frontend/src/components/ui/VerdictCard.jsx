@@ -139,7 +139,7 @@ export default function VerdictCard({
       {/* Gap-closing message for stretch tiers */}
       {(tier === 'stretch' || tier === 'weak') && (
         <p style={{
-          fontSize: '12px',
+          fontSize: '13px',
           color: 'var(--color-text-muted)',
           textAlign: 'center',
           marginBottom: 'var(--space-3)',
