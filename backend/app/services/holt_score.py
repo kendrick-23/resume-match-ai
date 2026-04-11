@@ -193,8 +193,9 @@ def calculate_holt_score(
                          "surgeon", "surgery", "anesthesiologist", "anesthesia",
                          "psychiatrist", "psychiatry", "pathologist", "pathology",
                          "neurologist", "neurology", "cardiologist", "cardiology",
-                         "md", "do"],
-            "signals": ["medical degree", "md", "do", "residency",
+                         "podiatrist", "podiatry",
+                         "md", "do", "dpm"],
+            "signals": ["medical degree", "md", "do", "dpm", "residency",
                         "board certified", "physician assistant"],
         },
         {
@@ -301,8 +302,8 @@ def calculate_holt_score(
         # Same has-background test as the title path — if the candidate
         # actually holds the credential, no penalty.
         candidate_has_credential = (
-            re.search(r"\b(md|do|rn|jd|pharmd|dds|dvm)\b", skills_str)
-            or re.search(r"\b(md|do|rn|jd)\b", degree)
+            re.search(r"\b(md|do|dpm|rn|jd|pharmd|dds|dvm)\b", skills_str)
+            or re.search(r"\b(md|do|dpm|rn|jd)\b", degree)
             or "medical degree" in skills_str
             or "nursing license" in skills_str
             or "law degree" in skills_str

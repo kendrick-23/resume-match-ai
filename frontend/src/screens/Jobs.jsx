@@ -1257,10 +1257,10 @@ function ProfileMatchLoading() {
 
 
 function SourceBadge({ source }) {
-  if (source === 'adzuna') {
-    return <Badge variant="info" className="source-badge--private">Private</Badge>;
+  if (source === 'usajobs') {
+    return <Badge variant="info">Federal</Badge>;
   }
-  return <Badge variant="info">Federal</Badge>;
+  return <Badge variant="info" className="source-badge--private">Private</Badge>;
 }
 
 
