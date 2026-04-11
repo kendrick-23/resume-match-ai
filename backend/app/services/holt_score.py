@@ -386,8 +386,11 @@ def calculate_holt_score(
     if not _USER_TARGETS_HR and not domain_penalty_applied:
         is_recruitment_title = any(rt in job_title for rt in _RECRUITMENT_TITLES)
         if is_recruitment_title:
+            # Recruitment JDs often contain incidental ops words ("training",
+            # "operations") in a non-ops context. Require 3+ ops keywords to
+            # override (stricter than sales demotion's 2).
             ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
-            if ops_override_count < 2:
+            if ops_override_count < 3:
                 skills_match = max(0, skills_match - 35)
 
     # --- 2. Salary Alignment (20%) — sigmoid curve, hard floor, overpay penalty ---

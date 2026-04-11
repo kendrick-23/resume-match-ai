@@ -792,8 +792,11 @@ export default function Jobs() {
         .slice(0, 25)
     : activeJobs;
 
+  // Within Reach: 60-69% — close enough to 70% to be genuinely closeable.
+  // Jobs below 60% go to the collapsed "outside your preferences" section.
+  const WITHIN_REACH_FLOOR = 60;
   const withinReachJobs = activeJobs.filter(
-    (j) => j.holt_score != null && j.holt_score >= TIER_BREAKPOINTS.stretch && j.holt_score < TIER_BREAKPOINTS.strong && !j.dealbreaker_triggered
+    (j) => j.holt_score != null && j.holt_score >= WITHIN_REACH_FLOOR && j.holt_score < TIER_BREAKPOINTS.strong && !j.dealbreaker_triggered
   );
 
   // "Outside your preferences" jobs — collapsed section for profile match
