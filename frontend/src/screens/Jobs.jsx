@@ -27,20 +27,24 @@ const CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 // Role synonym expansion — surfaces more relevant inventory from existing sources.
 // Maps normalized target role → related job titles that often match the same candidate.
+// Role synonym expansion — surfaces more relevant inventory from existing sources.
+// Maps normalized target role → related job titles. Kept specific to avoid
+// pulling off-target roles (e.g. "general manager" is too broad — matches
+// trucking, military, etc.). Each synonym should pass the test: "Would Nicole
+// be qualified and interested in this role given her ops/training background?"
 const ROLE_SYNONYMS = {
-  'operations manager': ['operations coordinator', 'office manager', 'site manager', 'general manager'],
-  'operations coordinator': ['operations manager', 'office manager', 'administrative coordinator'],
+  'operations manager': ['operations coordinator', 'operations director', 'business operations manager', 'operations supervisor'],
+  'operations coordinator': ['operations manager', 'operations specialist', 'administrative coordinator'],
   'training manager': ['training coordinator', 'learning and development manager', 'training specialist', 'l&d manager'],
   'training coordinator': ['training manager', 'training specialist', 'learning and development coordinator'],
   'compliance coordinator': ['compliance manager', 'compliance specialist', 'regulatory coordinator', 'quality assurance coordinator'],
   'compliance manager': ['compliance coordinator', 'compliance specialist', 'regulatory manager'],
-  'office manager': ['administrative manager', 'business operations manager', 'facilities manager'],
-  'general manager': ['operations manager', 'assistant general manager', 'store manager'],
-  'store manager': ['assistant store manager', 'retail manager', 'general manager'],
+  'office manager': ['administrative manager', 'business operations manager', 'office administrator'],
+  'store manager': ['assistant store manager', 'retail operations manager', 'retail manager'],
   'assistant manager': ['shift manager', 'team lead', 'assistant store manager'],
-  'facilities manager': ['facilities coordinator', 'building manager', 'property manager'],
+  'facilities manager': ['facilities coordinator', 'building operations manager'],
   'project manager': ['program manager', 'project coordinator', 'operations project manager'],
-  'administrative manager': ['office manager', 'administrative coordinator', 'executive assistant'],
+  'administrative manager': ['office manager', 'administrative coordinator', 'operations administrator'],
 };
 
 function expandQueriesWithSynonyms(roles, maxTotal = 6) {
@@ -775,20 +779,33 @@ export default function Jobs() {
     ...sortedJobs.filter((j) => !j.is_target_company),
   ];
 
-  // Profile match: Ott recommends (top 5 strong, any source, not penalized)
+  // Profile match: Ott recommends (top 5 strong, any source, not penalized, not dealbreaker)
   const ottRecommends = isProfileMatch
-    ? activeJobs.filter((j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !j.domain_penalized).slice(0, 5)
+    ? activeJobs.filter((j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !j.domain_penalized && !j.dealbreaker_triggered).slice(0, 5)
     : [];
   const ottRecommendsIds = new Set(ottRecommends.map((j) => j.id));
 
-  // Profile match: main list (score >= 70, not in recommends, capped at 25)
+  // Profile match: main list (score >= 70, not in recommends, not dealbreaker, capped at 25)
   const mainJobs = isProfileMatch
-    ? activeJobs.filter((j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !ottRecommendsIds.has(j.id)).slice(0, 25)
+    ? activeJobs
+        .filter((j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !ottRecommendsIds.has(j.id) && !j.dealbreaker_triggered)
+        .slice(0, 25)
     : activeJobs;
 
   const withinReachJobs = activeJobs.filter(
-    (j) => j.holt_score != null && j.holt_score >= TIER_BREAKPOINTS.stretch && j.holt_score < TIER_BREAKPOINTS.strong
+    (j) => j.holt_score != null && j.holt_score >= TIER_BREAKPOINTS.stretch && j.holt_score < TIER_BREAKPOINTS.strong && !j.dealbreaker_triggered
   );
+
+  // "Outside your preferences" jobs — collapsed section for profile match
+  const outsidePrefsJobs = isProfileMatch
+    ? activeJobs.filter((j) => j.dealbreaker_triggered)
+    : [];
+  const [showOutsidePrefs, setShowOutsidePrefs] = useState(false);
+
+  // Displayed job count — actual visible jobs after all filtering and caps
+  const displayedCount = isProfileMatch
+    ? ottRecommends.length + mainJobs.length + withinReachJobs.length
+    : activeTotal;
 
   // Tab labels with counts (keyword search only)
   const fmtCount = (n) => n > 1000 ? '1,000+' : n.toLocaleString();
@@ -1288,7 +1305,10 @@ export default function Jobs() {
           fontSize: '13px',
           marginBottom: 'var(--space-3)',
         }}>
-          {activeTotal > 1000 ? '1,000+' : activeTotal.toLocaleString()} {isProfileMatch ? 'jobs found across all sources' : `${tabLabel.toLowerCase()} jobs found`}
+          {isProfileMatch
+            ? `${displayedCount} jobs found across all sources`
+            : `${activeTotal > 1000 ? '1,000+' : activeTotal.toLocaleString()} ${tabLabel.toLowerCase()} jobs found`
+          }
         </p>
       )}
 
@@ -1308,6 +1328,48 @@ export default function Jobs() {
           />
         ))}
       </div>
+
+      {/* Outside your preferences — collapsed section for profile match */}
+      {isProfileMatch && outsidePrefsJobs.length > 0 && (
+        <div style={{ marginTop: 'var(--space-5)' }}>
+          <button
+            onClick={() => setShowOutsidePrefs(!showOutsidePrefs)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--color-text-muted)',
+              fontFamily: "'Nunito', sans-serif",
+              fontWeight: 600,
+              fontSize: '13px',
+              padding: 'var(--space-2) 0',
+              minHeight: '44px',
+            }}
+          >
+            <AlertTriangle size={14} />
+            {outsidePrefsJobs.length} job{outsidePrefsJobs.length !== 1 ? 's' : ''} outside your preferences
+            <ChevronDown size={14} style={{ transform: showOutsidePrefs ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }} />
+          </button>
+          {showOutsidePrefs && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+              {outsidePrefsJobs.map((job) => (
+                <JobCard
+                  key={job.id + job.title}
+                  job={job}
+                  savedIds={savedIds}
+                  onSave={handleSave}
+                  onAnalyze={handleAnalyze}
+                  formatSalary={formatSalary}
+                  holtScore={job.holt_score}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Load more — keyword search only */}
       {!isProfileMatch && activeTab === 'federal' && fedSearched && fedJobs.length > 0 && fedJobs.length < fedTotal && (
