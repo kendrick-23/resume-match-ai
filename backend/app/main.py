@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
+import anthropic
 from app.clients import sync_client as anthropic_client
 from app.services.token_budget import check_opus_budget, estimate_tokens
 from supabase import create_client
@@ -1040,6 +1041,9 @@ Analyze this match. Apply the truthfulness rules strictly. Use the gap effort ta
         }}
     except HTTPException:
         raise
+    except anthropic.APIStatusError as e:
+        logger.error(f"[/analyze] Anthropic API error (status {e.status_code}): {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="Ott needs a quick breather — please try again in a moment.")
     except Exception as e:
         logger.error(f"[/analyze] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Something went wrong during analysis. Please try again.")

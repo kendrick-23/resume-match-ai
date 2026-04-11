@@ -8,6 +8,7 @@ import os
 from app.main import get_current_user, limiter
 from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
+import anthropic
 from app.clients import sync_client as anthropic_client
 
 router = APIRouter(tags=["generate-cover-letter"])
@@ -149,6 +150,9 @@ Write the cover letter now."""
 
     except HTTPException:
         raise
+    except anthropic.APIStatusError as e:
+        logger.error(f"[/generate-cover-letter] Anthropic API error (status {e.status_code}): {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="Ott needs a quick breather — please try again in a moment.")
     except Exception as e:
         logger.error(f"[/generate-cover-letter] Error: {e}", exc_info=True)
         raise HTTPException(

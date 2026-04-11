@@ -5,6 +5,7 @@ import os
 
 from app.main import get_current_user, limiter
 from app.logger import logger
+import anthropic
 from app.clients import sync_client as anthropic_client
 from app.services.token_budget import check_opus_budget, estimate_tokens
 
@@ -163,6 +164,9 @@ Rewrite the resume per the system rules. Output only the markdown — no comment
 
     except HTTPException:
         raise
+    except anthropic.APIStatusError as e:
+        logger.error(f"[/generate-resume] Anthropic API error (status {e.status_code}): {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="Ott needs a quick breather — please try again in a moment.")
     except Exception as e:
         logger.error(f"[/generate-resume] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Something went wrong generating your resume. Please try again.")
