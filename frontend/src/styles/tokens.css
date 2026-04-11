@@ -17,6 +17,10 @@
   --color-danger-light:     #FFF0F0;  /* Danger background tint */
   --color-warning:          #FFC800;  /* Caution, medium match */
   --color-warning-light:    #FFFBEB;  /* Warning background tint */
+  --color-stretch:          #F5A623;  /* Stretch tier — amber */
+  --color-stretch-light:    #FFF7E6;  /* Stretch background tint */
+  --color-stretch-dark:     #B86F00;  /* Stretch text / pressed */
+  --color-weak:             #E8821A;  /* Weak tier — dark amber */
   --color-info:             #4A90D9;  /* Neutral information */
   --color-info-light:       #EBF4FF;  /* Info background tint */
 

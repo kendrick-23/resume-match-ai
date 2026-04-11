@@ -23,14 +23,14 @@ const TIER_META = {
     headline: "You're closer than you think.",
     ottState: 'coaching',
     ottImage: '/ott/ott-coaching.png',
-    ringColor: '#F5A623',
+    ringColor: 'var(--color-stretch)',
   },
   weak: {
     label: 'Worth a Shot',
     headline: 'Gap is closeable — here\'s how.',
     ottState: 'thinking',
     ottImage: '/ott/ott-thinking.png',
-    ringColor: '#E8821A',
+    ringColor: 'var(--color-weak)',
   },
   wrong_domain: {
     label: 'Not Your Path',
