@@ -25,6 +25,54 @@ const RECOMMENDATIONS_CACHE_KEY = 'holt_recommendations_cache';
 // reused for the sessionStorage recommendations cache.
 const CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
+// Role synonym expansion — surfaces more relevant inventory from existing sources.
+// Maps normalized target role → related job titles that often match the same candidate.
+const ROLE_SYNONYMS = {
+  'operations manager': ['operations coordinator', 'office manager', 'site manager', 'general manager'],
+  'operations coordinator': ['operations manager', 'office manager', 'administrative coordinator'],
+  'training manager': ['training coordinator', 'learning and development manager', 'training specialist', 'l&d manager'],
+  'training coordinator': ['training manager', 'training specialist', 'learning and development coordinator'],
+  'compliance coordinator': ['compliance manager', 'compliance specialist', 'regulatory coordinator', 'quality assurance coordinator'],
+  'compliance manager': ['compliance coordinator', 'compliance specialist', 'regulatory manager'],
+  'office manager': ['administrative manager', 'business operations manager', 'facilities manager'],
+  'general manager': ['operations manager', 'assistant general manager', 'store manager'],
+  'store manager': ['assistant store manager', 'retail manager', 'general manager'],
+  'assistant manager': ['shift manager', 'team lead', 'assistant store manager'],
+  'facilities manager': ['facilities coordinator', 'building manager', 'property manager'],
+  'project manager': ['program manager', 'project coordinator', 'operations project manager'],
+  'administrative manager': ['office manager', 'administrative coordinator', 'executive assistant'],
+};
+
+function expandQueriesWithSynonyms(roles, maxTotal = 6) {
+  const queries = [];
+  const seen = new Set();
+
+  // Primary roles first (highest priority)
+  for (const role of roles.slice(0, 2)) {
+    if (!seen.has(role.toLowerCase())) {
+      queries.push(role);
+      seen.add(role.toLowerCase());
+    }
+  }
+
+  // Add synonyms for matched roles
+  for (const role of roles.slice(0, 2)) {
+    const key = role.toLowerCase().trim();
+    const synonyms = ROLE_SYNONYMS[key];
+    if (!synonyms) continue;
+    for (const syn of synonyms) {
+      if (queries.length >= maxTotal) break;
+      if (!seen.has(syn)) {
+        queries.push(syn);
+        seen.add(syn);
+      }
+    }
+    if (queries.length >= maxTotal) break;
+  }
+
+  return queries;
+}
+
 
 function loadRecommendationsCache() {
   try {
@@ -512,10 +560,8 @@ export default function Jobs() {
         return;
       }
 
-      const queries = [];
-      for (const role of roles.slice(0, 2)) queries.push(role);
-      const skillPhrase = skills.slice(0, 3).join(' ').trim();
-      if (skillPhrase && !queries.includes(skillPhrase)) queries.push(skillPhrase);
+      // Expand target roles with synonyms — cap at 6 total queries
+      const queries = expandQueriesWithSynonyms(roles, 6);
 
       setLocation(loc);
 
@@ -634,7 +680,7 @@ export default function Jobs() {
         role: job.title,
         status: 'Saved',
         url: job.url || job.apply_url,
-        notes: `Source: ${({ usajobs: 'USAJobs', adzuna: 'Adzuna', indeed: 'Indeed', glassdoor: 'Glassdoor', google: 'Google Jobs', zip_recruiter: 'ZipRecruiter' })[job.source] || job.source || 'Unknown'} | Location: ${job.location}`,
+        notes: `Source: ${({ usajobs: 'USAJobs', adzuna: 'Adzuna', indeed: 'Indeed', glassdoor: 'Glassdoor', google: 'Google Jobs', zip_recruiter: 'ZipRecruiter', jooble: 'Jooble' })[job.source] || job.source || 'Unknown'} | Location: ${job.location}`,
       });
       showAction('job-saved');
     } catch {

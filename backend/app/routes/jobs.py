@@ -16,6 +16,7 @@ from app.services.token_budget import is_budget_exhausted
 from app.services.usajobs import search_usajobs
 from app.services.adzuna import search_adzuna_jobs
 from app.services.jobspy_service import search_jobspy
+from app.services.jooble import search_jooble
 from app.services.holt_score import calculate_holt_score
 from app.services.enrich import enrich_jobs_batch
 from app.services.semantic_score import semantic_rescore_batch
@@ -297,18 +298,19 @@ async def search_unified(
     remote: Optional[bool] = Query(default=None),
     user: dict = Depends(get_current_user),
 ):
-    """Search all sources (USAJobs + Adzuna + JobSpy) in parallel, deduplicate,
-    score once, return a single sorted list."""
+    """Search all sources (USAJobs + Adzuna + JobSpy + Jooble) in parallel,
+    deduplicate, score once, return a single sorted list."""
     try:
-        usajobs_result, adzuna_result, jobspy_result = await asyncio.gather(
+        usajobs_result, adzuna_result, jobspy_result, jooble_result = await asyncio.gather(
             search_usajobs(keyword=keyword, location=location, remote=remote),
             search_adzuna_jobs(keywords=keyword, location=location),
             search_jobspy(keywords=keyword, location=location or "Florida", results=15),
+            search_jooble(keywords=keyword, location=location),
             return_exceptions=True,
         )
 
         all_jobs = []
-        for result in (usajobs_result, adzuna_result, jobspy_result):
+        for result in (usajobs_result, adzuna_result, jobspy_result, jooble_result):
             if isinstance(result, dict):
                 all_jobs.extend(result.get("jobs", []))
 
