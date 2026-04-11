@@ -1138,6 +1138,11 @@ export default function Jobs() {
               </p>
             </div>
           </div>
+          <HintBubble
+            storageKey="holt_hint_within_reach"
+            ottImage="/ott/ott-encouraging.png"
+            text="These jobs are close — the gap pills show exactly what skills would push your score over 70. Small moves, real results."
+          />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             {withinReachJobs.map((job) => (
               <WithinReachCard

@@ -372,6 +372,15 @@ export default function Profile() {
         </p>
       </div>
 
+      {/* Hint — empty profile nudge */}
+      {!fullName && !targetRoles && !location && (
+        <HintBubble
+          storageKey="holt_hint_profile_empty"
+          ottImage="/ott/ott-encouraging.png"
+          text="The more you tell me, the better I can score jobs for you. Fill in your target role and salary — it only takes a minute."
+        />
+      )}
+
       <div className="profile-form-grid">
       {/* My Resume section */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>My Resume</h3>

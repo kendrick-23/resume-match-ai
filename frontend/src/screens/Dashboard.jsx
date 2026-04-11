@@ -209,6 +209,15 @@ export default function Dashboard() {
         </p>
       </Card>
 
+      {/* Hint — streak broken (returning user with no active streak) */}
+      {streak === 0 && activity?.recent?.length > 0 && (
+        <HintBubble
+          storageKey="holt_hint_streak_broken"
+          ottImage="/ott/ott-coaching.png"
+          text="No worries — otters take rest days too. Run one analysis or log one application and you're right back on track."
+        />
+      )}
+
       {/* Pipeline summary — meaningful job-search counts */}
       {journey.error ? (
         <Card style={{ textAlign: 'center', marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
