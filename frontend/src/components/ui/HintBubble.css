@@ -35,7 +35,7 @@
 /* ===== POPOVER ===== */
 .hint-popover {
   position: relative;
-  z-index: 100;
+  z-index: var(--z-popover);
   max-width: 260px;
   margin-bottom: var(--space-3, 12px);
   opacity: 0;

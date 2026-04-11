@@ -79,6 +79,15 @@
   --shadow-lg:  0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
   --shadow-button: 0 4px 0 var(--color-accent-dark);  /* 3D press effect on primary buttons */
 
+  /* === Z-INDEX SCALE === */
+  --z-sticky:    50;   /* Sticky pill nav (Results) */
+  --z-nav:       100;  /* Header, bottom nav */
+  --z-popover:   150;  /* Hint bubbles, popovers */
+  --z-dropdown:  200;  /* Settings dropdown */
+  --z-overlay:   250;  /* Action toasts, overlays */
+  --z-modal:     300;  /* Milestone modal, full-screen overlays */
+  --z-toast:     400;  /* Toast notifications — always topmost */
+
   /* === TRANSITIONS === */
   --transition-fast:   150ms ease-out;
   --transition-base:   250ms ease-out;
