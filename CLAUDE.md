@@ -587,25 +587,27 @@ Every gap returned by `/analyze` and the gap analyzer carries an effort tag:
 - `months` — certification or substantial training (1–6 months).
 - `years` — degree, license, or major career detour.
 
-### The 8 call sites (current as of April 2026 overhaul)
-| # | File | Endpoint / function | Model | Tool use | System prompt | Profile-aware |
-|---|---|---|---|---|---|---|
-| 1 | `main.py::analyze` | `/analyze` | Opus 4.6 | ✅ `submit_analysis` | ✅ | ✅ |
-| 2 | `main.py::_generate_coaching_tips` | (called inside `/analyze`) | Haiku 4.5 | ✅ `submit_coaching_tips` | ✅ | ✅ |
-| 3 | `main.py::_extract_and_merge_skills` | (called inside `/analyze`) | Haiku 4.5 | ✅ `submit_skills` | ❌ inline | ✅ (target_roles, existing skills) |
-| 4 | `main.py::interview_prep` | `/interview-prep` | Haiku 4.5 | ✅ `submit_interview_prep` | ✅ | ✅ |
-| 5 | `routes/generate_resume.py::generate_resume` | `/generate-resume` | Opus 4.6 | ❌ markdown output | ✅ | ✅ |
-| 6 | `services/semantic_score.py::semantic_rescore` | (jobs pipeline) | Haiku 4.5 | ❌ JSON parse | ❌ inline | ✅ |
-| 7 | `services/gap_analyzer.py::get_job_specific_gaps` | (jobs pipeline) | Haiku 4.5 | ❌ JSON parse | ❌ inline | ✅ (target_roles passed through) |
-| 8 | `services/enrich.py::enrich_job_description` | (jobs pipeline) | Haiku 4.5 | ❌ text passthrough | ❌ inline | N/A (job-side) |
+### The 9 call sites (current as of April 2026 overhaul)
+| # | File | Endpoint / function | Model | Tool use | System prompt | Profile-aware | Cached |
+|---|---|---|---|---|---|---|---|
+| 1 | `main.py::analyze` | `/analyze` | Opus 4.6 | ✅ `submit_analysis` | ✅ | ✅ | DB dedup (1hr) |
+| 2 | `main.py::_generate_coaching_tips` | (called inside `/analyze`) | Haiku 4.5 | ✅ `submit_coaching_tips` | ✅ | ✅ | ✅ DB `analyses.coaching_tips` |
+| 3 | `main.py::_extract_and_merge_skills` | (called inside `/analyze`) | Haiku 4.5 | ✅ `submit_skills` | ❌ inline | ✅ (target_roles, existing skills) | DB upsert |
+| 4 | `main.py::interview_prep` | `/interview-prep` | Haiku 4.5 | ✅ `submit_interview_prep` | ✅ | ✅ | ✅ DB `analyses.interview_prep` |
+| 5 | `routes/generate_resume.py::generate_resume` | `/generate-resume` | Opus 4.6 | ❌ markdown output | ✅ | ✅ | DB `analyses.generated_resume_md` |
+| 6 | `routes/generate_cover_letter.py::generate_cover_letter` | `/generate-cover-letter` | Haiku 4.5 | ❌ text output | ✅ | ✅ | DB `analyses.cover_letter` |
+| 7 | `services/semantic_score.py::semantic_rescore` | (jobs pipeline) | Haiku 4.5 | ❌ JSON parse | ❌ inline | ✅ | In-memory 24h |
+| 8 | `services/gap_analyzer.py::get_job_specific_gaps` | (jobs pipeline) | Haiku 4.5 | ❌ JSON parse | ❌ inline | ✅ (target_roles passed through) | In-memory 24h |
+| 9 | `services/enrich.py::enrich_job_description` | (jobs pipeline) | Haiku 4.5 | ❌ text passthrough | ❌ inline | N/A (job-side) | In-memory 24h |
 
 ### Specific guardrails per call
 
 - **`/analyze`**: System prompt contains the truthfulness rules + scoring philosophy. JSON tool schema includes `score_tier`, `salary_disclosed`, structured `gaps` (with `effort` tag), and `translation_opportunities`. Salary alignment is `null` when not disclosed.
-- **Ott's Take coaching tips**: Receives FULL resume + FULL JD (no 500-char truncation). Tone matches the score tier. Truthfulness rule scoped to "find the closest real experience and translate, never invent."
+- **Ott's Take coaching tips**: Receives FULL resume + FULL JD (no 500-char truncation). Tone matches the score tier. Truthfulness rule scoped to "find the closest real experience and translate, never invent." Generated before DB insert and cached in `analyses.coaching_tips` — never called twice for the same analysis.
 - **Skills extraction**: Removed the hardcoded "operations/management" bias — uses the candidate's actual `target_roles`. Sends FULL resume (no 3000-char cap). Receives `existing_skills` and is instructed to merge + dedupe + normalize, NOT overwrite.
-- **Interview prep**: Pulls the most recent matching analysis (`role_name` first, then most recent overall) and the candidate's profile. Returns structured `{question, competency, star_scaffold}` objects. Each STAR scaffold must point at a real situation from the resume.
+- **Interview prep**: Pulls the most recent matching analysis (`role_name` first, then most recent overall) and the candidate's profile. Returns structured `{question, competency, star_scaffold}` objects. Each STAR scaffold must point at a real situation from the resume. Cached in `analyses.interview_prep` — returns cached questions on repeat requests for the same analysis.
 - **Resume rewrite**: Removed the dangerous "Quantify achievements that are already implied" line — replaced with "Quantify ONLY where the original resume already contains a specific number." Added explicit anti-fabrication rules (no fake employers, dates, certifications, metrics). Profile context injected so the summary positions the pivot from `current_background` → `target_roles`.
+- **Cover letter**: Downgraded from Opus to Haiku 4.5 (formulaic task: 3-4 paragraphs, under 350 words). Receives pre-digested analysis context (score, strengths, gaps, coaching summary). System prompt enforces first-person tone, no fabrication, no hollow openers. Cached in `analyses.cover_letter` — returns cached on repeat unless `regenerate=true`. Token budget gated.
 - **Semantic scorer**: Job description bumped from 300 → 1500 chars. `about_me` from 150 → 400 chars. Sends FULL skills list (was top 8). Career trajectory has explicit anchor points (lateral 60, step-up 75, two-levels-above 45, pivot-with-skills 65, pivot-without 30). `reasoning` field MUST cite specific text.
 - **Gap analyzer**: Sends FULL skill list (was top 10) and FULL JD (1500 chars, was 400). Each gap is tagged with `effort` (easy/months/years) and an `effort_note`. Receives `target_roles` so it doesn't flag misaligned skills as gaps.
 - **Job enrichment**: Refusal path — if the JD has fewer than 20 words, return original unchanged. Do NOT manufacture requirements out of nothing. Enriched content is tagged `[ENRICHED]` so downstream scorers can weight it lower. The model can also explicitly return `NOT_ENOUGH_INFO` and we honor it. Company name is used as an anchor.
