@@ -196,6 +196,16 @@ export async function searchAggregatedJobs({ keyword, location, page }) {
   return apiRequest(`${API_URL}/jobs/aggregated?${params}`, { headers });
 }
 
+export async function searchUnifiedJobs({ keyword, location, remote }) {
+  const headers = await authHeaders();
+  const params = new URLSearchParams();
+  if (keyword) params.set('keyword', keyword);
+  if (location) params.set('location', location);
+  if (remote) params.set('remote', 'true');
+
+  return apiRequest(`${API_URL}/jobs/unified?${params}`, { headers });
+}
+
 export async function searchAdzunaJobs({ keyword, location, page }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();

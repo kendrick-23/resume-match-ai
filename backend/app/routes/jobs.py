@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Query, Depends, Request, Body
 from typing import Optional
@@ -270,6 +271,80 @@ async def search_aggregated(
 
     except Exception as e:
         logger.error(f"[/jobs/aggregated] Error: {e}", exc_info=True)
+        return {"total": 0, "jobs": [], "degraded": False}
+
+
+_COMPANY_SUFFIXES = re.compile(
+    r"\b(inc|llc|ltd|corp|corporation|company|co|group|holdings|services|solutions)\b\.?",
+    re.IGNORECASE,
+)
+
+
+def _normalize_dedup_key(title: str, company: str, location: str) -> str:
+    """Normalize (title, company, location) for cross-source deduplication."""
+    t = (title or "").lower().strip()
+    c = _COMPANY_SUFFIXES.sub("", (company or "").lower()).strip().rstrip(",. ")
+    loc = (location or "").lower().strip()
+    return f"{t}|{c}|{loc}"
+
+
+@router.get("/unified")
+@limiter.limit("20/hour")
+async def search_unified(
+    request: Request,
+    keyword: str = Query(..., min_length=1, max_length=200),
+    location: Optional[str] = Query(default=None, max_length=200),
+    remote: Optional[bool] = Query(default=None),
+    user: dict = Depends(get_current_user),
+):
+    """Search all sources (USAJobs + Adzuna + JobSpy) in parallel, deduplicate,
+    score once, return a single sorted list."""
+    try:
+        usajobs_result, adzuna_result, jobspy_result = await asyncio.gather(
+            search_usajobs(keyword=keyword, location=location, remote=remote),
+            search_adzuna_jobs(keywords=keyword, location=location),
+            search_jobspy(keywords=keyword, location=location or "Florida", results=15),
+            return_exceptions=True,
+        )
+
+        all_jobs = []
+        for result in (usajobs_result, adzuna_result, jobspy_result):
+            if isinstance(result, dict):
+                all_jobs.extend(result.get("jobs", []))
+
+        # Deduplicate by normalized (title, company, location)
+        seen: set[str] = set()
+        unique_jobs = []
+        for job in all_jobs:
+            key = _normalize_dedup_key(
+                job.get("title", ""),
+                job.get("company", job.get("department", "")),
+                job.get("location", ""),
+            )
+            if key not in seen:
+                seen.add(key)
+                unique_jobs.append(job)
+
+        # Score all jobs with timeout
+        try:
+            unique_jobs = await asyncio.wait_for(
+                _score_jobs(unique_jobs, user),
+                timeout=30.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("[/jobs/unified] Scoring pipeline timed out after 30s")
+
+        # Sort by Holt Score descending
+        unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
+
+        return {
+            "total": len(unique_jobs),
+            "jobs": unique_jobs,
+            "degraded": is_budget_exhausted(),
+        }
+
+    except Exception as e:
+        logger.error(f"[/jobs/unified] Error: {e}", exc_info=True)
         return {"total": 0, "jobs": [], "degraded": False}
 
 

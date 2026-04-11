@@ -6,7 +6,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, searchUnifiedJobs, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
@@ -167,6 +167,10 @@ export default function Jobs() {
   const [filterPostedWithin, setFilterPostedWithin] = useState(restoredPageState?.filterPostedWithin || 'any');
   const [filterDegree, setFilterDegree] = useState(restoredPageState?.filterDegree || 'all');
   const [showDealbreakers, setShowDealbreakers] = useState(restoredPageState?.showDealbreakers ?? true);
+  const [filterSource, setFilterSource] = useState(restoredPageState?.filterSource || 'all');
+
+  // Unified search results (profile match only)
+  const [unifiedJobs, setUnifiedJobs] = useState(restoredPageState?.unifiedJobs || []);
 
   // Cache state
   const [cachedAt, setCachedAt] = useState(null);
@@ -189,10 +193,10 @@ export default function Jobs() {
   useEffect(() => {
     pageStateRef.current = {
       keyword, location, remoteOnly, activeTab, sortBy,
-      filterPostedWithin, filterDegree, showDealbreakers,
+      filterPostedWithin, filterDegree, showDealbreakers, filterSource,
       fedJobs, fedTotal, fedPage, fedSearched,
       pvtJobs, pvtTotal, pvtPage, pvtSearched,
-      recommended, hasAnalysis,
+      recommended, hasAnalysis, unifiedJobs,
     };
   });
 
@@ -527,6 +531,7 @@ export default function Jobs() {
             const ageMs = Date.now() - cachedAtMs;
             if (cachedAtMs > 0 && ageMs <= CACHE_MAX_AGE_MS) {
               const r = cached.results;
+              if (r.unified) setUnifiedJobs(r.unified);
               _applyResults(r.federal || [], r.private || [], loc, cached.cached_at);
               return;
             }
@@ -541,31 +546,36 @@ export default function Jobs() {
       setFedError('');
       setPvtLoading(true);
 
-      const [fedResults, pvtResults] = await Promise.all([
-        Promise.all(queries.map((q) =>
-          searchJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
-        )),
-        Promise.all(queries.map((q) =>
-          searchAggregatedJobs({ keyword: q, location: loc, page: 1 }).catch(() => ({ jobs: [], total: 0 }))
-        )),
-      ]);
+      // Fire all queries through the unified endpoint (all 3 sources per query)
+      const allResults = await Promise.all(
+        queries.map((q) =>
+          searchUnifiedJobs({ keyword: q, location: loc }).catch(() => ({ jobs: [], total: 0 }))
+        ),
+      );
 
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
-      const fedMerged = _dedup(fedResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||j.department||'').toLowerCase()}`);
-      const pvtMerged = _dedup(pvtResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}`);
+      // Merge and dedup across all query results
+      const allMerged = _dedup(allResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||j.department||'').toLowerCase()}`);
 
-      // Check if any aggregated response signaled token budget exhaustion
-      if (pvtResults.some((r) => r.degraded)) {
+      // Check if any response signaled token budget exhaustion
+      if (allResults.some((r) => r.degraded)) {
         toast.warning("Running on cached intelligence today — results may be less specific.");
       }
+
+      // Store the full unified list for source filtering
+      setUnifiedJobs(allMerged);
+
+      // Split into fed/pvt for the existing display logic
+      const fedMerged = allMerged.filter((j) => j.source === 'usajobs');
+      const pvtMerged = allMerged.filter((j) => j.source !== 'usajobs');
 
       _applyResults(fedMerged, pvtMerged, loc);
 
       // Save to cache in background
       saveSearchCache({
         cacheKey,
-        results: { federal: fedMerged, private: pvtMerged },
+        results: { federal: fedMerged, private: pvtMerged, unified: allMerged },
         federalCount: fedMerged.length,
         privateCount: pvtMerged.length,
       }).catch(() => {});
@@ -620,7 +630,7 @@ export default function Jobs() {
         role: job.title,
         status: 'Saved',
         url: job.url || job.apply_url,
-        notes: `Source: ${job.source === 'adzuna' ? 'Adzuna' : 'USAJobs'} | Location: ${job.location}`,
+        notes: `Source: ${({ usajobs: 'USAJobs', adzuna: 'Adzuna', indeed: 'Indeed', glassdoor: 'Glassdoor', google: 'Google Jobs', zip_recruiter: 'ZipRecruiter' })[job.source] || job.source || 'Unknown'} | Location: ${job.location}`,
       });
       showAction('job-saved');
     } catch {
@@ -683,6 +693,9 @@ export default function Jobs() {
         if (filterDegree === 'no_degree' && flag === 'required') return false;
         if (filterDegree === 'preferred_only' && flag === 'required') return false;
       }
+      // Source filter
+      if (filterSource === 'federal' && job.source !== 'usajobs') return false;
+      if (filterSource === 'private' && job.source === 'usajobs') return false;
       return true;
     });
   }
@@ -1030,6 +1043,24 @@ export default function Jobs() {
                     key={val}
                     className={`jobs-filter-chip ${filterDegree === val ? 'jobs-filter-chip--active' : ''}`}
                     onClick={() => setFilterDegree(val)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Source filter */}
+            <div>
+              <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+                Source
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {[['all', 'All'], ['federal', 'Federal'], ['private', 'Private']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    className={`jobs-filter-chip ${filterSource === val ? 'jobs-filter-chip--active' : ''}`}
+                    onClick={() => setFilterSource(val)}
                   >
                     {label}
                   </button>
