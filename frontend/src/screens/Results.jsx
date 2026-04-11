@@ -13,6 +13,7 @@ import { useToast } from '../context/ToastContext';
 import { useActionToast } from '../context/ActionToastContext';
 import VerdictCard from '../components/ui/VerdictCard';
 import EmptyStateResults from '../components/ui/EmptyStateResults';
+import HintBubble from '../components/ui/HintBubble';
 import { deriveTier, scoreColor, scoreBadgeVariant, scoreOttState, subScoreColor } from '../constants/scoring';
 import { clearRecommendationsCache } from '../utils/cache';
 import './Results.css';
@@ -788,6 +789,13 @@ export default function Results() {
 
           {/* Sticky pill navigation */}
           <StickyPillNav activePill={activePill} onPillClick={handlePillClick} />
+
+          {/* JIT hint — shown once per session, guides user to Ott's Take */}
+          <HintBubble
+            storageKey="holt_hint_results"
+            ottImage="/ott/ott-encouraging.png"
+            text="Scroll down to Ott's Take for my honest coaching notes — and tap Resume to generate a tailored version in seconds."
+          />
 
           {/* === OVERVIEW SECTION === */}
           <section id="overview" ref={setSectionRef('overview')} className="results-section" style={{ scrollMarginTop: '120px' }}>

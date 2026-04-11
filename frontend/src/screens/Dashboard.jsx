@@ -9,6 +9,7 @@ import { getActivity, listBadges, listApplications, listAnalyses, getProfile } f
 import { FileText, Search, Clock } from 'lucide-react';
 import JourneyMap from '../components/ui/JourneyMap';
 import EmptyStateDashboard from '../components/ui/EmptyStateDashboard';
+import HintBubble from '../components/ui/HintBubble';
 import { useToast } from '../context/ToastContext';
 import { BADGES } from '../constants/badges';
 import './Dashboard.css';
@@ -249,6 +250,15 @@ export default function Dashboard() {
       {/* Job search journey map */}
       <h3 style={{ marginBottom: 'var(--space-3)' }}>Your job search</h3>
       <JourneyMap completed={journey.completed} ready={journey.ready} />
+
+      {/* JIT hint — shown once per session after journey map loads */}
+      {journey.ready && (
+        <HintBubble
+          storageKey="holt_hint_dashboard"
+          ottImage="/ott/ott-coaching.png"
+          text="Each step lights up as you go — upload a resume, fill out your profile, and I'll start matching you to real jobs."
+        />
+      )}
 
       {/* Paw print section divider */}
       <div className="paw-divider" aria-hidden="true">

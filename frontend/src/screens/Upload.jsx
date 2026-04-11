@@ -10,6 +10,7 @@ import { Upload as UploadIcon, UserCircle, ChevronDown, ChevronUp, Check, X, Inf
 import { uploadResume, analyzeResume, checkBadges, listResumes, createResume, getProfile } from '../services/api';
 import MilestoneCelebration from '../components/ui/MilestoneCelebration';
 import EmptyStateUpload from '../components/ui/EmptyStateUpload';
+import HintBubble from '../components/ui/HintBubble';
 import { clearRecommendationsCache } from '../utils/cache';
 import { useToast } from '../context/ToastContext';
 import './Upload.css';
@@ -241,6 +242,13 @@ export default function Upload() {
   return (
     <ScreenWrapper>
       <h2 style={{ marginBottom: 'var(--space-6)' }}>Analyze Resume</h2>
+
+      {/* JIT hint — shown once per session for first-time uploaders */}
+      <HintBubble
+        storageKey="holt_hint_upload"
+        ottImage="/ott/ott-waiting.png"
+        text="Paste a job description below your resume and I'll score how well they match — plus show you exactly what to change."
+      />
 
       {/* Resume zone — three states: vault default / vault picker / fresh upload */}
       {vaultLoading ? (
