@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from app.clients import sync_client as anthropic_client
+from app.services.token_budget import check_opus_budget, estimate_tokens
 from supabase import create_client
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -842,6 +843,12 @@ JOB DESCRIPTION:
 {body.job_description}
 {prior_score_note}
 Analyze this match. Apply the truthfulness rules strictly. Use the gap effort tags honestly. If salary is not disclosed in the JD, set salary_alignment=null and salary_disclosed=false. Submit the result via the submit_analysis tool."""
+
+    if not check_opus_budget(estimate_tokens(user_message)):
+        raise HTTPException(
+            status_code=429,
+            detail="Ott's been busy today — resume analysis is temporarily unavailable. Try again tomorrow!",
+        )
 
     try:
         message = anthropic_client.messages.create(

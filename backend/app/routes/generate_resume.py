@@ -6,6 +6,7 @@ import os
 from app.main import get_current_user, limiter
 from app.logger import logger
 from app.clients import sync_client as anthropic_client
+from app.services.token_budget import check_opus_budget, estimate_tokens
 
 router = APIRouter(tags=["generate-resume"])
 
@@ -135,6 +136,12 @@ JOB DESCRIPTION:
 {job_description}
 
 Rewrite the resume per the system rules. Output only the markdown — no commentary."""
+
+    if not check_opus_budget(estimate_tokens(user_message)):
+        raise HTTPException(
+            status_code=429,
+            detail="Ott's been busy today — resume generation is temporarily unavailable. Try again tomorrow!",
+        )
 
     try:
         message = anthropic_client.messages.create(
