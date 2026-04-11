@@ -227,9 +227,10 @@ async def interview_prep(
     profile = _fetch_profile_for_analysis(sb, user["user_id"])
 
     latest_analysis = None
+    matched_analysis_id = None
     try:
         ana_query = sb.table("analyses") \
-            .select("strengths,gaps,resume_text,role_name,company_name") \
+            .select("id,strengths,gaps,resume_text,role_name,company_name,interview_prep") \
             .eq("user_id", user["user_id"]) \
             .order("created_at", desc=True) \
             .limit(10) \
@@ -242,6 +243,8 @@ async def interview_prep(
                 break
         if latest_analysis is None and rows:
             latest_analysis = rows[0]
+        if latest_analysis:
+            matched_analysis_id = latest_analysis.get("id")
     except Exception as exc:
         logger.error(f"[/interview-prep] Profile/analysis fetch failed: {exc}", exc_info=True)
 
@@ -285,6 +288,16 @@ async def interview_prep(
     final_gaps = body.gaps if body.gaps else analysis_gaps
     final_strengths = analysis_strengths
 
+    # Return cached interview prep if it exists for this analysis
+    if latest_analysis and latest_analysis.get("interview_prep"):
+        try:
+            cached = json.loads(latest_analysis["interview_prep"]) if isinstance(latest_analysis["interview_prep"], str) else latest_analysis["interview_prep"]
+            if cached:
+                logger.info(f"[/interview-prep] Returning cached prep for analysis {matched_analysis_id}")
+                return {"questions": cached}
+        except (json.JSONDecodeError, TypeError):
+            pass  # Corrupted cache — regenerate
+
     jd_section = f"\nJOB DESCRIPTION:\n{body.job_description[:3000]}" if body.job_description.strip() else "\n(no JD provided)"
 
     user_message = f"""ROLE: {body.role} at {body.company or 'Not specified'}
@@ -327,7 +340,19 @@ Generate 5 behavioral interview questions tailored to this candidate. Each STAR 
                             "star_scaffold": str(q.get("star_scaffold", "")),
                         })
                 break
-        return {"questions": questions[:5]}
+        final_questions = questions[:5]
+
+        # Cache the result on the matched analysis row
+        if matched_analysis_id and final_questions:
+            try:
+                sb.table("analyses") \
+                    .update({"interview_prep": json.dumps(final_questions)}) \
+                    .eq("id", matched_analysis_id) \
+                    .execute()
+            except Exception as exc:
+                logger.warning(f"[/interview-prep] Cache save failed (column may not exist): {exc}")
+
+        return {"questions": final_questions}
     except Exception as e:
         logger.error(f"[/interview-prep] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Couldn't generate interview questions. Please try again.")
