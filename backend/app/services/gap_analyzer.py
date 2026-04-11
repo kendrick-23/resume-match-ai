@@ -6,7 +6,6 @@ skills or qualifications the job requires that the candidate lacks.
 """
 
 import asyncio
-import json
 import time
 from typing import Optional
 
@@ -21,6 +20,30 @@ _gap_cache: dict[str, tuple[float, list]] = {}
 _CACHE_TTL = 86400  # 24 hours
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
+
+GAP_ANALYSIS_TOOL = {
+    "name": "submit_gaps",
+    "description": "Submit 2-3 specific skill gaps the candidate is missing for this job.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "gaps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "gap": {"type": "string", "description": "Specific missing skill or qualification"},
+                        "effort": {"type": "string", "enum": ["easy", "months", "years"], "description": "Effort to close"},
+                        "effort_note": {"type": "string", "description": "Brief cost/time estimate"},
+                    },
+                    "required": ["gap", "effort", "effort_note"],
+                },
+                "description": "2-3 specific gaps",
+            },
+        },
+        "required": ["gaps"],
+    },
+}
 
 
 async def get_job_specific_gaps(
@@ -66,11 +89,7 @@ async def get_job_specific_gaps(
         "  - \"easy\": something she could demonstrate from prior work, or a short tutorial (<1 month)\n"
         "  - \"months\": a certification or course (1-6 months)\n"
         "  - \"years\": degree, license, or major career detour\n\n"
-        "Return ONLY a JSON array of objects, no preamble:\n"
-        "[\n"
-        "  {\"gap\": \"QuickBooks experience\", \"effort\": \"easy\", \"effort_note\": \"~$50 online course, 1-2 weeks\"},\n"
-        "  {\"gap\": \"PMP certification\", \"effort\": \"months\", \"effort_note\": \"~$1000, 4-6 months prep + exam\"}\n"
-        "]"
+        "Submit your gaps via the submit_gaps tool."
     )
 
     if not check_budget(estimate_tokens(prompt)):
@@ -81,29 +100,29 @@ async def get_job_specific_gaps(
             response = await anthropic_async.messages.create(
                 model=HAIKU_MODEL,
                 max_tokens=400,
+                tools=[GAP_ANALYSIS_TOOL],
+                tool_choice={"type": "tool", "name": "submit_gaps"},
                 messages=[{"role": "user", "content": prompt}],
             )
-            text = response.content[0].text.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-            gaps = json.loads(text)
-            if isinstance(gaps, list):
-                result: list[dict] = []
-                for g in gaps[:3]:
-                    if not isinstance(g, dict):
-                        continue
-                    gap_text = (g.get("gap") or "").strip()
-                    effort = (g.get("effort") or "").strip().lower()
-                    if effort not in ("easy", "months", "years"):
-                        effort = "months"
-                    if gap_text and len(gap_text) > 3:
-                        result.append({
-                            "gap": gap_text,
-                            "effort": effort,
-                            "effort_note": (g.get("effort_note") or "").strip(),
-                        })
-                _gap_cache[cache_key] = (time.time(), result)
-                return result
+            for block in response.content:
+                if getattr(block, "type", None) == "tool_use" and block.name == "submit_gaps":
+                    raw_gaps = block.input.get("gaps") or []
+                    result: list[dict] = []
+                    for g in raw_gaps[:3]:
+                        if not isinstance(g, dict):
+                            continue
+                        gap_text = (g.get("gap") or "").strip()
+                        effort = (g.get("effort") or "").strip().lower()
+                        if effort not in ("easy", "months", "years"):
+                            effort = "months"
+                        if gap_text and len(gap_text) > 3:
+                            result.append({
+                                "gap": gap_text,
+                                "effort": effort,
+                                "effort_note": (g.get("effort_note") or "").strip(),
+                            })
+                    _gap_cache[cache_key] = (time.time(), result)
+                    return result
         except Exception as exc:
             logger.error(f"[GapAnalyzer] Failed for '{title}': {exc}", exc_info=True)
     return []

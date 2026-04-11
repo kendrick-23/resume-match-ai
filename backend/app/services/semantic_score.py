@@ -24,6 +24,22 @@ _semaphore = asyncio.Semaphore(5)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
+SEMANTIC_SCORE_TOOL = {
+    "name": "submit_score",
+    "description": "Submit the candidate-job fit score.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "score": {"type": "integer", "description": "Overall fit score 0-100"},
+            "skills_score": {"type": "integer", "description": "Skills alignment sub-score 0-100"},
+            "career_score": {"type": "integer", "description": "Career trajectory sub-score 0-100"},
+            "practical_score": {"type": "integer", "description": "Practical fit sub-score 0-100"},
+            "reasoning": {"type": "string", "description": "1 sentence citing specific text from prompt"},
+        },
+        "required": ["score", "skills_score", "career_score", "practical_score", "reasoning"],
+    },
+}
+
 # Same relevance filter as enrich.py
 RELEVANT_TITLE_WORDS = {
     "manager", "director", "supervisor", "coordinator",
@@ -131,7 +147,7 @@ Career trajectory scoring guidance:
 
 Your `reasoning` field MUST cite specific text from either the candidate profile or the job description above. Do not invent justifications. If you can't ground your reasoning in the prompt content, lower your confidence and pick a more conservative score.
 
-Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practical_score":<int>,"reasoning":"<1 sentence with a specific quote or paraphrase from the prompt>"}}"""
+Submit the result via the submit_score tool."""
 
     if not check_budget(estimate_tokens(prompt)):
         return None
@@ -140,19 +156,19 @@ Return ONLY: {{"score":<int>,"skills_score":<int>,"career_score":<int>,"practica
         response = await anthropic_async.messages.create(
             model=HAIKU_MODEL,
             max_tokens=250,
+            tools=[SEMANTIC_SCORE_TOOL],
+            tool_choice={"type": "tool", "name": "submit_score"},
             messages=[{"role": "user", "content": prompt}],
         )
-        text = response.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        result = json.loads(text)
-
-        if "score" not in result or not isinstance(result["score"], (int, float)):
-            return None
-
-        result["score"] = max(0, min(100, int(result["score"])))
-        _semantic_cache[key] = (time.time(), result)
-        return result
+        for block in response.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "submit_score":
+                result = block.input
+                if "score" not in result or not isinstance(result["score"], (int, float)):
+                    return None
+                result["score"] = max(0, min(100, int(result["score"])))
+                _semantic_cache[key] = (time.time(), result)
+                return result
+        return None
     except Exception as exc:
         logger.error(f"[SemanticScore] Failed for '{j_title}': {exc}", exc_info=True)
         return None
