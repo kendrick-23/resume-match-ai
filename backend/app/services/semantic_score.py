@@ -27,7 +27,7 @@ from app.services.token_budget import check_budget, estimate_tokens
 _semantic_cache: dict[str, tuple[float, dict]] = {}
 _CACHE_TTL = 86400  # 24 hours
 
-_semaphore = asyncio.Semaphore(5)
+_semaphore = asyncio.Semaphore(3)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
