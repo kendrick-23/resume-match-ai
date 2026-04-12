@@ -190,7 +190,9 @@ def calculate_holt_score(
         {
             # Expanded physician / medical specialist coverage. Any title with
             # MD or DO as a standalone token counts (handled via word-boundary
-            # match in _trigger_matches).
+            # match in _trigger_matches). Also covers clinical specialty terms
+            # (medical surgical, cardiac, neuro) that signal nursing/physician
+            # leadership roles in hospital settings.
             "triggers": ["physician", "medicine", "medical degree",
                          "radiologist", "radiology", "diagnostic imaging",
                          "surgeon", "surgery", "anesthesiologist", "anesthesia",
@@ -198,6 +200,8 @@ def calculate_holt_score(
                          "neurologist", "neurology", "cardiologist", "cardiology",
                          "podiatrist", "podiatry",
                          "clinical design", "clinical integration", "clinical informatics",
+                         "medical surgical", "cardiac neuro", "med surg",
+                         "neuro icu", "cardiac icu",
                          "md", "do", "dpm"],
             "signals": ["medical degree", "md", "do", "dpm", "residency",
                         "board certified", "physician assistant"],
@@ -370,6 +374,26 @@ def calculate_holt_score(
             skills_match = min(skills_match, 10)
             domain_penalty_applied = True
 
+    # Construction "Job Captain" demotion — "Job Captain" at homebuilders is an
+    # architecture/construction project lead role, not operations. Penalize when
+    # the company is a known homebuilder or description has construction signals.
+    _CONSTRUCTION_COMPANIES = [
+        "toll brothers", "pulte", "dr horton", "lennar", "kb home",
+        "meritage", "taylor morrison", "ryan homes", "nvr ",
+    ]
+    _CONSTRUCTION_SIGNALS = [
+        "construction", "homebuilder", "blueprint", "architectural",
+        "building permit", "floor plan", "residential",
+    ]
+    if not domain_penalty_applied and "job captain" in job_title:
+        is_construction = (
+            any(cc in job_company for cc in _CONSTRUCTION_COMPANIES)
+            or any(cs in job_desc for cs in _CONSTRUCTION_SIGNALS)
+        )
+        if is_construction:
+            skills_match = min(skills_match, 10)
+            domain_penalty_applied = True
+
     # Off-target title demotion: sales & recruitment roles are off-target for
     # ops/training/compliance profiles unless the JD has strong operations language.
     # Uses both exact-phrase matches AND word-boundary checks for "sales" to catch
@@ -387,6 +411,7 @@ def calculate_holt_score(
         "sales director", "sales engineer", "sales consultant",
         "broker", "broker growth", "field development manager",
         "field development representative",
+        "marketing manager", "marketing coordinator", "brand manager",
     }
     _USER_TARGETS_SALES = any(
         st in (target_roles or "").lower()
@@ -421,6 +446,30 @@ def calculate_holt_score(
             ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
             if ops_override_count < 3:
                 skills_match = max(0, skills_match - 35)
+
+    # --- Emergency services demotion ---
+    _EMERGENCY_TITLE_TRIGGERS = ["fire rescue", "ems coordinator", "emergency medical"]
+    _EMERGENCY_DESC_SIGNALS = ["paramedic", "firefighter", "dispatch", "first responder",
+                               "fire station", "emergency response"]
+    if not domain_penalty_applied:
+        is_emergency_title = any(et in job_title for et in _EMERGENCY_TITLE_TRIGGERS)
+        if is_emergency_title:
+            has_emergency_context = any(es in job_desc for es in _EMERGENCY_DESC_SIGNALS)
+            if has_emergency_context:
+                ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
+                if ops_override_count < 2:
+                    skills_match = max(0, skills_match - 35)
+
+    # --- Franchise store number demotion ---
+    # Titles containing (XXXXX) patterns like "General Manager (12345)" are
+    # franchise postings for individual store locations — typically low-level
+    # food-service/retail, not the multi-unit ops roles Nicole targets.
+    _FRANCHISE_OVERRIDE_KEYWORDS = {"p&l", "district", "regional", "multiple locations",
+                                    "multi-unit", "area manager"}
+    if not domain_penalty_applied and re.search(r"\(\d{4,6}\)", job_title):
+        franchise_override_count = sum(1 for kw in _FRANCHISE_OVERRIDE_KEYWORDS if kw in job_desc)
+        if franchise_override_count < 1:
+            skills_match = max(0, skills_match - 35)
 
     # --- 2. Salary Alignment (20%) — sigmoid curve, hard floor, overpay penalty ---
     # Replaces the old 3-bucket cliff with a continuous curve grounded in

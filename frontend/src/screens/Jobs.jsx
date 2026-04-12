@@ -17,6 +17,7 @@ import './Jobs.css';
 
 const STORAGE_KEY = 'holt_jobs_search';
 const RECOMMENDATIONS_CACHE_KEY = 'holt_recommendations_cache';
+const PROFILE_MATCH_CACHE_KEY = 'holt_profile_match_cache';
 
 // Client-side freshness gate for the Supabase job_search_cache. The backend
 // holds rows for 4 hours so that an explicit Refresh after a long break can
@@ -156,6 +157,29 @@ function savePageState(state) {
 
 function clearPageState() {
   try { sessionStorage.removeItem(PAGE_STATE_KEY); } catch {}
+}
+
+function saveProfileMatchCache(cacheKey, results) {
+  try {
+    sessionStorage.setItem(PROFILE_MATCH_CACHE_KEY, JSON.stringify({
+      cacheKey, timestamp: Date.now(), results,
+    }));
+  } catch { /* sessionStorage full or unavailable */ }
+}
+
+function loadProfileMatchCache(cacheKey) {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_MATCH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.cacheKey !== cacheKey) return null;
+    if (Date.now() - parsed.timestamp > CACHE_MAX_AGE_MS) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+function clearProfileMatchCache() {
+  try { sessionStorage.removeItem(PROFILE_MATCH_CACHE_KEY); } catch {}
 }
 
 function makeCacheKey(searchType, keywords = '', location = '') {
@@ -569,13 +593,20 @@ export default function Jobs() {
 
       setLocation(loc);
 
-      // Check cache first (unless forced refresh). The backend retains rows
-      // up to 4h, but we refuse to render anything older than CACHE_MAX_AGE_MS
-      // (30 min) here. This prevents the "Find jobs that fit me" button from
-      // showing results hours stale after a browser refresh — the user always
-      // gets fresh data unless they explicitly chose Refresh on a recent run.
+      // Check cache first (unless forced refresh). Prefer the sessionStorage
+      // profile-match cache (updated synchronously on every fetch/refresh) over
+      // the backend Supabase cache (async save that may lag behind a Refresh).
       const cacheKey = makeCacheKey('profile', queries.join('|'), loc);
       if (!forceRefresh) {
+        // 1. sessionStorage — instant, always current after a Refresh
+        const localCache = loadProfileMatchCache(cacheKey);
+        if (localCache) {
+          const r = localCache.results;
+          if (r.unified) setUnifiedJobs(r.unified);
+          _applyResults(r.federal || [], r.private || [], loc, new Date(localCache.timestamp).toISOString());
+          return;
+        }
+        // 2. Backend Supabase cache — survives full page refreshes
         try {
           const cached = await getSearchCache(cacheKey);
           if (cached.cached) {
@@ -626,10 +657,15 @@ export default function Jobs() {
 
       _applyResults(fedMerged, pvtMerged, loc);
 
-      // Save to cache in background
+      // Save to sessionStorage (synchronous — immediately available for the
+      // next "Find jobs" tap, even if the backend save hasn't completed yet).
+      const cacheResults = { federal: fedMerged, private: pvtMerged, unified: allMerged };
+      saveProfileMatchCache(cacheKey, cacheResults);
+
+      // Save to backend Supabase cache in background (survives full page refreshes)
       saveSearchCache({
         cacheKey,
-        results: { federal: fedMerged, private: pvtMerged, unified: allMerged },
+        results: cacheResults,
         federalCount: fedMerged.length,
         privateCount: pvtMerged.length,
       }).catch(() => {});
