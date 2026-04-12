@@ -417,6 +417,10 @@ def calculate_holt_score(
         st in (target_roles or "").lower()
         for st in ("sales", "account executive", "business development", "bdr")
     )
+    # Marketing titles get a stricter override threshold (3+ ops keywords)
+    # because entertainment/hospitality venue JDs incidentally mention
+    # "training" and "operations" without being ops roles.
+    _MARKETING_TITLES = {"marketing manager", "marketing coordinator", "brand manager"}
     if not _USER_TARGETS_SALES and not domain_penalty_applied:
         # Check exact phrases OR "sales" as a standalone word in the title
         is_sales_title = (
@@ -424,8 +428,10 @@ def calculate_holt_score(
             or bool(re.search(r"\bsales\b", job_title))
         )
         if is_sales_title:
+            is_marketing = any(mt in job_title for mt in _MARKETING_TITLES)
+            override_threshold = 3 if is_marketing else 2
             ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
-            if ops_override_count < 2:
+            if ops_override_count < override_threshold:
                 skills_match = max(0, skills_match - 35)
 
     # --- Recruitment/HR demotion ---
@@ -448,13 +454,24 @@ def calculate_holt_score(
                 skills_match = max(0, skills_match - 35)
 
     # --- Emergency services demotion ---
+    # Normalize dashes/hyphens in the title so "Coordinator - Fire Rescue"
+    # matches the same as "Coordinator Fire Rescue". Titles with "fire rescue"
+    # or "ems" are unambiguous — skip the description confirmation.
     _EMERGENCY_TITLE_TRIGGERS = ["fire rescue", "ems coordinator", "emergency medical"]
+    _EMERGENCY_STRONG_SIGNALS = ["fire rescue", " ems"]  # unambiguous in title alone
     _EMERGENCY_DESC_SIGNALS = ["paramedic", "firefighter", "dispatch", "first responder",
-                               "fire station", "emergency response"]
+                               "fire station", "emergency response",
+                               "fire rescue", "ems"]
     if not domain_penalty_applied:
-        is_emergency_title = any(et in job_title for et in _EMERGENCY_TITLE_TRIGGERS)
-        if is_emergency_title:
-            has_emergency_context = any(es in job_desc for es in _EMERGENCY_DESC_SIGNALS)
+        title_normalized = re.sub(r"\s*[-–—]\s*", " ", job_title)
+        is_emergency_title = any(et in title_normalized for et in _EMERGENCY_TITLE_TRIGGERS)
+        is_strong_signal = any(ss in title_normalized for ss in _EMERGENCY_STRONG_SIGNALS)
+        if is_emergency_title or is_strong_signal:
+            # Strong title signals (fire rescue, ems) skip description check.
+            # Weaker triggers still require description confirmation.
+            has_emergency_context = is_strong_signal or any(
+                es in job_desc for es in _EMERGENCY_DESC_SIGNALS
+            )
             if has_emergency_context:
                 ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
                 if ops_override_count < 2:
@@ -469,6 +486,16 @@ def calculate_holt_score(
     if not domain_penalty_applied and re.search(r"\(\d{4,6}\)", job_title):
         franchise_override_count = sum(1 for kw in _FRANCHISE_OVERRIDE_KEYWORDS if kw in job_desc)
         if franchise_override_count < 1:
+            skills_match = max(0, skills_match - 35)
+
+    # --- Entry-level title demotion ---
+    # "Receptionist" and "administrative assistant" are a step down for an AGM.
+    # -35 demotion pushes them below the 60% Within Reach floor.
+    _ENTRY_LEVEL_TITLES = ["receptionist", "administrative assistant", "front desk clerk",
+                           "office assistant", "data entry"]
+    if not domain_penalty_applied:
+        is_entry_level = any(el in job_title for el in _ENTRY_LEVEL_TITLES)
+        if is_entry_level:
             skills_match = max(0, skills_match - 35)
 
     # --- 2. Salary Alignment (20%) — sigmoid curve, hard floor, overpay penalty ---
