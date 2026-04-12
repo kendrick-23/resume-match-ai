@@ -19,7 +19,7 @@ from app.services.jobspy_service import search_jobspy
 from app.services.jooble import search_jooble
 from app.services.holt_score import calculate_holt_score
 from app.services.enrich import enrich_jobs_batch
-from app.services.semantic_score import semantic_rescore_batch
+from app.services.batch_scorer import batch_semantic_rescore
 from app.services.gap_analyzer import analyze_gaps_batch
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -98,11 +98,13 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["salary_floor_violation"] = False
             job["salary_not_disclosed"] = False
 
-    # Step 4: Semantic re-scoring — SKIP domain-penalized jobs entirely
+    # Step 4: Semantic re-scoring via Batch API — no rate limits, 50% cost
+    # reduction. Polls until results arrive (1-5 min). Falls back to
+    # keyword-only scores on timeout or error.
     try:
-        await semantic_rescore_batch(jobs, profile, user.get("user_id", ""))
+        await batch_semantic_rescore(jobs, profile, user.get("user_id", ""))
     except Exception as exc:
-        logger.error(f"[SemanticScore] Batch re-scoring failed: {exc}")
+        logger.error(f"[BatchScorer] Semantic re-scoring failed: {exc}")
 
     # Step 5: Claude-powered gap analysis — SKIP domain-penalized jobs entirely.
     # Pass target_roles so the gap analyzer knows what direction the candidate
@@ -170,10 +172,10 @@ async def search_jobs(
         try:
             scored = await asyncio.wait_for(
                 _score_jobs(results.get("jobs", []), user),
-                timeout=30.0,
+                timeout=330.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/search] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/search] Scoring pipeline timed out after 330s")
             scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
@@ -201,10 +203,10 @@ async def search_adzuna(
         try:
             scored = await asyncio.wait_for(
                 _score_jobs(results.get("jobs", []), user),
-                timeout=30.0,
+                timeout=330.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/adzuna] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/adzuna] Scoring pipeline timed out after 330s")
             scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
@@ -255,10 +257,10 @@ async def search_aggregated(
         try:
             unique_jobs = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
-                timeout=30.0,
+                timeout=330.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/aggregated] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/aggregated] Scoring pipeline timed out after 330s")
 
         # Sort by Holt Score descending (best matches first)
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
@@ -326,10 +328,10 @@ async def search_unified(
         try:
             unique_jobs = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
-                timeout=30.0,
+                timeout=330.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/unified] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/unified] Scoring pipeline timed out after 330s")
 
         # Sort by Holt Score descending
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)

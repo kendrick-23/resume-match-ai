@@ -567,7 +567,7 @@ export default function Jobs() {
     setCachedAt(null);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const timeoutId = setTimeout(() => controller.abort(), 360000); // 6 min — batch scoring takes 1-5 min
     profileAbortRef.current = controller;
 
     try {
@@ -1433,8 +1433,9 @@ export default function Jobs() {
 const LOADING_MESSAGES = [
   'Searching across 6 job sources...',
   'Scoring each job against your profile...',
-  'Finding your best matches...',
-  'Almost there...',
+  'Finding and ranking your matches — this takes about a minute...',
+  'Still working — Ott is carefully reading each job description...',
+  'Almost there — applying your preferences and filters...',
 ];
 
 function ProfileMatchLoading() {
