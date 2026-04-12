@@ -50,6 +50,7 @@ async def get_job_specific_gaps(
     job: dict,
     user_skills: list[str],
     target_roles: str = "",
+    current_title: str = "",
 ) -> list[dict]:
     """Return 2-3 specific gap objects for this job vs the candidate.
 
@@ -63,7 +64,7 @@ async def get_job_specific_gaps(
     """
     title = job.get("title") or ""
     company = job.get("company") or ""
-    cache_key = f"gaps_v2:{title.lower()}:{company.lower()}"
+    cache_key = f"gaps_v3:{title.lower()}:{company.lower()}"
 
     if cache_key in _gap_cache:
         ts, cached = _gap_cache[cache_key]
@@ -73,16 +74,20 @@ async def get_job_specific_gaps(
     # Send the FULL skill list (was capped at 10) and full target_roles for context.
     skills_str = ", ".join(user_skills) if user_skills else "(no extracted skills)"
     target_text = target_roles.strip() or "(target roles not specified)"
+    current_text = current_title.strip() or "(current title not specified)"
     # Was 400 — bumped to 1500 so the model sees real requirements.
     desc = (job.get("description") or "")[:1500]
 
     prompt = (
+        f"Candidate current title: {current_text}\n"
         f"Candidate target roles: {target_text}\n"
         f"Candidate skills (FULL list): {skills_str}\n\n"
         f"Job: {title} at {company}\n"
         f"Description: {desc}\n\n"
         "List exactly 2-3 specific skills or qualifications this job requires that the "
         "candidate is clearly missing. Be specific and actionable.\n"
+        "Consider the candidate's current level — gaps should be realistic for someone "
+        f"currently working as {current_text}.\n"
         "Do NOT list skills the candidate already has (cross-check the full skills list above).\n"
         "Do NOT list generic words like \"experience\" or \"skills\".\n\n"
         "For each gap, tag the effort honestly:\n"
@@ -141,6 +146,7 @@ async def analyze_gaps_batch(
     jobs: list,
     user_skills: list[str],
     target_roles: str = "",
+    current_title: str = "",
 ) -> None:
     """Run gap analysis on Within Reach (stretch tier) jobs in parallel."""
     within_reach = [
@@ -156,7 +162,7 @@ async def analyze_gaps_batch(
 
     async def _analyze_one(job):
         async with _semaphore:
-            gaps = await get_job_specific_gaps(job, user_skills, target_roles)
+            gaps = await get_job_specific_gaps(job, user_skills, target_roles, current_title)
             if gaps:
                 # Backwards-compat string array for the existing frontend
                 job["holt_breakdown"]["job_specific_gaps"] = [_format_gap(g) for g in gaps]

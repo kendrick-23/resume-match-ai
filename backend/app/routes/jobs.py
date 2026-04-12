@@ -108,7 +108,11 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     # Pass target_roles so the gap analyzer knows what direction the candidate
     # is heading and doesn't flag misaligned skills as gaps.
     try:
-        await analyze_gaps_batch(jobs, resume_skills, profile.get("target_roles") or "")
+        await analyze_gaps_batch(
+            jobs, resume_skills,
+            profile.get("target_roles") or "",
+            profile.get("job_title") or "",
+        )
     except Exception as exc:
         logger.error(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
 
