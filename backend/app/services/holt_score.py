@@ -374,25 +374,31 @@ def calculate_holt_score(
             skills_match = min(skills_match, 10)
             domain_penalty_applied = True
 
-    # Construction "Job Captain" demotion — "Job Captain" at homebuilders is an
-    # architecture/construction project lead role, not operations. Penalize when
-    # the company is a known homebuilder or description has construction signals.
+    # Construction demotion — "Job Captain" at homebuilders/contractors is an
+    # architecture role (hard cap). Other titles at known construction firms
+    # get a softer -35 demotion since "Director of Operations" at a GC is
+    # construction project management, not corporate ops.
     _CONSTRUCTION_COMPANIES = [
         "toll brothers", "pulte", "dr horton", "lennar", "kb home",
         "meritage", "taylor morrison", "ryan homes", "nvr ",
+        "wharton smith", "hoar", "skanska", "turner construction",
+        "suffolk", "brasfield & gorrie", "hensel phelps",
     ]
     _CONSTRUCTION_SIGNALS = [
         "construction", "homebuilder", "blueprint", "architectural",
         "building permit", "floor plan", "residential",
+        "commercial construction", "general contractor", "construction management",
     ]
-    if not domain_penalty_applied and "job captain" in job_title:
-        is_construction = (
-            any(cc in job_company for cc in _CONSTRUCTION_COMPANIES)
-            or any(cs in job_desc for cs in _CONSTRUCTION_SIGNALS)
-        )
-        if is_construction:
+    if not domain_penalty_applied:
+        is_construction_company = any(cc in job_company for cc in _CONSTRUCTION_COMPANIES)
+        has_construction_desc = any(cs in job_desc for cs in _CONSTRUCTION_SIGNALS)
+        is_construction = is_construction_company or has_construction_desc
+        if "job captain" in job_title and is_construction:
             skills_match = min(skills_match, 10)
             domain_penalty_applied = True
+        elif is_construction_company:
+            # Known construction firm — softer demotion for ops-titled roles
+            skills_match = max(0, skills_match - 35)
 
     # Off-target title demotion: sales & recruitment roles are off-target for
     # ops/training/compliance profiles unless the JD has strong operations language.
@@ -427,12 +433,18 @@ def calculate_holt_score(
             any(st in job_title for st in _SALES_TITLES)
             or bool(re.search(r"\bsales\b", job_title))
         )
+        # "(Sales)" in the title means the employer explicitly categorized
+        # this as a sales role — always demote, skip ops override.
+        has_explicit_sales_tag = "(sales)" in job_title
         if is_sales_title:
             is_marketing = any(mt in job_title for mt in _MARKETING_TITLES)
             override_threshold = 3 if is_marketing else 2
             ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
-            if ops_override_count < override_threshold:
-                skills_match = max(0, skills_match - 35)
+            if has_explicit_sales_tag or ops_override_count < override_threshold:
+                # Cap to 30 instead of subtracting — high base scores from
+                # ops floor + bridge matching push subtraction-based demotions
+                # above the 60% Within Reach floor. A hard cap guarantees it.
+                skills_match = min(skills_match, 30)
 
     # --- Recruitment/HR demotion ---
     _RECRUITMENT_TITLES = {
@@ -456,7 +468,9 @@ def calculate_holt_score(
     # --- Emergency services demotion ---
     # Normalize dashes/hyphens in the title so "Coordinator - Fire Rescue"
     # matches the same as "Coordinator Fire Rescue". Titles with "fire rescue"
-    # or "ems" are unambiguous — skip the description confirmation.
+    # or "ems" are unambiguous — skip BOTH description check AND ops override.
+    # County government fire/EMS JDs naturally contain "compliance", "operations",
+    # "training" which would falsely trigger the ops override and block demotion.
     _EMERGENCY_TITLE_TRIGGERS = ["fire rescue", "ems coordinator", "emergency medical"]
     _EMERGENCY_STRONG_SIGNALS = ["fire rescue", " ems"]  # unambiguous in title alone
     _EMERGENCY_DESC_SIGNALS = ["paramedic", "firefighter", "dispatch", "first responder",
@@ -467,15 +481,18 @@ def calculate_holt_score(
         is_emergency_title = any(et in title_normalized for et in _EMERGENCY_TITLE_TRIGGERS)
         is_strong_signal = any(ss in title_normalized for ss in _EMERGENCY_STRONG_SIGNALS)
         if is_emergency_title or is_strong_signal:
-            # Strong title signals (fire rescue, ems) skip description check.
-            # Weaker triggers still require description confirmation.
-            has_emergency_context = is_strong_signal or any(
-                es in job_desc for es in _EMERGENCY_DESC_SIGNALS
-            )
-            if has_emergency_context:
-                ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
-                if ops_override_count < 2:
-                    skills_match = max(0, skills_match - 35)
+            if is_strong_signal:
+                # "fire rescue" / "ems" in title is definitive — always demote.
+                skills_match = max(0, skills_match - 35)
+            else:
+                # Weaker triggers need description confirmation + ops override check.
+                has_emergency_context = any(
+                    es in job_desc for es in _EMERGENCY_DESC_SIGNALS
+                )
+                if has_emergency_context:
+                    ops_override_count = sum(1 for kw in _OFFTARGET_OVERRIDE_KEYWORDS if kw in job_desc)
+                    if ops_override_count < 2:
+                        skills_match = max(0, skills_match - 35)
 
     # --- Franchise store number demotion ---
     # Titles containing (XXXXX) patterns like "General Manager (12345)" are
