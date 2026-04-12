@@ -53,9 +53,14 @@ Candidate:
 Job: {j_title} at {j_company}, {j_sal}
 {j_desc}
 
+Scoring guide:
+STRONG MATCH (80-95): Job title directly matches or is semantically equivalent to a target role. Role is in hospitality, retail, food service, corporate operations, or training & development. Candidate's ops/training experience directly transfers.
+MODERATE MATCH (60-79): Adjacent domain where ops/training skills transfer with some gap. Title is a stretch up (Director) or slight step sideways (Supervisor).
+WEAK MATCH (below 45): Role requires specialized credentials the candidate lacks (clinical, construction trades, emergency services, insurance sales). Title is clearly outside operations/training/compliance.
+
 Rules:
 - Score only role fit, NOT company prestige.
-- Seniority matters: if the job is coordinator/specialist/associate level and the candidate is currently a manager/AGM, cap the score at 55 — that's a step backward in seniority.
+- Seniority: if the job is coordinator/specialist/associate level and the candidate is currently a manager/AGM, cap the score at 55.
 - Domain alignment HIGH (70+): operations, training, compliance, hospitality/retail management, government services.
 - Domain alignment LOW (<30): clinical medical, construction trades, pure sales/marketing, defense/military, emergency services, licensed professions.
 - Cite specific text in reasoning.

@@ -58,7 +58,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             except (json.JSONDecodeError, TypeError):
                 resume_skills = []
 
-        analysis_res = sb.table("analyses").select("strengths,gaps,skills_match") \
+        analysis_res = sb.table("analyses").select("strengths,gaps") \
             .eq("user_id", user["user_id"]) \
             .order("created_at", desc=True) \
             .limit(1) \
