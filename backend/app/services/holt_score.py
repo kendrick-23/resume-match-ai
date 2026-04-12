@@ -11,8 +11,11 @@ Dimensions:
 """
 
 import json
+import logging
 import re
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from app.constants.scoring import TIER_BREAKPOINTS, DOMAIN_PENALTY_CAP
 
@@ -346,6 +349,7 @@ def calculate_holt_score(
         "truck driver", "cdl", "owner operator", "class a driver",
         "grounds maintenance", "groundskeeper", "custodian",
         "security officer", "security guard", "janitor", "janitorial",
+        "linen bagger", "linen folder", "team member", "crew member",
     ]
     if not domain_penalty_applied and any(vt in job_title for vt in _VOCATIONAL_TRIGGERS):
         skills_match = min(skills_match, 10)
@@ -474,15 +478,16 @@ def calculate_holt_score(
         salary_not_disclosed = True
 
     # Salary dealbreaker — respect the user's stated minimum exactly.
-    # The hard-floor logic above caps the SCORE for egregiously low-paying jobs;
-    # the dealbreaker is for FILTERING and fires at any amount below the minimum.
-    # These are independent concepts: a $70k job when the user's min is $75k gets
-    # a reduced salary_alignment score BUT also triggers the dealbreaker.
+    # Use the PESSIMISTIC salary (salary_min when available) since that's
+    # the likely starting offer. A $65-75k range with a $75k minimum means
+    # the starting pay doesn't meet the requirement. Jobs with NO salary
+    # data are never filtered — we can't know if they violate the minimum.
+    dealbreaker_salary = job_salary_min or job_salary_max
     if (
         dealbreakers.get("below_salary")
         and target_salary_min
-        and job_salary
-        and job_salary < target_salary_min
+        and dealbreaker_salary
+        and dealbreaker_salary < target_salary_min
     ):
         dealbreaker_triggered = True
         salary_floor_violation = True
@@ -593,10 +598,22 @@ def calculate_holt_score(
             location_fit = 90
         elif same_state:
             location_fit = 70
+            # Same state but NOT same city/metro — outside commute range.
+            # Daytona Beach is in FL but ~60 miles from Casselberry.
+            if dealbreakers.get("outside_commute"):
+                dealbreaker_triggered = True
+                logger.debug(
+                    "[Dealbreaker] outside_commute triggered: %s is same-state but not same-metro for user in %s",
+                    job_location, user_location,
+                )
         else:
             location_fit = 20
             if dealbreakers.get("outside_commute"):
                 dealbreaker_triggered = True
+                logger.debug(
+                    "[Dealbreaker] outside_commute triggered: %s is out-of-state for user in %s",
+                    job_location, user_location,
+                )
     else:
         location_fit = 50
 
