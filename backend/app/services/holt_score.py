@@ -452,6 +452,26 @@ def calculate_holt_score(
         dealbreaker_triggered = True
         salary_floor_violation = True
 
+    # --- No-salary low-paying title inference ---
+    # When a job has NO listed salary AND the title matches known low-salary
+    # patterns (almost never meet $75k), apply -20 to salary_alignment.
+    # Not a dealbreaker — we can't be certain — but a meaningful signal.
+    # Exempt Nicole's target role patterns (Operations/Training/Compliance Coordinator).
+    _LOW_SALARY_TITLE_PATTERNS = [
+        "job captain", "sales coordinator", "marketing coordinator",
+        "administrative coordinator", "receptionist", "team member",
+        "crew member", "administrative assistant", "front desk",
+    ]
+    _EXEMPT_COORDINATOR_PREFIXES = [
+        "operations coordinator", "training coordinator", "compliance coordinator",
+        "program coordinator", "project coordinator",
+    ]
+    if salary_not_disclosed and target_salary_min:
+        is_low_salary_title = any(lp in job_title for lp in _LOW_SALARY_TITLE_PATTERNS)
+        is_exempt = any(ep in job_title for ep in _EXEMPT_COORDINATOR_PREFIXES)
+        if is_low_salary_title and not is_exempt:
+            salary_alignment = max(0, salary_alignment - 20)
+
     # --- 3. Schedule Fit (15%) ---
     schedule_red_flags = ["weekend", "nights", "shift", "rotating", "overnight"]
     has_schedule_flag = any(flag in job_desc for flag in schedule_red_flags)

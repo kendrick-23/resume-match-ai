@@ -201,7 +201,10 @@ DIMENSIONS TO SCORE:
 
 5. EXPERIENCE_RELEVANCE: Has the candidate done work like this before? Team management, compliance, training programs, scheduling, inventory, and operations oversight all transfer across industries.
 
-Your reasoning MUST cite specific text from the candidate profile or job description. Do not invent justifications.
+CRITICAL RULES:
+- Do NOT adjust scores based on company name, brand recognition, or employer prestige. A Sales Coordinator at Marriott is still a Sales Coordinator. Score only the role requirements and candidate fit.
+- SENIORITY CAP: If the job title contains "coordinator", "specialist", or "associate" AND the candidate's current title contains "manager", "supervisor", "director", or "general manager", the seniority_match score MUST NOT exceed 40. Moving from management to coordinator is always a step backward.
+- Your reasoning MUST cite specific text from the candidate profile or job description. Do not invent justifications.
 
 Submit via the submit_dimensional_score tool."""
 
@@ -225,6 +228,19 @@ Submit via the submit_dimensional_score tool."""
                         result[dim] = max(0, min(100, int(result[dim])))
                     else:
                         result[dim] = 50  # fallback
+
+                # Server-side seniority cap: coordinator/specialist/associate
+                # titles are always a step down for a manager/director/AGM.
+                # Haiku is instructed to cap at 40, but we enforce it here too.
+                _JUNIOR_TITLE_SIGNALS = ("coordinator", "specialist", "associate", "assistant")
+                _SENIOR_CURRENT_SIGNALS = ("manager", "supervisor", "director", "general manager")
+                title_lower = j_title.lower()
+                current_lower = current_title.lower()
+                is_junior_role = any(s in title_lower for s in _JUNIOR_TITLE_SIGNALS)
+                is_senior_candidate = any(s in current_lower for s in _SENIOR_CURRENT_SIGNALS)
+                if is_junior_role and is_senior_candidate:
+                    result["seniority_match"] = min(result["seniority_match"], 40)
+
                 result["composite"] = round(_compute_composite(result))
                 _semantic_cache[key] = (time.time(), result)
                 return result
