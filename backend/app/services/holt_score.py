@@ -234,6 +234,14 @@ def calculate_holt_score(
             "signals": ["dds", "dmd", "dental degree", "dental license"],
         },
         {
+            # Medical/clinical scheduling — titles with patient-facing signals
+            # indicate healthcare roles requiring clinical environment experience.
+            "triggers": ["new patients", "patient scheduling", "patient coordinator",
+                         "patient intake"],
+            "signals": ["clinical", "patient care", "ehr", "emr", "hipaa",
+                        "medical office", "nursing"],
+        },
+        {
             "triggers": ["veterinarian", "veterinary"],
             "signals": ["dvm", "veterinary degree", "veterinary license"],
         },
@@ -343,6 +351,21 @@ def calculate_holt_score(
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
 
+    # Military/defense "Special Operations" exclusion — "special operations" at
+    # defense contractors (CACI, Booz Allen, etc.) refers to military SpecOps
+    # support, not business operations. Only penalize when the company name or
+    # description contains defense/intelligence signals.
+    _DEFENSE_SIGNALS = [
+        "defense", "intelligence", "dod", "department of defense",
+        "clearance required", "security clearance", "top secret",
+        "ts/sci", "military", "armed forces", "combat",
+    ]
+    if not domain_penalty_applied and "special operations" in job_title:
+        has_defense_context = any(sig in job_company or sig in job_desc for sig in _DEFENSE_SIGNALS)
+        if has_defense_context:
+            skills_match = min(skills_match, 10)
+            domain_penalty_applied = True
+
     # Off-target title demotion: sales & recruitment roles are off-target for
     # ops/training/compliance profiles unless the JD has strong operations language.
     # Uses both exact-phrase matches AND word-boundary checks for "sales" to catch
@@ -358,6 +381,8 @@ def calculate_holt_score(
         "business development representative", "bdr",
         "sales manager", "sales representative", "sales associate",
         "sales director", "sales engineer", "sales consultant",
+        "broker", "broker growth", "field development manager",
+        "field development representative",
     }
     _USER_TARGETS_SALES = any(
         st in (target_roles or "").lower()
