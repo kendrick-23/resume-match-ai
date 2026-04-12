@@ -125,6 +125,7 @@ Job: {j_title} at {j_company}, {j_sal}
 
 Rules:
 - Score only role fit, NOT company prestige.
+- Seniority matters: if the job is coordinator/specialist/associate level and the candidate is currently a manager/AGM, cap the score at 55 — that's a step backward in seniority.
 - Domain alignment HIGH (70+): operations, training, compliance, hospitality/retail management, government services.
 - Domain alignment LOW (<30): clinical medical, construction trades, pure sales/marketing, defense/military, emergency services, licensed professions.
 - Cite specific text in reasoning.
@@ -197,6 +198,17 @@ Submit via the submit_score tool."""
                     sig in desc_lower for sig in ("fire rescue", "ems", "emergency")
                 ):
                     result["domain_alignment"] = min(result["domain_alignment"], 35)
+
+                # --- Server-side seniority cap ---
+                # Coordinator/specialist/associate titles are a step down
+                # for a manager/director/AGM. Cap score at 55 max.
+                _JUNIOR_SIGNALS = ("coordinator", "specialist", "associate")
+                _SENIOR_SIGNALS = ("manager", "supervisor", "director", "general manager")
+                current_title = (profile.get("job_title") or "").lower()
+                is_junior = any(s in title_lower for s in _JUNIOR_SIGNALS)
+                is_senior = any(s in current_title for s in _SENIOR_SIGNALS)
+                if is_junior and is_senior:
+                    result["score"] = min(result["score"], 55)
 
                 # --- Domain-alignment quality gate ---
                 da = result["domain_alignment"]
