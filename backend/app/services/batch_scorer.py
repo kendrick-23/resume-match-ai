@@ -215,7 +215,8 @@ async def poll_batch_until_done(
     # Collect results
     results: dict[str, dict] = {}
     try:
-        async for result in anthropic_async.messages.batches.results(batch_id):
+        results_stream = await anthropic_async.messages.batches.results(batch_id)
+        async for result in results_stream:
             cid = result.custom_id
             if result.result.type == "succeeded":
                 parsed = _parse_tool_result(result.result.message.content)
