@@ -241,7 +241,29 @@ Submit via the submit_dimensional_score tool."""
                 if is_junior_role and is_senior_candidate:
                     result["seniority_match"] = min(result["seniority_match"], 40)
 
+                # Server-side construction company gate: directors at known
+                # construction firms are construction project leads, not
+                # ops/training roles. Cap domain_alignment before composite.
+                _CONSTRUCTION_COMPANIES = (
+                    "wharton smith", "hoar", "skanska", "turner construction",
+                    "suffolk", "brasfield", "hensel phelps", "toll brothers",
+                    "pulte", "dr horton", "lennar", "kb home",
+                )
+                company_lower = j_company.lower()
+                if any(cc in company_lower for cc in _CONSTRUCTION_COMPANIES):
+                    result["domain_alignment"] = min(result["domain_alignment"], 30)
+
                 result["composite"] = round(_compute_composite(result))
+
+                # Domain-alignment quality gate — caps composite based on
+                # domain fit. Wrong-domain jobs can't be rescued by skills
+                # overlap alone (LinkedIn production pattern).
+                da = result["domain_alignment"]
+                if da < 35:
+                    result["composite"] = min(result["composite"], 25)
+                elif da < 50:
+                    result["composite"] = min(result["composite"], 58)
+
                 _semantic_cache[key] = (time.time(), result)
                 return result
         return None
