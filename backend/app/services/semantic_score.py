@@ -253,15 +253,28 @@ Submit via the submit_dimensional_score tool."""
                 if any(cc in company_lower for cc in _CONSTRUCTION_COMPANIES):
                     result["domain_alignment"] = min(result["domain_alignment"], 30)
 
+                # Server-side domain_alignment caps for known off-domain
+                # role patterns that Haiku consistently overscores due to
+                # incidental operational language in the JD.
+                desc_lower = j_desc.lower()
+                if "marketing manager" in title_lower or "marketing coordinator" in title_lower:
+                    result["domain_alignment"] = min(result["domain_alignment"], 30)
+                if "development review" in title_lower:
+                    result["domain_alignment"] = min(result["domain_alignment"], 30)
+                if "financial services" in title_lower and any(
+                    sig in desc_lower for sig in ("fire rescue", "ems", "emergency")
+                ):
+                    result["domain_alignment"] = min(result["domain_alignment"], 35)
+
                 result["composite"] = round(_compute_composite(result))
 
                 # Domain-alignment quality gate — caps composite based on
                 # domain fit. Wrong-domain jobs can't be rescued by skills
                 # overlap alone (LinkedIn production pattern).
                 da = result["domain_alignment"]
-                if da < 35:
+                if da < 45:
                     result["composite"] = min(result["composite"], 25)
-                elif da < 50:
+                elif da < 60:
                     result["composite"] = min(result["composite"], 58)
 
                 _semantic_cache[key] = (time.time(), result)
