@@ -211,14 +211,34 @@ Submit via the submit_dimensional_score tool."""
     if not check_budget(estimate_tokens(prompt)):
         return None
 
+    api_kwargs = dict(
+        model=HAIKU_MODEL,
+        max_tokens=300,
+        tools=[SEMANTIC_SCORE_TOOL],
+        tool_choice={"type": "tool", "name": "submit_dimensional_score"},
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    # Retry once on rate limit (429) with 3s backoff before falling back
+    # to keyword-only scoring (return None).
+    response = None
+    for attempt in range(2):
+        try:
+            response = await anthropic_async.messages.create(**api_kwargs)
+            break
+        except Exception as exc:
+            is_rate_limit = "rate" in str(exc).lower() or getattr(exc, "status_code", 0) == 429
+            if is_rate_limit and attempt == 0:
+                logger.warning(f"[SemanticScore] Rate limited for '{j_title}', retrying in 3s")
+                await asyncio.sleep(3)
+                continue
+            logger.error(f"[SemanticScore] Failed for '{j_title}': {exc}", exc_info=True)
+            return None
+
+    if response is None:
+        return None
+
     try:
-        response = await anthropic_async.messages.create(
-            model=HAIKU_MODEL,
-            max_tokens=300,
-            tools=[SEMANTIC_SCORE_TOOL],
-            tool_choice={"type": "tool", "name": "submit_dimensional_score"},
-            messages=[{"role": "user", "content": prompt}],
-        )
         for block in response.content:
             if getattr(block, "type", None) == "tool_use" and block.name == "submit_dimensional_score":
                 result = block.input
