@@ -473,6 +473,20 @@ def calculate_holt_score(
         salary_alignment = 55
         salary_not_disclosed = True
 
+    # Salary dealbreaker — respect the user's stated minimum exactly.
+    # The hard-floor logic above caps the SCORE for egregiously low-paying jobs;
+    # the dealbreaker is for FILTERING and fires at any amount below the minimum.
+    # These are independent concepts: a $70k job when the user's min is $75k gets
+    # a reduced salary_alignment score BUT also triggers the dealbreaker.
+    if (
+        dealbreakers.get("below_salary")
+        and target_salary_min
+        and job_salary
+        and job_salary < target_salary_min
+    ):
+        dealbreaker_triggered = True
+        salary_floor_violation = True
+
     # --- 3. Schedule Fit (15%) ---
     schedule_red_flags = ["weekend", "nights", "shift", "rotating", "overnight"]
     has_schedule_flag = any(flag in job_desc for flag in schedule_red_flags)
@@ -556,7 +570,7 @@ def calculate_holt_score(
             "orlando": {"orlando", "casselberry", "winter springs", "altamonte springs",
                         "oviedo", "sanford", "kissimmee", "maitland", "longwood",
                         "lake mary", "middleton", "apopka", "winter park", "clermont",
-                        "daytona beach", "deltona", "winter garden", "st cloud"},
+                        "winter garden", "st cloud"},
             "tampa": {"tampa", "st petersburg", "clearwater", "brandon", "lakeland",
                       "plant city", "wesley chapel", "new port richey", "largo"},
             "jacksonville": {"jacksonville", "orange park", "fleming island",

@@ -131,21 +131,12 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["holt_score"] = min(job["holt_score"], SALARY_FLOOR_CAP)
             job["coaching_label"] = "Below your salary range"
 
-    # Step 8: Hard exclusion when the user has explicitly set salary as a
-    # dealbreaker AND the job violates the floor. The user told us "$70k is my
-    # floor" — honor it. Filter at the route layer (mirrors how dealbreakers
-    # should have been enforced from day one).
-    if (profile.get("dealbreakers") or {}).get("below_salary") if isinstance(profile.get("dealbreakers"), dict) else False:
-        jobs = [j for j in jobs if not j.get("salary_floor_violation")]
-    else:
-        # dealbreakers may be a JSON string in the column; handle both
-        raw_db = profile.get("dealbreakers")
-        if isinstance(raw_db, str):
-            try:
-                if json.loads(raw_db).get("below_salary"):
-                    jobs = [j for j in jobs if not j.get("salary_floor_violation")]
-            except (json.JSONDecodeError, TypeError):
-                pass
+    # Step 8: Hard exclusion for ALL dealbreaker-triggered jobs.
+    # holt_score.py sets dealbreaker_triggered=True only when the user's
+    # profile has the corresponding dealbreaker checked (below_salary,
+    # outside_commute, hard_degree_required) AND the job violates it.
+    # Filter server-side so these jobs never reach the frontend.
+    jobs = [j for j in jobs if not j.get("dealbreaker_triggered")]
 
     return jobs
 
