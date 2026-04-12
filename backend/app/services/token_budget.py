@@ -13,7 +13,7 @@ import os
 from app.logger import logger
 
 _daily_tokens = {"date": None, "count": 0}
-DAILY_TOKEN_LIMIT = int(os.environ.get("HAIKU_DAILY_TOKEN_LIMIT", "250000"))
+DAILY_TOKEN_LIMIT = int(os.environ.get("HAIKU_DAILY_TOKEN_LIMIT", "600000"))
 
 _daily_opus_tokens = {"date": None, "count": 0}
 OPUS_DAILY_TOKEN_LIMIT = int(os.environ.get("OPUS_DAILY_TOKEN_LIMIT", "200000"))
