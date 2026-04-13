@@ -577,11 +577,13 @@ export default function Jobs() {
         toast.warning("Running on cached intelligence today — results may be less specific.");
       }
 
+      console.log('[Holt] Initial response scoring_complete:', multiResult?.scoring_complete);
       if (multiResult.scoring_complete === false) {
         toast.info("Ott is analyzing your matches — scores will update automatically.");
         // Poll for batch completion, then auto-refresh with semantic scores
         clearInterval(scoringPollRef.current);
         let attempts = 0;
+        console.log('[Holt] Starting polling — batch in progress');
         scoringPollRef.current = setInterval(async () => {
           attempts++;
           if (attempts > 20 || !isMountedRef.current) {
@@ -591,14 +593,16 @@ export default function Jobs() {
           }
           try {
             const status = await getScoringStatus();
+            console.log('[Holt] Poll attempt', attempts, '— status:', status?.scoring_complete);
             if (status.scoring_complete) {
               clearInterval(scoringPollRef.current);
               scoringPollRef.current = null;
               if (isMountedRef.current) {
+                console.log('[Holt] Auto-refresh triggered by polling');
                 handleProfileMatch(true);
               }
             }
-          } catch { /* ignore poll errors */ }
+          } catch (err) { console.log('[Holt] Poll error:', err); }
         }, 15000);
       }
 
