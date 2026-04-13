@@ -6,7 +6,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, createApplication, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
@@ -333,12 +333,19 @@ export default function Jobs() {
     return () => { profileAbortRef.current?.abort(); };
   }, []);
 
-  async function loadRecommendations(forceRefresh = false) {
+  // Re-derive Ott Recommends when job data arrives from handleProfileMatch.
+  // This ensures recommendations populate even if loadRecommendations() ran
+  // before handleProfileMatch completed (unifiedJobs was empty at that point).
+  useEffect(() => {
+    if (unifiedJobs.length > 0 && recommended.length === 0) {
+      loadRecommendations(true);
+    }
+  }, [unifiedJobs]);
+
+  function loadRecommendations(forceRefresh = false) {
     setRecError(false);
 
-    // Cache hit (sessionStorage, 30-minute TTL) — short-circuits the entire
-    // recommendation pipeline including the backend Anthropic Haiku calls.
-    // Cuts ~10-30 Haiku invocations per repeat mount.
+    // Cache hit (sessionStorage, 30-minute TTL)
     if (!forceRefresh) {
       const cached = loadRecommendationsCache();
       if (cached) {
@@ -349,103 +356,29 @@ export default function Jobs() {
       }
     }
 
-    // Parallel fetch — profile and analyses fire concurrently instead of
-    // serially. Saves ~250-500ms on mount. Each is wrapped independently so
-    // a profile failure does not block the analyses path.
-    const [profileResult, analysesResult] = await Promise.allSettled([
-      getProfile(),
-      listAnalyses(),
-    ]);
+    // Ott Recommends reads from jobs already in state (populated by
+    // handleProfileMatch). NO separate API call — per Invariant #4.
+    // If unifiedJobs is empty, recommendations will populate once
+    // handleProfileMatch completes and triggers a re-render.
+    const source = unifiedJobs.length > 0 ? unifiedJobs
+      : [...fedJobs, ...pvtJobs];
 
-    let profileTargetRoles = '';
-    let profileLocation = '';
-    if (profileResult.status === 'fulfilled' && profileResult.value) {
-      const profile = profileResult.value;
-      setCachedProfile(profile);
-      profileTargetRoles = profile.target_roles || '';
-      profileLocation = profile.location || '';
-      setUserLocation(profileLocation);
-      setSalaryTarget({
-        min: profile.target_salary_min || null,
-        max: profile.target_salary_max || null,
-      });
-      setTargetCompanies(
-        (profile.target_companies || '').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
-      );
-    }
-
-    try {
-      const analyses = analysesResult.status === 'fulfilled' ? analysesResult.value : null;
-      if (!analyses || analyses.length === 0) {
-        setHasAnalysis(false);
-        setRecLoading(false);
-        // Cache the empty state too — saves 2 API calls on repeat mounts
-        // for users who haven't analyzed anything yet.
-        saveRecommendationsCache([], false);
-        return;
-      }
-
-      setHasAnalysis(true);
-      const latest = analyses[0];
-
-      const roleName = latest.role_name || '';
-      setAnalysisRoleName(roleName);
-      const strengths = typeof latest.strengths === 'string'
-        ? JSON.parse(latest.strengths)
-        : latest.strengths || [];
-      const gaps = typeof latest.gaps === 'string'
-        ? JSON.parse(latest.gaps)
-        : latest.gaps || [];
-
-      setAnalysisGaps(gaps);
-
-      const allText = [...strengths, ...gaps, roleName].join(' ').toLowerCase();
-      const words = allText.split(/[\s,;.()]+/).filter((w) => w.length > 3);
-      setAnalysisKeywords([...new Set(words)]);
-
-      // Use profile target_roles as the ONLY trusted seed for recommendations.
-      // We deliberately do NOT fall back to `latest.role_name` — that field
-      // reflects whatever role the user most recently analyzed (which could
-      // be exploratory, corrections-adjacent, or otherwise unrelated to their
-      // actual target). A safe corporate-ops default is much better than
-      // accidentally seeding the recommender with an arbitrary past analysis.
-      let searchKeyword = '';
-      if (profileTargetRoles.trim()) {
-        const roles = profileTargetRoles.split(',').map((r) => r.trim()).filter(Boolean);
-        searchKeyword = roles.slice(0, 2).join(' ');
-      }
-      if (!searchKeyword) {
-        searchKeyword = 'operations manager';
-      }
-
-      const searchLocation = profileLocation || 'Florida';
-
-      try {
-        const data = await searchUnifiedMulti({
-          keywords: [searchKeyword],
-          location: searchLocation,
-        });
-        // Filter recommendations to high-confidence, in-domain matches only:
-        //   1. holt_score >= strong threshold (Strong Match floor — never recommend a stretch)
-        //   2. NOT domain_penalized — corrections / clinical / legal mismatches
-        //      and other out-of-domain roles are excluded outright, regardless
-        //      of how the keyword matcher scored them.
-        const filtered = (data.jobs || []).filter(
-          (j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !j.domain_penalized
-        );
-        const top = filtered.slice(0, 5);
-        setRecommended(top);
-        // Cache the recommendation list (sessionStorage, 30min TTL) so a
-        // repeat mount within the window skips the entire scoring pipeline.
-        saveRecommendationsCache(top, true);
-      } catch {
-        setRecError(true);
-      }
-    } catch {
-      setRecError(true);
-    } finally {
+    if (source.length === 0) {
+      // No jobs in state yet — will re-derive on next render after
+      // handleProfileMatch populates unifiedJobs.
       setRecLoading(false);
+      return;
     }
+
+    const filtered = source
+      .filter((j) => (j.holt_score ?? 0) >= TIER_BREAKPOINTS.strong && !j.domain_penalized && !j.dealbreaker_triggered)
+      .sort((a, b) => (b.holt_score ?? 0) - (a.holt_score ?? 0))
+      .slice(0, 5);
+
+    setRecommended(filtered);
+    setHasAnalysis(true);
+    saveRecommendationsCache(filtered, true);
+    setRecLoading(false);
   }
 
   // --- Federal search ---
@@ -1054,7 +987,7 @@ export default function Jobs() {
               // sessionStorage recommendations cache, then re-runs both.
               clearRecommendationsCache();
               handleProfileMatch(true);
-              loadRecommendations(true);
+              // Recommendations re-derive from unifiedJobs via useEffect
             }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
@@ -1088,7 +1021,7 @@ export default function Jobs() {
                 searchPrivate(keyword.trim(), location.trim());
               } else {
                 handleProfileMatch(true);
-                loadRecommendations(true);
+                // Recommendations re-derive from unifiedJobs via useEffect
               }
             }}
             style={{

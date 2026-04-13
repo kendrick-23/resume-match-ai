@@ -20,7 +20,7 @@ from app.services.token_budget import check_budget, estimate_tokens
 
 # Cache: cache_key → (timestamp, result_dict)
 _semantic_cache: dict[str, tuple[float, dict]] = {}
-_CACHE_TTL = 86400  # 24 hours
+_CACHE_TTL = 14400  # 4 hours — must match Supabase job_search_cache TTL (Invariant #5)
 
 _semaphore = asyncio.Semaphore(3)
 
