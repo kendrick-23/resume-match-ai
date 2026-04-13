@@ -446,10 +446,16 @@ export default function Jobs() {
     const kw = keyword.trim();
     const loc = location.trim();
 
+    // Cancel any in-flight profile match polling — keyword search takes priority
+    clearInterval(scoringPollRef.current);
+    scoringPollRef.current = null;
+    profileAbortRef.current?.abort();
+
     // Clear page state so this runs fresh
     clearPageState();
     setRestoredFromPageState(false);
     setIsProfileMatch(false);
+    setProfileMatchLoading(false);
     setUnifiedJobs([]);
 
     // Persist search state
@@ -534,7 +540,8 @@ export default function Jobs() {
     setPvtLoading(false);
 
     setCachedAt(cached);
-    saveSearch({ keyword: '', location: loc, remoteOnly, activeTab });
+    // Preserve keyword in saved state so tab-return restores it
+    saveSearch({ keyword: keyword.trim(), location: loc, remoteOnly, activeTab });
   }
 
   function _dedup(results, keyFn) {
@@ -957,12 +964,12 @@ export default function Jobs() {
         <Button
           full
           onClick={() => handleProfileMatch()}
-          disabled={fedLoading || pvtLoading}
+          disabled={profileMatchLoading || fedLoading || pvtLoading}
           style={{ marginBottom: 0 }}
         >
           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-            <Ott state={fedLoading || pvtLoading ? 'thinking' : 'idle'} size={32} />
-            {fedLoading || pvtLoading ? 'Finding your matches...' : 'Find jobs that fit me'}
+            <Ott state="idle" size={32} />
+            Find jobs that fit me
           </span>
         </Button>
       )}
