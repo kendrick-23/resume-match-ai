@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useBlocker } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -73,6 +73,27 @@ export default function Profile() {
     loadBadges();
     loadVaultResumes();
   }, []);
+
+  // Warn on browser refresh/close with unsaved changes
+  useEffect(() => {
+    if (!hasChanges) return;
+    const handler = (e) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasChanges]);
+
+  // Block in-app navigation with unsaved changes
+  const blocker = useBlocker(hasChanges);
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const leave = window.confirm('You have unsaved changes. Leave without saving?');
+      if (leave) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker.state]);
 
   async function loadVaultResumes() {
     try {

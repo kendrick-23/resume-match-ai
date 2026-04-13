@@ -1225,6 +1225,7 @@ export default function Results() {
                     prefill: true,
                     company: result.company_name || '',
                     role: result.role_name || '',
+                    url: result.posting_url || '',
                     notes: `Holt Score: ${result.score}%`,
                   },
                 })}

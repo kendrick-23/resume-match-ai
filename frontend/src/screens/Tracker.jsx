@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
 import Card from '../components/ui/Card';
@@ -204,29 +204,7 @@ export default function Tracker() {
       </div>
 
       {/* Pipeline stage tabs */}
-      <div style={{
-        display: 'flex',
-        gap: 'var(--space-2)',
-        overflowX: 'auto',
-        paddingBottom: 'var(--space-2)',
-        marginBottom: 'var(--space-5)',
-      }}>
-        <button
-          className={`tracker-stage-tab${activeStage === null ? ' tracker-stage-tab--active' : ''}`}
-          onClick={() => setActiveStage(null)}
-        >
-          All ({applications.length})
-        </button>
-        {STAGES.map((stage) => (
-          <button
-            key={stage}
-            className={`tracker-stage-tab${activeStage === stage ? ' tracker-stage-tab--active' : ''}`}
-            onClick={() => setActiveStage(activeStage === stage ? null : stage)}
-          >
-            {stage} ({stageCounts[stage]})
-          </button>
-        ))}
-      </div>
+      <StageTabsBar activeStage={activeStage} setActiveStage={setActiveStage} applications={applications} stageCounts={stageCounts} />
 
       {/* JIT hint — first tracker entry (inline popover below tabs) */}
       {applications.length >= 1 && (
@@ -378,6 +356,65 @@ export default function Tracker() {
 }
 
 
+function StageTabsBar({ activeStage, setActiveStage, applications, stageCounts }) {
+  const scrollRef = useRef(null);
+  const [showFade, setShowFade] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const check = () => {
+      setShowFade(el.scrollWidth > el.clientWidth && el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    };
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check);
+    return () => { el.removeEventListener('scroll', check); window.removeEventListener('resize', check); };
+  }, [applications.length]);
+
+  return (
+    <div style={{ position: 'relative', marginBottom: 'var(--space-5)' }}>
+      <div
+        ref={scrollRef}
+        style={{
+          display: 'flex',
+          gap: 'var(--space-2)',
+          overflowX: 'auto',
+          paddingBottom: 'var(--space-2)',
+          scrollbarWidth: 'none',
+        }}
+      >
+        <button
+          className={`tracker-stage-tab${activeStage === null ? ' tracker-stage-tab--active' : ''}`}
+          onClick={() => setActiveStage(null)}
+        >
+          All ({applications.length})
+        </button>
+        {STAGES.map((stage) => (
+          <button
+            key={stage}
+            className={`tracker-stage-tab${activeStage === stage ? ' tracker-stage-tab--active' : ''}`}
+            onClick={() => setActiveStage(activeStage === stage ? null : stage)}
+          >
+            {stage} ({stageCounts[stage]})
+          </button>
+        ))}
+      </div>
+      {showFade && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: '40px',
+          background: 'linear-gradient(to right, transparent, var(--color-bg))',
+          pointerEvents: 'none',
+        }} />
+      )}
+    </div>
+  );
+}
+
 function CopyQuestionsButton({ questions }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -415,6 +452,7 @@ function CopyQuestionsButton({ questions }) {
 function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLoading, onGeneratePrep }) {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showQuestions, setShowQuestions] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const currentIndex = STAGES.indexOf(app.status);
 
@@ -504,25 +542,70 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
             <ExternalLink size={12} /> Link
           </a>
         )}
-        <button
-          onClick={() => onDelete(app.id)}
-          aria-label="Delete application"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--color-text-muted)',
-            padding: 'var(--space-1)',
-            minHeight: '44px',
-            minWidth: '44px',
+        {confirmingDelete ? (
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            gap: 'var(--space-2)',
             marginLeft: 'auto',
-          }}
-        >
-          <Trash2 size={14} />
-        </button>
+          }}>
+            <button
+              onClick={() => setConfirmingDelete(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--color-text-muted)',
+                fontFamily: "'Nunito', sans-serif",
+                fontWeight: 600,
+                fontSize: '13px',
+                padding: 'var(--space-1)',
+                minHeight: '44px',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { setConfirmingDelete(false); onDelete(app.id); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--color-danger)',
+                fontFamily: "'Nunito', sans-serif",
+                fontWeight: 700,
+                fontSize: '13px',
+                padding: 'var(--space-1)',
+                minHeight: '44px',
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setConfirmingDelete(true);
+              setTimeout(() => setConfirmingDelete(false), 3000);
+            }}
+            aria-label="Delete application"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--color-text-muted)',
+              padding: 'var(--space-1)',
+              minHeight: '44px',
+              minWidth: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 'auto',
+            }}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
 
       {app.notes && (

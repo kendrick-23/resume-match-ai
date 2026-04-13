@@ -146,6 +146,9 @@ export default function Onboarding() {
             <Button full onClick={() => setStep(2)}>
               Almost done &rarr;
             </Button>
+            <button className="onboarding__skip" onClick={() => setStep(0)}>
+              &larr; Back
+            </button>
           </div>
         )}
 
@@ -241,6 +244,9 @@ export default function Onboarding() {
             </Button>
             <button className="onboarding__skip" onClick={handleFinish} disabled={saving}>
               I'll fill this in later
+            </button>
+            <button className="onboarding__skip" onClick={() => setStep(1)} disabled={saving}>
+              &larr; Back
             </button>
           </div>
         )}
