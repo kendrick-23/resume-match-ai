@@ -206,6 +206,11 @@ export async function searchUnifiedJobs({ keyword, location, remote }) {
   return apiRequest(`${API_URL}/jobs/unified?${params}`, { headers });
 }
 
+export async function getScoringStatus() {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/jobs/scoring-status`, { headers });
+}
+
 export async function searchUnifiedMulti({ keywords, location, remote }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();

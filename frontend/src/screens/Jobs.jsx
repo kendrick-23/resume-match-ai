@@ -6,7 +6,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, createApplication, getProfile, getSearchCache, saveSearchCache } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, getScoringStatus, createApplication, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
@@ -259,6 +259,7 @@ export default function Jobs() {
   const [profileEmpty, setProfileEmpty] = useState(false);
   const [profileTimedOut, setProfileTimedOut] = useState(false);
   const profileAbortRef = useRef(null);
+  const scoringPollRef = useRef(null);
 
   // Cached profile from mount — handleProfileMatch reuses this instead of
   // re-fetching. Stale-on-edit is acceptable: the user goes to /profile to
@@ -286,7 +287,7 @@ export default function Jobs() {
 
   // Guard: prevent stale async responses from setting state after unmount.
   const isMountedRef = useRef(true);
-  useEffect(() => { return () => { isMountedRef.current = false; }; }, []);
+  useEffect(() => { return () => { isMountedRef.current = false; clearInterval(scoringPollRef.current); }; }, []);
 
   // Save scroll position + full state on unmount
   useEffect(() => {
@@ -577,7 +578,28 @@ export default function Jobs() {
       }
 
       if (multiResult.scoring_complete === false) {
-        toast.info("Ott is still scoring a few new matches — tap Refresh in 2 minutes for complete results.");
+        toast.info("Ott is analyzing your matches — scores will update automatically.");
+        // Poll for batch completion, then auto-refresh with semantic scores
+        clearInterval(scoringPollRef.current);
+        let attempts = 0;
+        scoringPollRef.current = setInterval(async () => {
+          attempts++;
+          if (attempts > 20 || !isMountedRef.current) {
+            clearInterval(scoringPollRef.current);
+            scoringPollRef.current = null;
+            return;
+          }
+          try {
+            const status = await getScoringStatus();
+            if (status.scoring_complete) {
+              clearInterval(scoringPollRef.current);
+              scoringPollRef.current = null;
+              if (isMountedRef.current) {
+                handleProfileMatch(true);
+              }
+            }
+          } catch { /* ignore poll errors */ }
+        }, 15000);
       }
 
       // Store the full unified list for source filtering
@@ -987,9 +1009,10 @@ export default function Jobs() {
           })()}</span>
           <button
             onClick={() => {
-              // Refresh clears BOTH the profile-match cache and the
-              // sessionStorage recommendations cache, then re-runs both.
+              // Refresh clears caches and cancels any scoring poll.
               clearRecommendationsCache();
+              clearInterval(scoringPollRef.current);
+              scoringPollRef.current = null;
               handleProfileMatch(true);
               // Recommendations re-derive from unifiedJobs via useEffect
             }}
@@ -1024,6 +1047,8 @@ export default function Jobs() {
                 searchFederal(keyword.trim(), location.trim(), 1);
                 searchPrivate(keyword.trim(), location.trim());
               } else {
+                clearInterval(scoringPollRef.current);
+                scoringPollRef.current = null;
                 handleProfileMatch(true);
                 // Recommendations re-derive from unifiedJobs via useEffect
               }

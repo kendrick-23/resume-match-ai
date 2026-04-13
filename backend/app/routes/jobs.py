@@ -19,7 +19,7 @@ from app.services.jobspy_service import search_jobspy
 from app.services.jooble import search_jooble
 from app.services.holt_score import calculate_holt_score
 from app.services.enrich import enrich_jobs_batch
-from app.services.batch_scorer import batch_semantic_rescore
+from app.services.batch_scorer import batch_semantic_rescore, _user_batch_in_flight
 from app.services.gap_analyzer import analyze_gaps_batch
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -457,6 +457,18 @@ async def search_unified_multi(
     except Exception as e:
         logger.error(f"[/jobs/unified-multi] Error: {e}", exc_info=True)
         return {"total": 0, "jobs": [], "degraded": False, "scoring_complete": False}
+
+
+@router.get("/scoring-status")
+@limiter.limit("100/hour")
+async def get_scoring_status(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Check if a background batch is still running for this user."""
+    user_id = user["user_id"]
+    in_flight = user_id in _user_batch_in_flight
+    return {"scoring_complete": not in_flight}
 
 
 # --- Search result caching ---
