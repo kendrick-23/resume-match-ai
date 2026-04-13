@@ -258,35 +258,3 @@ export default function Onboarding() {
     </div>
   );
 }
-
-function ScoreRingMini() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48">
-      <circle
-        cx="24" cy="24" r="18"
-        fill="none"
-        stroke="var(--color-border)"
-        strokeWidth="4"
-      />
-      <circle
-        cx="24" cy="24" r="18"
-        fill="none"
-        stroke="var(--color-accent)"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeDasharray="84 113"
-        transform="rotate(-90 24 24)"
-      />
-      <text
-        x="24" y="28"
-        textAnchor="middle"
-        fontFamily="'Nunito', sans-serif"
-        fontWeight="800"
-        fontSize="14"
-        fill="var(--color-text)"
-      >
-        74
-      </text>
-    </svg>
-  );
-}

@@ -378,6 +378,40 @@ export default function Tracker() {
 }
 
 
+function CopyQuestionsButton({ questions }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        const exportText = questions.map((q, i) => {
+          const text = typeof q === 'string' ? q : (q?.question || '');
+          const scaffold = typeof q === 'object' && q?.star_scaffold ? `\n   ${q.star_scaffold}` : '';
+          return `${i + 1}. ${text}${scaffold}`;
+        }).join('\n\n');
+        navigator.clipboard.writeText(exportText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-1)',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: copied ? 'var(--color-success)' : 'var(--color-accent)',
+        fontFamily: "'Nunito', sans-serif",
+        fontWeight: 600,
+        fontSize: '13px',
+        padding: 'var(--space-1) 0',
+        transition: 'color var(--transition-fast)',
+      }}
+    >
+      <Copy size={12} /> {copied ? 'Copied!' : 'Copy all questions'}
+    </button>
+  );
+}
+
 function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLoading, onGeneratePrep }) {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showQuestions, setShowQuestions] = useState(false);
@@ -578,32 +612,7 @@ function ApplicationCard({ app, onStatusChange, onDelete, questions, questionsLo
                   </div>
                 );
               })}
-              <button
-                onClick={() => {
-                  const exportText = questions.map((q, i) => {
-                    const text = typeof q === 'string' ? q : (q?.question || '');
-                    const scaffold = typeof q === 'object' && q?.star_scaffold ? `\n   ${q.star_scaffold}` : '';
-                    return `${i + 1}. ${text}${scaffold}`;
-                  }).join('\n\n');
-                  navigator.clipboard.writeText(exportText);
-                  // Toast would be nice here but we don't have access in this component
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-1)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--color-accent)',
-                  fontFamily: "'Nunito', sans-serif",
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  padding: 'var(--space-1) 0',
-                }}
-              >
-                <Copy size={12} /> Copy all questions
-              </button>
+              <CopyQuestionsButton questions={questions} />
             </div>
           )}
         </div>

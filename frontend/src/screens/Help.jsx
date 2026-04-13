@@ -37,7 +37,7 @@ export default function Help() {
   const navigate = useNavigate();
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper screenName="Help">
       <div className="help-page">
         {/* Hero — Ott in his holt */}
         <div className="help-page__hero">
