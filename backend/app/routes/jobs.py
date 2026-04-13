@@ -5,7 +5,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Query, Depends, Request, Body
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel
 from supabase import create_client
 
@@ -348,6 +348,92 @@ async def search_unified(
 
     except Exception as e:
         logger.error(f"[/jobs/unified] Error: {e}", exc_info=True)
+        return {"total": 0, "jobs": [], "degraded": False}
+
+
+async def _fetch_for_keyword(keyword: str, location: Optional[str], remote: Optional[bool]) -> list:
+    """Fetch from all 4 sources for a single keyword. Returns raw job list."""
+    results = await asyncio.gather(
+        search_usajobs(keyword=keyword, location=location, remote=remote),
+        search_adzuna_jobs(keywords=keyword, location=location),
+        search_jobspy(keywords=keyword, location=location or "Florida", results=15),
+        search_jooble(keywords=keyword, location=location),
+        return_exceptions=True,
+    )
+    jobs = []
+    for r in results:
+        if isinstance(r, dict):
+            jobs.extend(r.get("jobs", []))
+    return jobs
+
+
+@router.get("/unified-multi")
+@limiter.limit("10/hour")
+async def search_unified_multi(
+    request: Request,
+    keywords: str = Query(..., min_length=1, max_length=1200, description="Comma-separated keywords"),
+    location: Optional[str] = Query(default=None, max_length=200),
+    remote: Optional[bool] = Query(default=None),
+    user: dict = Depends(get_current_user),
+):
+    """Fetch all synonym queries in parallel, deduplicate globally, score ONCE.
+
+    Accepts comma-separated keywords (e.g. "operations manager,training manager").
+    All fetches run in parallel, results are merged and deduped, then scored
+    in a single batch — guaranteeing every unique job gets semantic scoring.
+    """
+    try:
+        keyword_list = [k.strip() for k in keywords.split(",") if k.strip()][:8]
+        if not keyword_list:
+            return {"total": 0, "jobs": [], "degraded": False}
+
+        logger.info(f"[/jobs/unified-multi] Fetching {len(keyword_list)} queries: {keyword_list}")
+
+        # Step 1: Fetch all keywords in parallel (no scoring)
+        fetch_results = await asyncio.gather(
+            *[_fetch_for_keyword(kw, location, remote) for kw in keyword_list],
+            return_exceptions=True,
+        )
+
+        # Step 2: Merge and deduplicate across ALL keyword results
+        seen: set[str] = set()
+        unique_jobs = []
+        for result in fetch_results:
+            if isinstance(result, Exception):
+                logger.warning(f"[/jobs/unified-multi] One fetch failed: {result}")
+                continue
+            for job in result:
+                key = _normalize_dedup_key(
+                    job.get("title", ""),
+                    job.get("company", job.get("department", "")),
+                    job.get("location", ""),
+                )
+                if key not in seen:
+                    seen.add(key)
+                    unique_jobs.append(job)
+
+        logger.info(f"[/jobs/unified-multi] {len(unique_jobs)} unique jobs after global dedup")
+
+        # Step 3: Score ALL jobs ONCE (single batch submission)
+        try:
+            unique_jobs = await asyncio.wait_for(
+                _score_jobs(unique_jobs, user),
+                timeout=330.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("[/jobs/unified-multi] Scoring pipeline timed out after 330s")
+
+        # Step 4: Sort and return
+        unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
+
+        return {
+            "total": len(unique_jobs),
+            "jobs": unique_jobs,
+            "degraded": is_budget_exhausted(),
+        }
+
+    except Exception as e:
+        logger.error(f"[/jobs/unified-multi] Error: {e}", exc_info=True)
         return {"total": 0, "jobs": [], "degraded": False}
 
 

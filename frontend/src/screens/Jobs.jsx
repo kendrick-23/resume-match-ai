@@ -6,7 +6,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, searchUnifiedJobs, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, searchUnifiedJobs, searchUnifiedMulti, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
@@ -631,20 +631,16 @@ export default function Jobs() {
       setFedError('');
       setPvtLoading(true);
 
-      // Fire all queries through the unified endpoint (all 3 sources per query)
-      const allResults = await Promise.all(
-        queries.map((q) =>
-          searchUnifiedJobs({ keyword: q, location: loc }).catch(() => ({ jobs: [], total: 0 }))
-        ),
-      );
+      // Single request sends ALL synonym queries — backend fetches in parallel,
+      // deduplicates globally, then scores once via a single batch submission.
+      // This guarantees every unique job gets semantic scoring.
+      const multiResult = await searchUnifiedMulti({ keywords: queries, location: loc });
 
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
-      // Merge and dedup across all query results
-      const allMerged = _dedup(allResults, (j) => `${(j.title||'').toLowerCase()}|${(j.company||j.department||'').toLowerCase()}`);
+      const allMerged = multiResult.jobs || [];
 
-      // Check if any response signaled token budget exhaustion
-      if (allResults.some((r) => r.degraded)) {
+      if (multiResult.degraded) {
         toast.warning("Running on cached intelligence today — results may be less specific.");
       }
 

@@ -206,6 +206,16 @@ export async function searchUnifiedJobs({ keyword, location, remote }) {
   return apiRequest(`${API_URL}/jobs/unified?${params}`, { headers });
 }
 
+export async function searchUnifiedMulti({ keywords, location, remote }) {
+  const headers = await authHeaders();
+  const params = new URLSearchParams();
+  if (keywords?.length) params.set('keywords', keywords.join(','));
+  if (location) params.set('location', location);
+  if (remote) params.set('remote', 'true');
+
+  return apiRequest(`${API_URL}/jobs/unified-multi?${params}`, { headers });
+}
+
 export async function searchAdzunaJobs({ keyword, location, page }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();
