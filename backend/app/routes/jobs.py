@@ -280,14 +280,32 @@ _COMPANY_SUFFIXES = re.compile(
     r"\b(inc|llc|ltd|corp|corporation|company|co|group|holdings|services|solutions)\b\.?",
     re.IGNORECASE,
 )
+# Strip parenthetical DBA names, dash-separated subsidiaries, and punctuation
+_COMPANY_PARENS = re.compile(r"\(.*?\)")
+_COMPANY_DASH_TAIL = re.compile(r"\s*[-–—]\s+.*$")
+_COMPANY_PUNCT = re.compile(r"[^a-z0-9\s]")
 
 
 def _normalize_dedup_key(title: str, company: str, location: str) -> str:
-    """Normalize (title, company, location) for cross-source deduplication."""
+    """Normalize (title, company) for cross-source deduplication.
+
+    Aggressively strips company suffixes, subsidiaries (after dashes),
+    parenthetical names, and punctuation so "Crunch Fitness - CR Holdings LLC"
+    matches "Crunch Fitness". Location is dropped — same title+company
+    shouldn't appear twice regardless of location formatting.
+    """
     t = (title or "").lower().strip()
-    c = _COMPANY_SUFFIXES.sub("", (company or "").lower()).strip().rstrip(",. ")
-    loc = (location or "").lower().strip()
-    return f"{t}|{c}|{loc}"
+    # Strip dashes from title too (e.g. "Training Manager - Orlando" vs "Training Manager")
+    t = re.sub(r"\s*[-–—]\s+.*$", "", t).strip()
+    c = (company or "").lower()
+    c = _COMPANY_PARENS.sub("", c)          # "(DBA Name)" → ""
+    c = _COMPANY_DASH_TAIL.sub("", c)       # " - CR Holdings" → ""
+    c = _COMPANY_SUFFIXES.sub("", c)        # "LLC", "Inc", "Group" → ""
+    c = _COMPANY_PUNCT.sub("", c).strip()   # punctuation → ""
+    c = re.sub(r"\s+", " ", c).strip()      # collapse whitespace
+    # Strip trailing short tokens (1-2 chars) — stray initials like "cr", "fl"
+    c = re.sub(r"(\s+[a-z]{1,2})+$", "", c).strip()
+    return f"{t}|{c}"
 
 
 @router.get("/unified")

@@ -355,7 +355,16 @@ def calculate_holt_score(
         "security officer", "security guard", "janitor", "janitorial",
         "linen bagger", "linen folder", "team member", "crew member",
     ]
+    # Industrial/construction JD signals — if the company or description
+    # contains these, the role is industrial ops Nicole can't do.
+    _INDUSTRIAL_DESC_TRIGGERS = ["dewatering", "submergent", "excavation",
+                                 "heavy equipment", "crane operator"]
     if not domain_penalty_applied and any(vt in job_title for vt in _VOCATIONAL_TRIGGERS):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+    if not domain_penalty_applied and any(
+        idt in job_desc or idt in job_company for idt in _INDUSTRIAL_DESC_TRIGGERS
+    ):
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
 
