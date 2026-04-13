@@ -34,7 +34,7 @@ def _user_sb(user: dict):
     return sb
 
 
-async def _score_jobs(jobs: list, user: dict) -> list:
+async def _score_jobs(jobs: list, user: dict) -> tuple[list, bool]:
     """Enrich sparse descriptions then score using the 6-dimension Holt Score engine."""
     # Step 1: JD enrichment DISABLED — the batch semantic scorer reads
     # sparse JDs directly and infers context from the title + company.
@@ -102,11 +102,12 @@ async def _score_jobs(jobs: list, user: dict) -> list:
             job["salary_floor_violation"] = False
             job["salary_not_disclosed"] = False
 
-    # Step 4: Semantic re-scoring via Batch API — no rate limits, 50% cost
-    # reduction. Polls until results arrive (1-5 min). Falls back to
-    # keyword-only scores on timeout or error.
+    # Step 4: Semantic re-scoring via Batch API. Returns immediately with
+    # cached scores. Uncached jobs keep keyword-only scores while a background
+    # batch runs. scoring_complete=False means "tap Refresh for full results."
+    scoring_complete = True
     try:
-        await batch_semantic_rescore(jobs, profile, user.get("user_id", ""))
+        jobs, scoring_complete = await batch_semantic_rescore(jobs, profile, user.get("user_id", ""))
     except Exception as exc:
         logger.error(f"[BatchScorer] Semantic re-scoring failed: {exc}")
 
@@ -148,7 +149,7 @@ async def _score_jobs(jobs: list, user: dict) -> list:
     # Filter server-side so these jobs never reach the frontend.
     jobs = [j for j in jobs if not j.get("dealbreaker_triggered")]
 
-    return jobs
+    return jobs, scoring_complete
 
 
 @router.get("/search")
@@ -174,7 +175,7 @@ async def search_jobs(
             page=page,
         )
         try:
-            scored = await asyncio.wait_for(
+            scored, _ = await asyncio.wait_for(
                 _score_jobs(results.get("jobs", []), user),
                 timeout=330.0,
             )
@@ -205,7 +206,7 @@ async def search_adzuna(
             page=page,
         )
         try:
-            scored = await asyncio.wait_for(
+            scored, _ = await asyncio.wait_for(
                 _score_jobs(results.get("jobs", []), user),
                 timeout=330.0,
             )
@@ -259,7 +260,7 @@ async def search_aggregated(
 
         # Score all jobs with timeout
         try:
-            unique_jobs = await asyncio.wait_for(
+            unique_jobs, _ = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
                 timeout=330.0,
             )
@@ -348,7 +349,7 @@ async def search_unified(
 
         # Score all jobs with timeout
         try:
-            unique_jobs = await asyncio.wait_for(
+            unique_jobs, _ = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
                 timeout=330.0,
             )
@@ -433,13 +434,15 @@ async def search_unified_multi(
         logger.info(f"[/jobs/unified-multi] {len(unique_jobs)} unique jobs after global dedup")
 
         # Step 3: Score ALL jobs ONCE (single batch submission)
+        scoring_complete = True
         try:
-            unique_jobs = await asyncio.wait_for(
+            unique_jobs, scoring_complete = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
                 timeout=330.0,
             )
         except asyncio.TimeoutError:
             logger.warning("[/jobs/unified-multi] Scoring pipeline timed out after 330s")
+            scoring_complete = False
 
         # Step 4: Sort and return
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
@@ -448,11 +451,12 @@ async def search_unified_multi(
             "total": len(unique_jobs),
             "jobs": unique_jobs,
             "degraded": is_budget_exhausted(),
+            "scoring_complete": scoring_complete,
         }
 
     except Exception as e:
         logger.error(f"[/jobs/unified-multi] Error: {e}", exc_info=True)
-        return {"total": 0, "jobs": [], "degraded": False}
+        return {"total": 0, "jobs": [], "degraded": False, "scoring_complete": False}
 
 
 # --- Search result caching ---

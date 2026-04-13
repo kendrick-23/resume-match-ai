@@ -576,6 +576,10 @@ export default function Jobs() {
         toast.warning("Running on cached intelligence today — results may be less specific.");
       }
 
+      if (multiResult.scoring_complete === false) {
+        toast.info("Ott is still scoring a few new matches — tap Refresh in 2 minutes for complete results.");
+      }
+
       // Store the full unified list for source filtering
       setUnifiedJobs(allMerged);
 

@@ -336,14 +336,16 @@ def _apply_cached_scores(jobs: list[dict], profile: dict, user_id: str) -> int:
 
 async def batch_semantic_rescore(
     jobs: list[dict], profile: dict, user_id: str
-) -> list[dict]:
-    """Score eligible jobs via the Batch API with user-level deduplication.
+) -> tuple[list[dict], bool]:
+    """Score eligible jobs, returning immediately with cached scores.
 
-    If another synonym query already submitted a batch for this user,
-    await that batch's completion (which populates _semantic_cache),
-    then read scores from cache instead of submitting a duplicate batch.
+    Returns (jobs, scoring_complete):
+      - scoring_complete=True: all eligible jobs have semantic scores
+      - scoring_complete=False: some jobs have keyword-only scores,
+        a background batch is running and will populate _semantic_cache
 
-    Falls back gracefully to keyword-only scores on any failure.
+    The caller should pass scoring_complete to the frontend so it can
+    show a "tap Refresh for complete results" message.
     """
     # Filter eligible jobs (same criteria as semantic_score.py)
     eligible = [
@@ -355,7 +357,7 @@ async def batch_semantic_rescore(
     ]
 
     if not eligible:
-        return jobs
+        return jobs, True
 
     # First pass — apply any scores already in cache
     cached_count = _apply_cached_scores(jobs, profile, user_id)
@@ -374,7 +376,7 @@ async def batch_semantic_rescore(
         uncached.append(job)
 
     if not uncached:
-        return jobs
+        return jobs, True
 
     # --- User-level dedup: check if a batch is already in flight ---
     existing_future = None
@@ -411,44 +413,56 @@ async def batch_semantic_rescore(
         except Exception:
             pass
         _apply_cached_scores(jobs, profile, user_id)
-        return jobs
+        return jobs, True  # scoring_complete=True (batch finished)
 
-    # We own the batch — submit, poll, resolve
-    try:
-        logger.info(f"[BatchScorer] Submitting {len(uncached)} uncached jobs to Batch API")
-        batch_id = await submit_scoring_batch(uncached, profile, user_id)
-        if batch_id is None:
-            logger.warning("[BatchScorer] Batch submission failed — using keyword scores")
-            return jobs
+    # --- Fire batch in background, return immediately with cached scores ---
+    # The background task writes results to _semantic_cache when done.
+    # Uncached jobs keep keyword-only scores for now; the Refresh button
+    # picks up the full scores once the batch completes (2-3 min).
 
-        batch_results = await poll_batch_until_done(batch_id, poll_interval=10, max_wait=300)
+    async def _background_batch():
+        """Submit, poll, and write results to _semantic_cache. Runs after
+        the HTTP response has been sent — must not reference the jobs list."""
+        try:
+            logger.info(f"[BatchScorer] Background: submitting {len(uncached)} jobs")
+            batch_id = await submit_scoring_batch(uncached, profile, user_id)
+            if batch_id is None:
+                logger.warning("[BatchScorer] Background: batch submission failed")
+                return
 
-        # Map batch results back and apply to jobs
-        uncached_results: dict[str, dict] = {}
-        for idx, job in enumerate(uncached):
-            cid = _make_custom_id(job, idx)
-            if cid in batch_results:
-                full_idx = jobs.index(job)
-                full_cid = _make_custom_id(job, full_idx)
-                uncached_results[full_cid] = batch_results[cid]
+            batch_results = await poll_batch_until_done(batch_id, poll_interval=10, max_wait=300)
 
-        if uncached_results:
-            await apply_batch_scores(jobs, uncached_results, profile, user_id)
+            # Write raw results (before gates) to _semantic_cache so future
+            # requests can apply gates fresh. _apply_gates runs at read time
+            # in _apply_cached_scores and apply_batch_scores.
+            for idx, job in enumerate(uncached):
+                cid = _make_custom_id(job, idx)
+                result = batch_results.get(cid)
+                if result is None:
+                    continue
+                job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
+                cache_key = f"lite_v2:{job_id}:{user_id}"
+                _semantic_cache[cache_key] = (time.time(), result)
 
-        # Resolve the shared future so other callers proceed
-        if not future.done():
-            future.set_result(True)
+            logger.info(f"[BatchScorer] Background: {len(batch_results)} scores written to cache")
 
-    except asyncio.TimeoutError:
-        logger.warning(f"[BatchScorer] Batch timed out after 5 min — using keyword scores")
-        if not future.done():
-            future.set_exception(asyncio.TimeoutError("batch timed out"))
-    except Exception as exc:
-        logger.error(f"[BatchScorer] Batch failed: {exc} — using keyword scores")
-        if not future.done():
-            future.set_exception(exc)
-    finally:
-        async with _user_batch_lock:
-            _user_batch_in_flight.pop(user_id, None)
+            if not future.done():
+                future.set_result(True)
 
-    return jobs
+        except asyncio.TimeoutError:
+            logger.warning("[BatchScorer] Background: batch timed out after 5 min")
+            if not future.done():
+                future.set_exception(asyncio.TimeoutError("batch timed out"))
+        except Exception as exc:
+            logger.error(f"[BatchScorer] Background: batch failed: {exc}")
+            if not future.done():
+                future.set_exception(exc)
+        finally:
+            async with _user_batch_lock:
+                _user_batch_in_flight.pop(user_id, None)
+
+    # Launch background task — does NOT block the response
+    asyncio.create_task(_background_batch())
+
+    logger.info(f"[BatchScorer] Returning {cached_count} cached + {len(uncached)} keyword-only jobs (batch scoring in background)")
+    return jobs, False  # scoring_complete=False (batch still running)
