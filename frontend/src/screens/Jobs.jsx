@@ -6,7 +6,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchAggregatedJobs, searchUnifiedJobs, searchUnifiedMulti, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, createApplication, listAnalyses, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
@@ -421,10 +421,9 @@ export default function Jobs() {
       const searchLocation = profileLocation || 'Florida';
 
       try {
-        const data = await searchAggregatedJobs({
-          keyword: searchKeyword,
+        const data = await searchUnifiedMulti({
+          keywords: [searchKeyword],
           location: searchLocation,
-          page: 1,
         });
         // Filter recommendations to high-confidence, in-domain matches only:
         //   1. holt_score >= strong threshold (Strong Match floor — never recommend a stretch)
