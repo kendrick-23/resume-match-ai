@@ -177,10 +177,10 @@ async def search_jobs(
         try:
             scored, _ = await asyncio.wait_for(
                 _score_jobs(results.get("jobs", []), user),
-                timeout=330.0,
+                timeout=30.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/search] Scoring pipeline timed out after 330s")
+            logger.warning("[/jobs/search] Scoring pipeline timed out after 30s")
             scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
@@ -208,10 +208,10 @@ async def search_adzuna(
         try:
             scored, _ = await asyncio.wait_for(
                 _score_jobs(results.get("jobs", []), user),
-                timeout=330.0,
+                timeout=30.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/adzuna] Scoring pipeline timed out after 330s")
+            logger.warning("[/jobs/adzuna] Scoring pipeline timed out after 30s")
             scored = results.get("jobs", [])
         scored.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
         results["jobs"] = scored
@@ -262,10 +262,10 @@ async def search_aggregated(
         try:
             unique_jobs, _ = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
-                timeout=330.0,
+                timeout=30.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/aggregated] Scoring pipeline timed out after 330s")
+            logger.warning("[/jobs/aggregated] Scoring pipeline timed out after 30s")
 
         # Sort by Holt Score descending (best matches first)
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
@@ -351,10 +351,10 @@ async def search_unified(
         try:
             unique_jobs, _ = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
-                timeout=330.0,
+                timeout=30.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/unified] Scoring pipeline timed out after 330s")
+            logger.warning("[/jobs/unified] Scoring pipeline timed out after 30s")
 
         # Sort by Holt Score descending
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
@@ -438,10 +438,10 @@ async def search_unified_multi(
         try:
             unique_jobs, scoring_complete = await asyncio.wait_for(
                 _score_jobs(unique_jobs, user),
-                timeout=330.0,
+                timeout=30.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/unified-multi] Scoring pipeline timed out after 330s")
+            logger.warning("[/jobs/unified-multi] Scoring pipeline timed out after 30s")
             scoring_complete = False
 
         # Step 4: Sort and return

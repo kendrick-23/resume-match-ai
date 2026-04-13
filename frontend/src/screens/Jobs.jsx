@@ -499,7 +499,7 @@ export default function Jobs() {
     setCachedAt(null);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 360000); // 6 min — batch scoring takes 1-5 min
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s — backend returns immediately with cached + keyword scores
     profileAbortRef.current = controller;
 
     try {
