@@ -126,20 +126,36 @@ export default function Onboarding() {
                 onChange={(e) => setLocation(e.target.value)}
               />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                <input
-                  className="onboarding__input"
-                  type="number"
-                  placeholder="Min salary (e.g. 75000)"
-                  value={targetSalaryMin}
-                  onChange={(e) => setTargetSalaryMin(e.target.value)}
-                />
-                <input
-                  className="onboarding__input"
-                  type="number"
-                  placeholder="Max salary (e.g. 85000)"
-                  value={targetSalaryMax}
-                  onChange={(e) => setTargetSalaryMax(e.target.value)}
-                />
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                    color: 'var(--color-text-muted)', fontWeight: 600, fontSize: '15px', pointerEvents: 'none',
+                  }}>$</span>
+                  <input
+                    className="onboarding__input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Min (e.g. 75000)"
+                    value={targetSalaryMin}
+                    onChange={(e) => setTargetSalaryMin(e.target.value.replace(/[^0-9]/g, ''))}
+                    style={{ paddingLeft: 24 }}
+                  />
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                    color: 'var(--color-text-muted)', fontWeight: 600, fontSize: '15px', pointerEvents: 'none',
+                  }}>$</span>
+                  <input
+                    className="onboarding__input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Max (e.g. 85000)"
+                    value={targetSalaryMax}
+                    onChange={(e) => setTargetSalaryMax(e.target.value.replace(/[^0-9]/g, ''))}
+                    style={{ paddingLeft: 24 }}
+                  />
+                </div>
               </div>
             </div>
 

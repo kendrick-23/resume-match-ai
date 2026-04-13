@@ -197,7 +197,16 @@ export default function Tracker() {
         justifyContent: 'space-between',
         marginBottom: 'var(--space-5)',
       }}>
-        <h2>Tracker</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {applications.length > 0 && (
+            <img
+              src={celebrating ? '/ott/ott-celebrating.png' : '/ott/ott-encouraging.png'}
+              alt="Ott"
+              style={{ width: 40, height: 'auto' }}
+            />
+          )}
+          <h2>Tracker</h2>
+        </div>
         <Button variant="primary" onClick={() => setShowForm(true)}>
           <Plus size={18} /> Add
         </Button>

@@ -500,7 +500,7 @@ export default function Jobs() {
                 _applyResults(fedRefresh, pvtRefresh, loc);
               }
             }
-          } catch (err) { console.log('[Holt] Poll error:', err); }
+          } catch { /* poll error — retry next interval */ }
         }, 15000);
       }
 
@@ -636,13 +636,10 @@ export default function Jobs() {
         toast.warning("Running on cached intelligence today — results may be less specific.");
       }
 
-      console.log('[Holt] Initial response scoring_complete:', multiResult?.scoring_complete);
       if (multiResult.scoring_complete === false) {
         toast.info("Ott is analyzing your matches — scores will update automatically.");
-        // Poll for batch completion, then auto-refresh with semantic scores
         clearInterval(scoringPollRef.current);
         let attempts = 0;
-        console.log('[Holt] Starting polling — batch in progress');
         scoringPollRef.current = setInterval(async () => {
           attempts++;
           if (attempts > 20 || !isMountedRef.current) {
@@ -652,16 +649,14 @@ export default function Jobs() {
           }
           try {
             const status = await getScoringStatus();
-            console.log('[Holt] Poll attempt', attempts, '— status:', status?.scoring_complete);
             if (status.scoring_complete) {
               clearInterval(scoringPollRef.current);
               scoringPollRef.current = null;
               if (isMountedRef.current) {
-                console.log('[Holt] Auto-refresh triggered by polling');
                 handleProfileMatch(true);
               }
             }
-          } catch (err) { console.log('[Holt] Poll error:', err); }
+          } catch { /* poll error — retry next interval */ }
         }, 15000);
       }
 
@@ -962,12 +957,12 @@ export default function Jobs() {
         <Button
           full
           onClick={() => handleProfileMatch()}
-          disabled={fedLoading && pvtLoading}
+          disabled={fedLoading || pvtLoading}
           style={{ marginBottom: 0 }}
         >
           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-            <Ott state="idle" size={32} />
-            Find jobs that fit me
+            <Ott state={fedLoading || pvtLoading ? 'thinking' : 'idle'} size={32} />
+            {fedLoading || pvtLoading ? 'Finding your matches...' : 'Find jobs that fit me'}
           </span>
         </Button>
       )}

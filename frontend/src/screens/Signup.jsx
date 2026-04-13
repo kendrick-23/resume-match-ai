@@ -43,7 +43,8 @@ export default function Signup() {
   };
 
   return (
-    <div className="auth-screen" style={{ position: 'relative', overflow: 'hidden' }}>
+    <div className="auth-screen" style={{ position: 'relative', overflow: 'visible' }}>
+      <style>{`.auth-corner{width:80px}@media(min-width:481px){.auth-corner{width:120px}}`}</style>
       <div className="auth-screen__inner" style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <img
@@ -116,8 +117,8 @@ export default function Signup() {
         </p>
       </div>
       {/* Corner vegetation framing */}
-      <img src="/ott/ott-corner-left.png" alt="" aria-hidden="true" style={{ position: 'fixed', bottom: 60, left: 0, width: 120, pointerEvents: 'none', zIndex: 0, opacity: 0.85 }} />
-      <img src="/ott/ott-corner-right.png" alt="" aria-hidden="true" style={{ position: 'fixed', bottom: 60, right: 0, width: 120, pointerEvents: 'none', zIndex: 0, opacity: 0.85 }} />
+      <img src="/ott/ott-corner-left.png" alt="" aria-hidden="true" className="auth-corner" style={{ position: 'fixed', bottom: 60, left: 0, pointerEvents: 'none', zIndex: 2, opacity: 0.85 }} />
+      <img src="/ott/ott-corner-right.png" alt="" aria-hidden="true" className="auth-corner" style={{ position: 'fixed', bottom: 60, right: 0, pointerEvents: 'none', zIndex: 2, opacity: 0.85 }} />
     </div>
   );
 }
