@@ -1334,21 +1334,6 @@ export default function Results() {
         </>
       )}
 
-      {/* Corner vegetation framing */}
-      <img
-        src="/ott/ott-corner-left.png"
-        alt=""
-        aria-hidden="true"
-        className="results-corner"
-        style={{ position: 'fixed', bottom: 0, left: 0, pointerEvents: 'none', zIndex: 10, opacity: 0.85 }}
-      />
-      <img
-        src="/ott/ott-corner-right.png"
-        alt=""
-        aria-hidden="true"
-        className="results-corner"
-        style={{ position: 'fixed', bottom: 0, right: 0, pointerEvents: 'none', zIndex: 10, opacity: 0.85 }}
-      />
       </div>
     </ScreenWrapper>
   );
