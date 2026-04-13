@@ -662,6 +662,7 @@ Every gap returned by `/analyze` and the gap analyzer carries an effort tag:
 5. In-memory `_semantic_cache` TTL (24h) must outlast Supabase `job_search_cache` TTL (4h) — if Supabase cache expires, in-memory cache still serves.
 6. Domain penalties run as the LAST step before dealbreaker filter — semantic scorer must never override domain penalty caps.
 7. Backend startup: `cd backend && source venv/bin/activate && set -a && source .env && set +a && uvicorn app.main:app --reload --port 8000`
+8. When making changes to the scoring prompt or gate logic, increment the cache version prefix (`lite_v2` → `lite_v3` → etc.) in BOTH `semantic_score.py` and `batch_scorer.py` to invalidate stale cached scores. Then clear Supabase `job_search_cache` and restart the backend.
 
 ## Resilience Patterns (Non-Negotiable)
 

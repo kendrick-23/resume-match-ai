@@ -287,7 +287,7 @@ async def apply_batch_scores(
 
         # Write to in-memory cache (same key format as semantic_score.py)
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-        cache_key = f"lite_v1:{job_id}:{user_id}"
+        cache_key = f"lite_v2:{job_id}:{user_id}"
         _semantic_cache[cache_key] = (time.time(), result)
 
     return jobs
@@ -305,7 +305,7 @@ def _apply_cached_scores(jobs: list[dict], profile: dict, user_id: str) -> int:
         if kw_score < 55 or job.get("domain_penalized") or not _is_relevant_title(job.get("title") or ""):
             continue
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-        cache_key = f"lite_v1:{job_id}:{user_id}"
+        cache_key = f"lite_v2:{job_id}:{user_id}"
         if cache_key not in _semantic_cache:
             continue
         ts, cached = _semantic_cache[cache_key]
@@ -366,7 +366,7 @@ async def batch_semantic_rescore(
     uncached = []
     for job in eligible:
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-        cache_key = f"lite_v1:{job_id}:{user_id}"
+        cache_key = f"lite_v2:{job_id}:{user_id}"
         if cache_key in _semantic_cache:
             ts, _ = _semantic_cache[cache_key]
             if time.time() - ts < _CACHE_TTL:
