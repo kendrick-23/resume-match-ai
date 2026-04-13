@@ -28,6 +28,13 @@ from app.services.semantic_score import (
 )
 
 # ---------------------------------------------------------------------------
+# User-level batch deduplication — prevents 6 synonym queries from
+# submitting 6 separate batches for the same user.
+# ---------------------------------------------------------------------------
+_user_batch_in_flight: dict[str, asyncio.Future] = {}
+_user_batch_lock = asyncio.Lock()
+
+# ---------------------------------------------------------------------------
 # Prompt builder — reuses the candidate summary from semantic_score.py
 # ---------------------------------------------------------------------------
 
@@ -290,11 +297,51 @@ async def apply_batch_scores(
 # Main entry point — called from _score_jobs() in jobs.py
 # ---------------------------------------------------------------------------
 
+def _apply_cached_scores(jobs: list[dict], profile: dict, user_id: str) -> int:
+    """Apply any scores found in _semantic_cache to jobs. Returns count applied."""
+    applied = 0
+    for idx, job in enumerate(jobs):
+        kw_score = job.get("holt_score", 0)
+        if kw_score < 55 or job.get("domain_penalized") or not _is_relevant_title(job.get("title") or ""):
+            continue
+        job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
+        cache_key = f"lite_v1:{job_id}:{user_id}"
+        if cache_key not in _semantic_cache:
+            continue
+        ts, cached = _semantic_cache[cache_key]
+        if time.time() - ts >= _CACHE_TTL:
+            continue
+        # Apply gates then blend — same as apply_batch_scores but from cache
+        result = dict(cached)  # don't mutate the cached copy
+        result = _apply_gates(result, job, profile)
+        sem_score = result["score"]
+        blended = round(kw_score * 0.3 + sem_score * 0.7)
+        job["holt_score"] = max(0, min(100, blended))
+        job["holt_breakdown"]["semantic_score"] = sem_score
+        job["holt_breakdown"]["semantic_domain_alignment"] = result.get("domain_alignment")
+        job["holt_breakdown"]["reasoning"] = result.get("reasoning", "")
+        if sem_score >= 80:
+            job["coaching_label"] = "Strong match — Ott recommends applying"
+        elif sem_score >= 70:
+            job["coaching_label"] = "Good match — worth a closer look"
+        elif sem_score >= 55:
+            job["coaching_label"] = "Within Reach — close your skills gap"
+        elif result.get("domain_alignment", 50) < 25:
+            job["coaching_label"] = "Different specialization"
+        else:
+            job["coaching_label"] = "Growth opportunity"
+        applied += 1
+    return applied
+
+
 async def batch_semantic_rescore(
     jobs: list[dict], profile: dict, user_id: str
 ) -> list[dict]:
-    """Score eligible jobs via the Batch API. Full pipeline:
-    submit → poll → apply gates → blend → update coaching labels.
+    """Score eligible jobs via the Batch API with user-level deduplication.
+
+    If another synonym query already submitted a batch for this user,
+    await that batch's completion (which populates _semantic_cache),
+    then read scores from cache instead of submitting a duplicate batch.
 
     Falls back gracefully to keyword-only scores on any failure.
     """
@@ -308,57 +355,100 @@ async def batch_semantic_rescore(
     ]
 
     if not eligible:
-        logger.info("[BatchScorer] No eligible jobs for semantic scoring")
         return jobs
 
-    # Check in-memory cache — skip jobs already scored
+    # First pass — apply any scores already in cache
+    cached_count = _apply_cached_scores(jobs, profile, user_id)
+    if cached_count:
+        logger.info(f"[BatchScorer] {cached_count} jobs served from cache")
+
+    # Check if ALL eligible jobs are now scored
     uncached = []
-    cached_results: dict[str, dict] = {}
-    for idx, job in enumerate(eligible):
+    for job in eligible:
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
         cache_key = f"lite_v1:{job_id}:{user_id}"
         if cache_key in _semantic_cache:
-            ts, cached = _semantic_cache[cache_key]
+            ts, _ = _semantic_cache[cache_key]
             if time.time() - ts < _CACHE_TTL:
-                cached_results[_make_custom_id(job, jobs.index(job))] = cached
                 continue
         uncached.append(job)
-
-    if cached_results:
-        logger.info(f"[BatchScorer] {len(cached_results)} jobs served from cache")
-        await apply_batch_scores(jobs, cached_results, profile, user_id)
 
     if not uncached:
         return jobs
 
-    logger.info(f"[BatchScorer] Submitting {len(uncached)} uncached jobs to Batch API")
+    # --- User-level dedup: check if a batch is already in flight ---
+    existing_future = None
+    async with _user_batch_lock:
+        if user_id in _user_batch_in_flight:
+            existing_future = _user_batch_in_flight[user_id]
 
-    # Build a temporary list mapping for uncached jobs
-    batch_id = await submit_scoring_batch(uncached, profile, user_id)
-    if batch_id is None:
-        logger.warning("[BatchScorer] Batch submission failed — using keyword scores")
+    if existing_future is not None:
+        # Another query already submitted a batch — wait for it
+        logger.info(f"[BatchScorer] Batch already in flight for user {user_id[:8]}… — waiting")
+        try:
+            await asyncio.shield(existing_future)
+        except Exception:
+            pass  # batch may have failed, but cache might still have partial results
+        # Cache was populated by the first batch — apply to our jobs
+        applied = _apply_cached_scores(jobs, profile, user_id)
+        logger.info(f"[BatchScorer] Applied {applied} scores from shared batch cache")
         return jobs
 
+    # --- We're the first caller: create the future and submit ---
+    loop = asyncio.get_event_loop()
+    future: asyncio.Future = loop.create_future()
+    async with _user_batch_lock:
+        # Double-check: another coroutine may have raced us
+        if user_id in _user_batch_in_flight:
+            existing_future = _user_batch_in_flight[user_id]
+        else:
+            _user_batch_in_flight[user_id] = future
+
+    if existing_future is not None:
+        # Lost the race — fall back to waiting
+        try:
+            await asyncio.shield(existing_future)
+        except Exception:
+            pass
+        _apply_cached_scores(jobs, profile, user_id)
+        return jobs
+
+    # We own the batch — submit, poll, resolve
     try:
+        logger.info(f"[BatchScorer] Submitting {len(uncached)} uncached jobs to Batch API")
+        batch_id = await submit_scoring_batch(uncached, profile, user_id)
+        if batch_id is None:
+            logger.warning("[BatchScorer] Batch submission failed — using keyword scores")
+            return jobs
+
         batch_results = await poll_batch_until_done(batch_id, poll_interval=10, max_wait=300)
+
+        # Map batch results back and apply to jobs
+        uncached_results: dict[str, dict] = {}
+        for idx, job in enumerate(uncached):
+            cid = _make_custom_id(job, idx)
+            if cid in batch_results:
+                full_idx = jobs.index(job)
+                full_cid = _make_custom_id(job, full_idx)
+                uncached_results[full_cid] = batch_results[cid]
+
+        if uncached_results:
+            await apply_batch_scores(jobs, uncached_results, profile, user_id)
+
+        # Resolve the shared future so other callers proceed
+        if not future.done():
+            future.set_result(True)
+
     except asyncio.TimeoutError:
-        logger.warning(f"[BatchScorer] Batch {batch_id} timed out after 5 min — using keyword scores")
-        return jobs
+        logger.warning(f"[BatchScorer] Batch timed out after 5 min — using keyword scores")
+        if not future.done():
+            future.set_exception(asyncio.TimeoutError("batch timed out"))
     except Exception as exc:
-        logger.error(f"[BatchScorer] Polling failed: {exc} — using keyword scores")
-        return jobs
-
-    # Map batch results back — uncached jobs use their own indices
-    uncached_results: dict[str, dict] = {}
-    for idx, job in enumerate(uncached):
-        cid = _make_custom_id(job, idx)
-        if cid in batch_results:
-            # Remap to the index in the full jobs list
-            full_idx = jobs.index(job)
-            full_cid = _make_custom_id(job, full_idx)
-            uncached_results[full_cid] = batch_results[cid]
-
-    if uncached_results:
-        await apply_batch_scores(jobs, uncached_results, profile, user_id)
+        logger.error(f"[BatchScorer] Batch failed: {exc} — using keyword scores")
+        if not future.done():
+            future.set_exception(exc)
+    finally:
+        async with _user_batch_lock:
+            _user_batch_in_flight.pop(user_id, None)
 
     return jobs
