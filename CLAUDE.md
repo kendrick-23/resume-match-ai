@@ -612,44 +612,76 @@ Every gap returned by `/analyze` and the gap analyzer carries an effort tag:
 - **Gap analyzer**: Sends FULL skill list (was top 10) and FULL JD (1500 chars, was 400). Each gap is tagged with `effort` (easy/months/years) and an `effort_note`. Receives `target_roles` so it doesn't flag misaligned skills as gaps.
 - **Job enrichment**: Refusal path — if the JD has fewer than 20 words, return original unchanged. Do NOT manufacture requirements out of nothing. Enriched content is tagged `[ENRICHED]` so downstream scorers can weight it lower. The model can also explicitly return `NOT_ENOUGH_INFO` and we honor it. Company name is used as an anchor.
 
-## AI Scoring Pipeline (Job Search)
+## AI Scoring Pipeline (Job Search) — Current as of Apr 12 2026
 
-The job search scoring pipeline lives in `backend/app/routes/jobs.py::_score_jobs()` and runs in this exact order:
+### Pipeline entry point: `GET /jobs/unified-multi`
+- Accepts comma-separated keywords, fetches from 4 sources in parallel (USAJobs, Adzuna, JobSpy, Jooble)
+- Global dedup via `_normalize_dedup_key(title, company)` before scoring — strips suffixes, subsidiaries, punctuation
+- Calls `_score_jobs()` ONCE on all deduplicated jobs
+- Results cached in Supabase `job_search_cache` (4h TTL) and sessionStorage `holt_profile_match_cache` (30min TTL)
 
-1. **Enrich** (`services/enrich.py`) — Claude Haiku expands sparse job descriptions (<300 chars but ≥20 words) into ~100-word requirement summaries. **Refuses** if JD is empty or under 20 words. Only runs on jobs with relevant operations/management titles. Tags enriched content with `[ENRICHED]`. Results cached 24h. Parallel via `asyncio.Semaphore(5)`.
-2. **Profile + analysis fetch** — ONE Supabase client fetches both `profiles` and latest `analyses` row. Never split into multiple clients (avoids connection pool exhaustion).
-3. **Keyword scoring** (`services/holt_score.py`) — Deterministic 6-dimension scoring: skills, salary, schedule, experience, location, degree. Sets `domain_penalized` flag for fundamentally mismatched roles (e.g., physician for an ops candidate).
-4. **Semantic re-scoring** (`services/semantic_score.py`) — Claude Haiku scores 0–100 for jobs with `holt_score >= 55`, relevant titles, and NOT domain-penalized. Blends `final = keyword * 0.3 + semantic * 0.7`. Receives FULL profile + 1500 chars of JD. Career trajectory has anchor points. Reasoning must cite specific text. Results cached 24h. Parallel via semaphore. Receives `profile` as a parameter — never fetches it itself.
-5. **Gap analysis** (`services/gap_analyzer.py`) — Claude Haiku identifies 2–3 effort-tagged gaps per "Within Reach" job (50–69% score). Receives FULL `user_skills`, 1500 chars of JD, and `target_roles`. Each gap returned with `effort` (easy/months/years) and an `effort_note`. Results cached 24h.
-6. **Domain penalty enforcement (FINAL, bulletproof)** — Caps `holt_score` at 15% for any `domain_penalized` job. This step runs LAST so semantic re-scoring can never override it. Sets `coaching_label = "Different specialization"`.
+### `_score_jobs()` pipeline (`backend/app/routes/jobs.py`):
+1. **Profile + analysis fetch** — ONE Supabase client fetches both `profiles` and latest `analyses` row. Never split into multiple clients.
+2. **Keyword scoring** (`services/holt_score.py`) — Deterministic 6-dimension scoring: skills (35%), salary (20%), schedule (15%), experience (15%), location (10%), degree (qualitative). Sets `domain_penalized` flag for mismatched roles.
+3. **Domain penalties** — Licensed professions (physician, nurse, attorney, etc.), vocational triggers (CDL, linen bagger, team member), defense SpecOps, industrial triggers (dewatering, submergent, heavy equipment). Caps `holt_score` at 15%.
+4. **Salary-floor enforcement** — Caps at 25% for jobs paying >25% below stated minimum.
+5. **Dealbreaker filter** — Removes jobs where `dealbreaker_triggered=True` (salary below min, outside commute range, degree required). Server-side hard filter — these jobs never reach the frontend.
+6. **Batch semantic scoring** (`services/batch_scorer.py`) — Single Anthropic Batch API call for all eligible jobs (kw_score >= 55, not domain-penalized, relevant title words).
+7. **Gap analysis** (`services/gap_analyzer.py`) — Claude Haiku identifies 2-3 effort-tagged gaps per Within Reach job (45-69%). Receives `target_roles` and `current_title`.
+8. **FINAL domain penalty enforcement** — Caps `holt_score` at 15% for any `domain_penalized` job. Runs LAST so semantic scoring can never override it.
 
-### Token Budget Guardrail
-`services/token_budget.py` enforces `HAIKU_DAILY_TOKEN_LIMIT`. Every Haiku call (`enrich`, `semantic_score`, `gap_analyzer`) gates on `check_budget(estimate_tokens(prompt))` and returns its safe fallback (original description / `None` / `[]`) when the budget is exhausted. This prevents runaway costs from a hot search.
+### Batch Scoring (`backend/app/services/batch_scorer.py`):
+- Uses Anthropic Batch API (`client.messages.batches`) — no rate limits, 50% cheaper than real-time
+- User-level dedup via `asyncio.Future` — only ONE batch per `user_id` at a time. Other parallel calls await the in-flight future and read from shared `_semantic_cache`
+- Lite prompt: returns `score` (0-100) + `domain_alignment` (0-100), ~464 tokens per job
+- Server-side caps applied BEFORE domain gate:
+  * Construction companies (Wharton Smith, Hoar, Toll Brothers, Skanska, etc.) → `domain_alignment` capped at 30
+  * Marketing titles (marketing manager, marketing coordinator) → `domain_alignment` capped at 30
+  * Development review titles → `domain_alignment` capped at 30
+  * Financial services + EMS/fire rescue context → `domain_alignment` capped at 35
+  * Coordinator/specialist vs manager seniority → `score` capped at 55
+- Domain gate applied AFTER caps:
+  * `domain_alignment < 45` → composite capped at 25
+  * `domain_alignment 45-59` → composite capped at 58
+  * `domain_alignment >= 60` → no cap
+- Final blend: `keyword * 0.3 + semantic * 0.7`
 
-### Parallelism
-All three Haiku stages use `asyncio.gather` with `asyncio.Semaphore(5)` to cap concurrent Anthropic API calls.
+### Token Budget
+`services/token_budget.py` enforces `HAIKU_DAILY_TOKEN_LIMIT` (600k default). Every Haiku call gates on `check_budget(estimate_tokens(prompt))` and returns its safe fallback when exhausted.
 
 ### Caching
-- **In-memory module caches** (24h TTL) inside each service for repeated job titles within a process.
-- **Supabase `job_search_cache` table** caches the entire scored result set for 4h per `(user_id, cache_key)`. Cuts repeat searches to a single DB read with zero Haiku spend. RLS-enforced per user.
+- **In-memory `_semantic_cache`** (24h TTL) inside `semantic_score.py` — shared by both `batch_scorer.py` and `semantic_score.py`
+- **Supabase `job_search_cache` table** — 4h TTL per `(user_id, cache_key)`. Frontend checks this before hitting the backend.
+- **sessionStorage `holt_profile_match_cache`** — 30min TTL. Synchronous client-side cache updated after every fetch/refresh.
+
+### Critical Invariants (things that must never be broken)
+1. `batch_scorer.py` and `semantic_score.py` must have IDENTICAL server-side cap logic — when updating one, always update the other.
+2. The Batch API call must remain ONE per user — never call `batch_semantic_rescore()` multiple times for the same `user_id` simultaneously.
+3. Enrichment is DISABLED — `enrich_jobs_batch()` is commented out in `jobs.py`. Do not re-enable without eliminating real-time Haiku RPM bottleneck.
+4. `/jobs/aggregated` is NOT called from the frontend — Ott Recommends uses `searchUnifiedMulti()`.
+5. In-memory `_semantic_cache` TTL (24h) must outlast Supabase `job_search_cache` TTL (4h) — if Supabase cache expires, in-memory cache still serves.
+6. Domain penalties run as the LAST step before dealbreaker filter — semantic scorer must never override domain penalty caps.
+7. Backend startup: `cd backend && source venv/bin/activate && set -a && source .env && set +a && uvicorn app.main:app --reload --port 8000`
 
 ## Resilience Patterns (Non-Negotiable)
 
-These patterns exist because of a real auth-corruption incident where a hung scoring pipeline broke every other screen until refresh. Do not regress.
-
 ### Backend
-- **Pipeline hard timeout:** Every job search route wraps `_score_jobs()` in `asyncio.wait_for(timeout=30.0)`. On `TimeoutError`, the route returns whatever jobs were fetched (unscored or partially scored) instead of hanging. Applies to `/jobs/search`, `/jobs/adzuna`, `/jobs/aggregated`.
-- **Single profile fetch:** `_score_jobs()` creates ONE Supabase client and reuses it for both profile + analyses queries. Downstream functions (`semantic_rescore_batch`, `analyze_gaps_batch`) receive profile/skills as parameters — they MUST NOT fetch their own Supabase session. Multiple parallel sessions exhaust the connection pool and corrupt auth state.
-- **Per-stage try/except:** Each stage in `_score_jobs()` is wrapped so a single failure (e.g., Haiku timeout) does not abort the rest of the pipeline.
+- **Pipeline hard timeout:** Every job search route wraps `_score_jobs()` in `asyncio.wait_for(timeout=330.0)`. On `TimeoutError`, the route returns whatever jobs were fetched (keyword-scored but not semantically scored) instead of hanging.
+- **Single profile fetch:** `_score_jobs()` creates ONE Supabase client and reuses it for both profile + analyses queries. Downstream functions receive profile/skills as parameters — they MUST NOT fetch their own Supabase session.
+- **Per-stage try/except:** Each stage in `_score_jobs()` is wrapped so a single failure does not abort the rest of the pipeline.
+- **Batch graceful fallback:** If batch submission fails, polling times out, or results can't be read, jobs retain keyword-only scores. No crash.
 
 ### Frontend
-- **`finally` blocks always reset loading state:** Long-running async handlers (e.g., `Jobs.jsx::handleProfileMatch`) MUST reset every loading flag (`profileMatchLoading`, `fedLoading`, `pvtLoading`) inside `finally`, regardless of success / error / timeout. Stuck loading flags block subsequent requests.
-- **45s `AbortController` timeout:** `handleProfileMatch` creates an `AbortController` with a 45s `setTimeout(() => controller.abort(), 45000)`. On abort, it shows Ott in `coaching` state with "Search took too long — try again or use keyword search instead" and a Try Again button. Cleaned up in unmount effect.
-- **Loading screen hard timeouts:** Screens that fetch on mount (e.g., `Results.jsx::loadAnalyses`) wrap their loading state in an 8s safety `setTimeout(() => setLoading(false), 8000)`. The empty state must always be reachable — never an infinite spinner.
+- **`finally` blocks always reset loading state:** `handleProfileMatch` MUST reset every loading flag inside `finally`, regardless of success / error / timeout.
+- **6-minute `AbortController` timeout:** `handleProfileMatch` creates an `AbortController` with `setTimeout(() => controller.abort(), 360000)`. On abort, shows Ott coaching state with retry button.
+- **Loading screen hard timeouts:** Screens that fetch on mount wrap their loading state in safety timeouts. The empty state must always be reachable.
 
 ## Known Issues
 
-- **Profile screen empty fields (UNRESOLVED).** Nicole's profile data is confirmed populated in Supabase, but the Profile screen displays empty fields. Audited every read/write site (`Profile.jsx`, `Onboarding.jsx`, `HeaderSettingsMenu.jsx`, `Jobs.jsx`, `backend/app/routes/profile.py`, `add_profile_enriched_columns.sql`) — column names match correctly across the entire stack. There is NO column-name mismatch to fix. **Next debugging step:** check the browser DevTools Network tab during profile load — does `GET /profile` return 200 with Nicole's populated row or an empty object? If populated, the bug is in frontend rendering. If empty, the bug is backend query / RLS / auto-create logic in `profile.py::get_profile()`.
+- **Profile screen empty fields (UNRESOLVED).** Nicole's profile data is confirmed populated in Supabase, but the Profile screen displays empty fields. No column-name mismatch found. **Next step:** check DevTools Network tab during profile load.
+- **Stale cache after scoring changes.** After any change to scoring logic, ALL three cache layers must be cleared: (1) restart backend to clear `_semantic_cache`, (2) `DELETE FROM job_search_cache` in Supabase, (3) clear browser sessionStorage. Without this, old scores persist for hours.
+- **Adzuna 429 errors during fetching.** Adzuna's own API rate limits occasionally fire. These are handled gracefully — other sources still return results.
+- **Glassdoor via JobSpy always returns 400** for Casselberry FL queries. Expected behavior, ignored.
 
 ## Phase Roadmap (For Context Only — Build in Order)
 
@@ -663,5 +695,5 @@ These patterns exist because of a real auth-corruption incident where a hung sco
 
 ---
 
-*Last updated: April 2026*
+*Last updated: April 12 2026*
 *Maintained by: Chris (kendrick-23)*
