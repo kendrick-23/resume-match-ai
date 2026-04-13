@@ -325,10 +325,11 @@ export default function Jobs() {
       return () => { profileAbortRef.current?.abort(); };
     }
     loadRecommendations();
-    // Auto-trigger search if restoring from sessionStorage (inputs only, no results)
+    // Auto-trigger search if restoring from sessionStorage (inputs only, no results).
+    // keyword + location are already initialized from saved state (line 203-204),
+    // so handleSearch() will pick them up.
     if (saved?.keyword) {
-      searchFederal(saved.keyword, saved.location || '', 1);
-      searchPrivate(saved.keyword, saved.location || '');
+      handleSearch();
       setRestoredSearch(false);
     }
     return () => { profileAbortRef.current?.abort(); };
@@ -454,9 +455,67 @@ export default function Jobs() {
     // Persist search state
     saveSearch({ keyword: kw, location: loc, remoteOnly, activeTab });
 
-    // Search both sources, cache results
-    searchFederal(kw, loc, 1);
-    searchPrivate(kw, loc);
+    // Route through unified-multi so keyword searches get Holt scoring,
+    // dedup, and results from all 4 sources — same as profile match.
+    setFedLoading(true);
+    setFedError('');
+    setPvtLoading(true);
+
+    try {
+      const result = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
+      if (!isMountedRef.current) return;
+
+      const allJobs = result.jobs || [];
+      setUnifiedJobs(allJobs);
+
+      if (result.degraded) {
+        toast.warning("Running on cached intelligence today — results may be less specific.");
+      }
+
+      // Poll for batch completion if semantic scoring is still in progress
+      if (result.scoring_complete === false) {
+        toast.info("Ott is analyzing your matches — scores will update automatically.");
+        clearInterval(scoringPollRef.current);
+        let attempts = 0;
+        scoringPollRef.current = setInterval(async () => {
+          attempts++;
+          if (attempts > 20 || !isMountedRef.current) {
+            clearInterval(scoringPollRef.current);
+            scoringPollRef.current = null;
+            return;
+          }
+          try {
+            const status = await getScoringStatus();
+            if (status.scoring_complete) {
+              clearInterval(scoringPollRef.current);
+              scoringPollRef.current = null;
+              if (isMountedRef.current) {
+                // Re-fetch with fresh scores
+                const refreshed = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
+                if (!isMountedRef.current) return;
+                const refreshedJobs = refreshed.jobs || [];
+                setUnifiedJobs(refreshedJobs);
+                const fedRefresh = refreshedJobs.filter((j) => j.source === 'usajobs');
+                const pvtRefresh = refreshedJobs.filter((j) => j.source !== 'usajobs');
+                _applyResults(fedRefresh, pvtRefresh, loc);
+              }
+            }
+          } catch (err) { console.log('[Holt] Poll error:', err); }
+        }, 15000);
+      }
+
+      const fedMerged = allJobs.filter((j) => j.source === 'usajobs');
+      const pvtMerged = allJobs.filter((j) => j.source !== 'usajobs');
+      _applyResults(fedMerged, pvtMerged, loc);
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setFedError(err.message);
+    } finally {
+      if (isMountedRef.current) {
+        setFedLoading(false);
+        setPvtLoading(false);
+      }
+    }
   }
 
   function _applyResults(fedMerged, pvtMerged, loc, cached = null) {
@@ -660,12 +719,6 @@ export default function Jobs() {
     // Persist tab choice
     if (keyword.trim()) {
       saveSearch({ keyword: keyword.trim(), location: location.trim(), remoteOnly, activeTab: tab });
-    }
-    // If switching to private and no results yet, auto-search
-    if (tab === 'private' && !pvtSearched && !pvtLoading) {
-      const kw = keyword.trim() || analysisRoleName;
-      const loc = location.trim() || userLocation;
-      if (kw) searchPrivate(kw, loc);
     }
   }
 
@@ -1048,8 +1101,7 @@ export default function Jobs() {
               clearPageState();
               setRestoredFromPageState(false);
               if (keyword.trim()) {
-                searchFederal(keyword.trim(), location.trim(), 1);
-                searchPrivate(keyword.trim(), location.trim());
+                handleSearch();
               } else {
                 clearInterval(scoringPollRef.current);
                 scoringPollRef.current = null;
