@@ -36,11 +36,15 @@ def _user_sb(user: dict):
 
 async def _score_jobs(jobs: list, user: dict) -> list:
     """Enrich sparse descriptions then score using the 6-dimension Holt Score engine."""
-    # Step 1: Enrich sparse job descriptions with Claude Haiku
-    try:
-        await enrich_jobs_batch(jobs)
-    except Exception as exc:
-        logger.error(f"[Enrich] Batch enrichment failed: {exc}")
+    # Step 1: JD enrichment DISABLED — the batch semantic scorer reads
+    # sparse JDs directly and infers context from the title + company.
+    # Enrichment was designed for the old keyword scorer which needed
+    # dense text for substring matching. Removing this eliminates all
+    # real-time Haiku calls during job fetching.
+    # try:
+    #     await enrich_jobs_batch(jobs)
+    # except Exception as exc:
+    #     logger.error(f"[Enrich] Batch enrichment failed: {exc}")
 
     # Step 2: Fetch profile + analysis data with a SINGLE Supabase client
     profile = {}
