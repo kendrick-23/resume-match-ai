@@ -88,7 +88,7 @@ def _build_candidate_summary(profile: dict) -> str:
 
 def _cache_key(job: dict, user_id: str) -> str:
     job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-    return f"lite_v2:{job_id}:{user_id}"
+    return f"lite_v4:{job_id}:{user_id}"
 
 
 async def semantic_rescore(job: dict, profile: dict, user_id: str) -> Optional[dict]:

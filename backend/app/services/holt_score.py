@@ -345,6 +345,23 @@ def calculate_holt_score(
         ops_bonus = min(20, ops_keyword_count * 3)
         skills_match = min(100, skills_match + ops_bonus)
 
+    # Adzuna category-based domain penalty — fires FIRST, before any keyword
+    # checks. Adzuna pre-classifies every job; wrong-domain categories get
+    # penalized automatically. Only Adzuna jobs have this field — Indeed,
+    # Jooble, USAJobs will have adzuna_category="" and fall through.
+    _ADZUNA_DOMAIN_PENALTY_CATEGORIES = {
+        "trade-construction-jobs",
+        "healthcare-nursing-jobs",
+        "retail-jobs",
+        "domestic-help-cleaning-jobs",
+        "maintenance-jobs",
+        "manufacturing-jobs",
+    }
+    adzuna_cat = job.get("adzuna_category", "")
+    if not domain_penalty_applied and adzuna_cat in _ADZUNA_DOMAIN_PENALTY_CATEGORIES:
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
     # Vocational/trade role exclusion — these roles require specific
     # certifications or physical skills unrelated to ops/training/compliance.
     # Same cap as domain penalty (15%). Runs after the ops bonus so it

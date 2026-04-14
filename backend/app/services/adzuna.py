@@ -83,6 +83,7 @@ def _normalize(raw: dict) -> dict:
             "apply_url": item.get("redirect_url", ""),
             "description": item.get("description", ""),
             "source": "adzuna",
+            "adzuna_category": (item.get("category") or {}).get("tag", ""),
         })
 
     return {
