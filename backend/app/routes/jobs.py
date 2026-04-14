@@ -441,6 +441,13 @@ async def search_unified_multi(
 
         logger.info(f"[/jobs/unified-multi] {len(unique_jobs)} unique jobs after global dedup")
 
+        # Temporary debug: inspect raw descriptions for domain trigger diagnosis
+        for job in unique_jobs:
+            company = (job.get("company") or "").lower()
+            title = (job.get("title") or "").lower()
+            if any(x in company or x in title for x in ["50floor", "westbrook", "odorzx", "british swim", "orlando health", "cph", "empreus", "security specialist"]):
+                logger.info(f"[DEBUG] {job.get('company')} | {job.get('title')} | desc: {(job.get('description') or '')[:400]}")
+
         # Step 3: Score ALL jobs ONCE (single batch submission)
         scoring_complete = True
         try:
