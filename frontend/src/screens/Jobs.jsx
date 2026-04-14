@@ -469,7 +469,6 @@ export default function Jobs() {
 
     try {
       const result = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
-      if (!isMountedRef.current) return;
 
       const allJobs = result.jobs || [];
       setUnifiedJobs(allJobs);
@@ -495,16 +494,13 @@ export default function Jobs() {
             if (status.scoring_complete) {
               clearInterval(scoringPollRef.current);
               scoringPollRef.current = null;
-              if (isMountedRef.current) {
-                // Re-fetch with fresh scores
-                const refreshed = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
-                if (!isMountedRef.current) return;
-                const refreshedJobs = refreshed.jobs || [];
-                setUnifiedJobs(refreshedJobs);
-                const fedRefresh = refreshedJobs.filter((j) => j.source === 'usajobs');
-                const pvtRefresh = refreshedJobs.filter((j) => j.source !== 'usajobs');
-                _applyResults(fedRefresh, pvtRefresh, loc);
-              }
+              // Re-fetch with fresh scores
+              const refreshed = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
+              const refreshedJobs = refreshed.jobs || [];
+              setUnifiedJobs(refreshedJobs);
+              const fedRefresh = refreshedJobs.filter((j) => j.source === 'usajobs');
+              const pvtRefresh = refreshedJobs.filter((j) => j.source !== 'usajobs');
+              _applyResults(fedRefresh, pvtRefresh, loc);
             }
           } catch { /* poll error — retry next interval */ }
         }, 15000);
@@ -514,13 +510,10 @@ export default function Jobs() {
       const pvtMerged = allJobs.filter((j) => j.source !== 'usajobs');
       _applyResults(fedMerged, pvtMerged, loc);
     } catch (err) {
-      if (!isMountedRef.current) return;
       setFedError(err.message);
     } finally {
-      if (isMountedRef.current) {
-        setFedLoading(false);
-        setPvtLoading(false);
-      }
+      setFedLoading(false);
+      setPvtLoading(false);
     }
   }
 
