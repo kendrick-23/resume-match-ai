@@ -469,9 +469,11 @@ export default function Jobs() {
 
     try {
       const result = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
+      console.log('[handleSearch] Response received:', result?.jobs?.length, 'jobs, scoring_complete:', result?.scoring_complete);
       if (!isMountedRef.current) return;
 
       const allJobs = result.jobs || [];
+      console.log('[handleSearch] Setting unifiedJobs:', allJobs.length);
       setUnifiedJobs(allJobs);
 
       if (result.degraded) {
@@ -506,14 +508,17 @@ export default function Jobs() {
                 _applyResults(fedRefresh, pvtRefresh, loc);
               }
             }
-          } catch { /* poll error — retry next interval */ }
+          } catch (pollErr) { console.error('[handleSearch] Poll error:', pollErr); }
         }, 15000);
       }
 
       const fedMerged = allJobs.filter((j) => j.source === 'usajobs');
       const pvtMerged = allJobs.filter((j) => j.source !== 'usajobs');
+      console.log('[handleSearch] Calling _applyResults: fed:', fedMerged.length, 'pvt:', pvtMerged.length);
       _applyResults(fedMerged, pvtMerged, loc);
+      console.log('[handleSearch] _applyResults complete');
     } catch (err) {
+      console.error('[handleSearch] ERROR:', err);
       if (!isMountedRef.current) return;
       setFedError(err.message);
     } finally {
