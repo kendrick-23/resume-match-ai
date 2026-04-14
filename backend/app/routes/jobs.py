@@ -456,6 +456,10 @@ async def search_unified_multi(
                 if job.get("domain_penalized"):
                     job["holt_score"] = min(job.get("holt_score", 0), DOMAIN_PENALTY_CAP)
                     job["coaching_label"] = "Different specialization"
+            for job in unique_jobs:
+                if job.get("salary_floor_violation") and not job.get("domain_penalized"):
+                    job["holt_score"] = min(job.get("holt_score", 0), SALARY_FLOOR_CAP)
+                    job["coaching_label"] = "Below your salary range"
             unique_jobs = [j for j in unique_jobs if not j.get("dealbreaker_triggered")]
 
         # Step 4: Sort and return
