@@ -410,6 +410,65 @@ def calculate_holt_score(
             skills_match = min(skills_match, 10)
             domain_penalty_applied = True
 
+    # Landscaping/outdoor services — "Operations Manager" at a landscaping
+    # company means managing lawn crews, not corporate operations.
+    _LANDSCAPING_TRIGGERS = [
+        "landscaping", "lawn care", "lawn mowing", "grounds maintenance",
+        "irrigation systems", "turf management", "outdoor services",
+    ]
+    if not domain_penalty_applied and any(
+        lt in job_desc or lt in job_company for lt in _LANDSCAPING_TRIGGERS
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Erosion/environmental construction — description signals that indicate
+    # field construction work even when the title looks like generic ops.
+    _EROSION_CONSTRUCTION_TRIGGERS = [
+        "erosion control", "silt fence", "sediment control",
+        "stormwater management", "earthwork", "grading contractor",
+        "soil stabilization",
+    ]
+    if not domain_penalty_applied and any(
+        ec in job_desc for ec in _EROSION_CONSTRUCTION_TRIGGERS
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Installation/flooring trades — coordinator roles at flooring, HVAC, or
+    # home improvement companies that require trades knowledge.
+    _INSTALLATION_TRADES_TRIGGERS = [
+        "flooring installation", "hardwood installation", "carpet installation",
+        "tile installation", "in-home measurement", "installation coordinator",
+    ]
+    if not domain_penalty_applied and any(
+        it in job_desc for it in _INSTALLATION_TRADES_TRIGGERS
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Housekeeping/custodial management — title triggers for facility cleaning
+    # roles that use "operations manager" in the title but are custodial work.
+    _HOUSEKEEPING_TITLE_TRIGGERS = [
+        "housekeeping manager", "housekeeping operations",
+        "custodial manager", "custodial operations manager",
+        "janitorial manager",
+    ]
+    if not domain_penalty_applied and any(ht in job_title for ht in _HOUSEKEEPING_TITLE_TRIGGERS):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Revenue/yield management — soft demotion (not full penalty).
+    # These are finance/analytics roles that share the word "inventory" or
+    # "manager" with ops but require pricing/revenue optimization skills.
+    _REVENUE_MGMT_SIGNALS = [
+        "revenue management", "yield management", "pricing strategy",
+    ]
+    if not domain_penalty_applied and any(
+        rm in job_title or rm in job_desc for rm in _REVENUE_MGMT_SIGNALS
+    ):
+        skills_match = min(skills_match, 30)
+
     # Military/defense "Special Operations" exclusion — "special operations" at
     # defense contractors (CACI, Booz Allen, etc.) refers to military SpecOps
     # support, not business operations. Only penalize when the company name or
