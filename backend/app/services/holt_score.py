@@ -368,6 +368,48 @@ def calculate_holt_score(
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
 
+    # Retail clothing companies — Nicole targets corporate ops, not retail floor mgmt.
+    # These companies almost exclusively hire for in-store roles when they appear
+    # in job aggregators. Store Manager at Hollister ≠ Operations Manager.
+    _RETAIL_CLOTHING_COMPANIES = [
+        "hollister", "abercrombie", "h&m", "zara", "gap inc", "old navy",
+        "forever 21", "american eagle", "aeropostale", "hot topic",
+        "express", "banana republic", "victoria's secret", "bath & body works",
+    ]
+    if not domain_penalty_applied and any(rc in job_company for rc in _RETAIL_CLOTHING_COMPANIES):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Military enlistment/active duty — Nicole is a civilian job seeker, not
+    # enlisting. "HR Officer" at Navy Reserve means military service, not corporate HR.
+    _MILITARY_ENLISTMENT_SIGNALS = [
+        "enlist", "active duty", "navy reserve", "army reserve",
+        "air force reserve", "marine reserve", "coast guard reserve",
+        "drill weekend", "deployment", "aboard ships", "military service",
+        "national guard", "commissioned officer",
+    ]
+    if not domain_penalty_applied and any(
+        ms in job_desc or ms in job_company for ms in _MILITARY_ENLISTMENT_SIGNALS
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Construction superintendent/foreman titles — require construction trade
+    # experience that doesn't transfer from hospitality/retail ops.
+    _CONSTRUCTION_TITLE_TRIGGERS = [
+        "superintendent", "project foreman", "site foreman",
+        "construction foreman", "general foreman",
+    ]
+    if not domain_penalty_applied and any(ct in job_title for ct in _CONSTRUCTION_TITLE_TRIGGERS):
+        # Only penalize if the company/description is actually construction
+        _CONSTRUCTION_CONTEXT = [
+            "construction", "general contractor", "build", "subcontract",
+            "concrete", "steel", "framing", "roofing", "plumbing",
+        ]
+        if any(cc in job_company or cc in job_desc for cc in _CONSTRUCTION_CONTEXT):
+            skills_match = min(skills_match, 10)
+            domain_penalty_applied = True
+
     # Military/defense "Special Operations" exclusion — "special operations" at
     # defense contractors (CACI, Booz Allen, etc.) refers to military SpecOps
     # support, not business operations. Only penalize when the company name or

@@ -34,7 +34,7 @@ def get_model() -> SentenceTransformer:
 # These are the terms BM25 uses to find keyword matches in job descriptions
 NICOLE_BM25_KEYWORDS = [
     "operations", "manager", "training", "assistant", "general", "manager",
-    "team", "leadership", "staff", "scheduling", "inventory", "compliance",
+    "team", "leadership", "staff", "inventory",
     "customer", "experience", "vendor", "onboarding", "workforce", "development",
     "restaurant", "hospitality", "food", "service", "P&L", "budget",
     "coordinator", "supervisor", "process", "improvement", "KPI",
