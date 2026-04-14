@@ -375,8 +375,15 @@ def calculate_holt_score(
         "hollister", "abercrombie", "h&m", "zara", "gap inc", "old navy",
         "forever 21", "american eagle", "aeropostale", "hot topic",
         "express", "banana republic", "victoria's secret", "bath & body works",
+        "buckle",
     ]
-    if not domain_penalty_applied and any(rc in job_company for rc in _RETAIL_CLOTHING_COMPANIES):
+    _RETAIL_CLOTHING_DESC_TRIGGERS = [
+        "apparel", "clothing store", "fashion retail", "retail clothing",
+    ]
+    if not domain_penalty_applied and (
+        any(rc in job_company for rc in _RETAIL_CLOTHING_COMPANIES)
+        or any(rd in job_desc for rd in _RETAIL_CLOTHING_DESC_TRIGGERS)
+    ):
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
 
@@ -418,6 +425,18 @@ def calculate_holt_score(
         if any(cc in job_company or cc in job_desc for cc in _CONSTRUCTION_CONTEXT):
             skills_match = min(skills_match, 10)
             domain_penalty_applied = True
+
+    # Construction description standalone — catches "Construction Operations
+    # Director" or any title when the description is clearly construction work.
+    _CONSTRUCTION_DESC_STANDALONE = [
+        "general contractor", "subcontractor", "construction site",
+        "building construction",
+    ]
+    if not domain_penalty_applied and any(
+        cs in job_desc for cs in _CONSTRUCTION_DESC_STANDALONE
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
 
     # Landscaping/outdoor services — "Operations Manager" at a landscaping
     # company means managing lawn crews, not corporate operations.
@@ -468,6 +487,29 @@ def calculate_holt_score(
     ]
     if not domain_penalty_applied and any(
         it in job_desc for it in _INSTALLATION_TRADES_TRIGGERS
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # HVAC/mechanical contractor — "HVAC Operations Manager" requires trade
+    # knowledge (refrigeration, ductwork, EPA certs) unrelated to hospitality ops.
+    _HVAC_TRIGGERS = [
+        "hvac", "air conditioning installation", "mechanical contractor",
+        "heating systems", "refrigeration", "plumbing contractor",
+    ]
+    if not domain_penalty_applied and any(
+        hv in job_desc or hv in job_title for hv in _HVAC_TRIGGERS
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Tax preparation / seasonal office — seasonal tax roles at H&R Block etc.
+    # are short-term financial services work, not operations management.
+    _TAX_COMPANIES = ["h&r block", "jackson hewitt", "liberty tax"]
+    _TAX_TRIGGERS = ["tax preparation", "tax returns", "tax office"]
+    if not domain_penalty_applied and (
+        any(tc in job_company for tc in _TAX_COMPANIES)
+        or any(tt in job_desc for tt in _TAX_TRIGGERS)
     ):
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
