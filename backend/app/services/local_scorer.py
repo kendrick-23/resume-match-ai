@@ -163,25 +163,20 @@ def hybrid_score_jobs(
     # Rank indices by semantic score descending
     semantic_ranking = np.argsort(semantic_scores)[::-1].tolist()
 
-    # --- RRF FUSION ---
-    rrf_scores = _reciprocal_rank_fusion([bm25_ranking, semantic_ranking])
-
-    # Normalize RRF scores to 0-100 range
-    if rrf_scores:
-        max_rrf = max(rrf_scores.values())
-        min_rrf = min(rrf_scores.values())
-        rrf_range = max_rrf - min_rrf if max_rrf != min_rrf else 1.0
-    else:
-        min_rrf = 0.0
-        rrf_range = 1.0
-
+    # --- ABSOLUTE SCORING ---
+    # Cosine similarity is already absolute (0 to 1 range, same job = same score always).
+    # BM25 provides a small absolute boost (0-10 points) for keyword relevance.
+    # No RRF needed — components are added directly.
     for i, job in enumerate(jobs):
-        rrf_raw = rrf_scores.get(i, 0.0)
-        # Normalize to 0-100, then scale: top jobs should be in 70-90 range
-        normalized = (rrf_raw - min_rrf) / rrf_range if rrf_scores else 0.0
-        # Scale to realistic score range (40-90) — not all 100s, not all 0s
-        job["local_score"] = round(40 + (normalized * 50), 1)
-        job["local_bm25_score"] = float(bm25_scores[i])
+        semantic_component = float(semantic_scores[i]) * 100  # 0-100, absolute
+
+        # BM25 boost: normalize score to 0-10 range with soft cap
+        bm25_raw = float(bm25_scores[i])
+        bm25_boost = min(10.0, bm25_raw * 2.0) if bm25_raw > 0 else 0.0
+
+        local_score = min(95.0, semantic_component + bm25_boost)
+        job["local_score"] = round(local_score, 1)
+        job["local_bm25_score"] = bm25_raw
         job["local_semantic_score"] = float(semantic_scores[i])
 
     elapsed_ms = (time.time() - start) * 1000
