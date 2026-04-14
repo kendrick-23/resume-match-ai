@@ -48,7 +48,19 @@ def _get_user_or_ip(request: Request) -> str:
 
 limiter = Limiter(key_func=_get_user_or_ip)
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app):
+    # Warm up the local scorer — loads MiniLM model and caches Nicole's embedding
+    try:
+        from app.services.local_scorer import warmup
+        warmup()
+    except Exception as exc:
+        logger.error(f"[Startup] Local scorer warmup failed: {exc}")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

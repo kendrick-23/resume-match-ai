@@ -626,9 +626,19 @@ Every gap returned by `/analyze` and the gap analyzer carries an effort tag:
 3. **Domain penalties** — Licensed professions (physician, nurse, attorney, etc.), vocational triggers (CDL, linen bagger, team member), defense SpecOps, industrial triggers (dewatering, submergent, heavy equipment). Caps `holt_score` at 15%.
 4. **Salary-floor enforcement** — Caps at 25% for jobs paying >25% below stated minimum.
 5. **Dealbreaker filter** — Removes jobs where `dealbreaker_triggered=True` (salary below min, outside commute range, degree required). Server-side hard filter — these jobs never reach the frontend.
-6. **Batch semantic scoring** (`services/batch_scorer.py`) — Single Anthropic Batch API call for all eligible jobs (kw_score >= 55, not domain-penalized, relevant title words).
-7. **Gap analysis** (`services/gap_analyzer.py`) — Claude Haiku identifies 2-3 effort-tagged gaps per Within Reach job (45-69%). Receives `target_roles` and `current_title`.
-8. **FINAL domain penalty enforcement** — Caps `holt_score` at 15% for any `domain_penalized` job. Runs LAST so semantic scoring can never override it.
+6. **Local hybrid scoring** (`services/local_scorer.py`) — Fast BM25 + MiniLM (all-MiniLM-L6-v2) scoring runs on ALL eligible jobs in <500ms, $0 cost. Produces `local_score` (0-100). Jobs with confident scores (>78 or <45) use local score directly. Only ambiguous 45-78 band goes to Haiku batch.
+7. **Batch semantic scoring** (`services/batch_scorer.py`) — Haiku batch runs ONLY on ambiguous-band jobs (local_score 45-78). Typically 30-50 jobs instead of 150+.
+8. **Gap analysis** (`services/gap_analyzer.py`) — Claude Haiku identifies 2-3 effort-tagged gaps per Within Reach job (45-69%). Receives `target_roles` and `current_title`.
+9. **FINAL domain penalty enforcement** — Caps `holt_score` at 15% for any `domain_penalized` job. Runs LAST so semantic scoring can never override it.
+
+### Local Scoring (`backend/app/services/local_scorer.py`):
+- **Engine:** BM25 (rank_bm25) + semantic embeddings (all-MiniLM-L6-v2) combined via Reciprocal Rank Fusion
+- **Speed:** <500ms for 200 jobs, fully local, $0 cost
+- **Model:** ~90MB, downloads on first run, cached in `~/.cache/huggingface/`
+- **Profile:** Nicole's profile text and BM25 keywords hard-coded; embedding cached in memory at startup
+- **Score range:** 40-90 (scaled from RRF fusion). >78 = confident good match, <45 = confident poor match
+- **Search mode detection:** `detect_search_mode()` classifies queries as "company" (disney), "role" (operations manager), or "profile" (synonym expansion)
+- **Warmup:** Called at FastAPI startup via lifespan event. First load ~5s, subsequent requests instant.
 
 ### Batch Scoring (`backend/app/services/batch_scorer.py`):
 - Uses Anthropic Batch API (`client.messages.batches`) — no rate limits, 50% cheaper than real-time
@@ -663,6 +673,7 @@ Every gap returned by `/analyze` and the gap analyzer carries an effort tag:
 6. Domain penalties run as the LAST step before dealbreaker filter — semantic scorer must never override domain penalty caps.
 7. Backend startup: `cd backend && source venv/bin/activate && set -a && source .env && set +a && uvicorn app.main:app --reload --port 8000`
 8. When making changes to the scoring prompt or gate logic, increment the cache version prefix (`lite_v2` → `lite_v3` → etc.) in BOTH `semantic_score.py` and `batch_scorer.py` to invalidate stale cached scores. Then clear Supabase `job_search_cache` and restart the backend.
+9. `local_scorer.py` is the primary scorer. Haiku batch is precision refinement only for 45-78 score band. Never submit jobs with `local_score` <45 or >78 to Haiku — waste of tokens.
 
 ## Resilience Patterns (Non-Negotiable)
 

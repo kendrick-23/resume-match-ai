@@ -10,3 +10,6 @@ PyJWT
 httpx
 slowapi
 python-jobspy
+sentence-transformers>=2.7.0
+rank_bm25>=0.2.2
+numpy>=1.24.0,<2.0.0

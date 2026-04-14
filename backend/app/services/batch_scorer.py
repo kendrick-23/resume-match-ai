@@ -26,6 +26,7 @@ from app.services.semantic_score import (
     _semantic_cache,
     _CACHE_TTL,
 )
+from app.services.local_scorer import hybrid_score_jobs
 
 # ---------------------------------------------------------------------------
 # User-level batch deduplication — prevents 6 synonym queries from
@@ -359,14 +360,47 @@ async def batch_semantic_rescore(
     if not eligible:
         return jobs, True
 
-    # First pass — apply any scores already in cache
+    # --- LOCAL SCORING (instant, $0) ---
+    # Run BM25 + MiniLM hybrid scoring on ALL eligible jobs before touching
+    # the Haiku cache or batch. This gives every job a local_score immediately.
+    try:
+        hybrid_score_jobs(eligible)
+        local_confident = 0
+        for job in eligible:
+            ls = job.get("local_score", 0)
+            if ls > 78 or ls < 45:
+                # Confident local score — use it as the displayed score blend
+                kw = job["holt_score"]
+                blended = round(kw * 0.3 + ls * 0.7)
+                job["holt_score"] = max(0, min(100, blended))
+                job["holt_breakdown"]["local_score"] = ls
+                # Set coaching label from local score
+                if ls >= 80:
+                    job["coaching_label"] = "Strong match — Ott recommends applying"
+                elif ls >= 70:
+                    job["coaching_label"] = "Good match — worth a closer look"
+                elif ls >= 55:
+                    job["coaching_label"] = "Within Reach — close your skills gap"
+                else:
+                    job["coaching_label"] = "Growth opportunity"
+                local_confident += 1
+        logger.info(f"[BatchScorer] Local scorer: {local_confident}/{len(eligible)} jobs scored with high confidence")
+    except Exception as exc:
+        logger.error(f"[BatchScorer] Local scorer failed (falling back to batch): {exc}")
+
+    # First pass — apply any Haiku scores already in cache
     cached_count = _apply_cached_scores(jobs, profile, user_id)
     if cached_count:
-        logger.info(f"[BatchScorer] {cached_count} jobs served from cache")
+        logger.info(f"[BatchScorer] {cached_count} jobs served from Haiku cache")
 
-    # Check if ALL eligible jobs are now scored
+    # Check if ALL eligible jobs are now scored (by Haiku cache or confident local).
+    # Only submit ambiguous-band jobs (local_score 45-78) to Haiku batch.
     uncached = []
     for job in eligible:
+        # Skip jobs with confident local scores — no Haiku needed
+        ls = job.get("local_score", 0)
+        if ls > 78 or ls < 45:
+            continue
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
         cache_key = f"lite_v2:{job_id}:{user_id}"
         if cache_key in _semantic_cache:

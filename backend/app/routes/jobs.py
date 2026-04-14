@@ -21,6 +21,7 @@ from app.services.holt_score import calculate_holt_score
 from app.services.enrich import enrich_jobs_batch
 from app.services.batch_scorer import batch_semantic_rescore, _user_batch_in_flight
 from app.services.gap_analyzer import analyze_gaps_batch
+from app.services.local_scorer import detect_search_mode
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -406,7 +407,9 @@ async def search_unified_multi(
         if not keyword_list:
             return {"total": 0, "jobs": [], "degraded": False}
 
-        logger.info(f"[/jobs/unified-multi] Fetching {len(keyword_list)} queries: {keyword_list}")
+        # Detect search intent for the primary keyword
+        search_mode = detect_search_mode(keyword_list[0]) if len(keyword_list) == 1 else "profile"
+        logger.info(f"[/jobs/unified-multi] mode={search_mode}, fetching {len(keyword_list)} queries: {keyword_list}")
 
         # Step 1: Fetch all keywords in parallel (no scoring)
         fetch_results = await asyncio.gather(
