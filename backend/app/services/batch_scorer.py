@@ -412,6 +412,32 @@ async def batch_semantic_rescore(
     if not uncached:
         return jobs, True
 
+    # --- Small result set fast path ---
+    # For company searches or very filtered queries (≤20 eligible jobs),
+    # local scoring is sufficient. Skip Haiku entirely — not worth the wait.
+    # Also skip if the ambiguous band is tiny (≤10 jobs).
+    if len(eligible) <= 20 or len(uncached) <= 10:
+        # Apply local scores to ambiguous-band jobs that didn't get scored above
+        for job in uncached:
+            ls = job.get("local_score", 0)
+            kw = job["holt_score"]
+            blended = round(kw * 0.3 + ls * 0.7)
+            job["holt_score"] = max(0, min(100, blended))
+            job["holt_breakdown"]["local_score"] = ls
+            if ls >= 80:
+                job["coaching_label"] = "Strong match — Ott recommends applying"
+            elif ls >= 70:
+                job["coaching_label"] = "Good match — worth a closer look"
+            elif ls >= 55:
+                job["coaching_label"] = "Within Reach — close your skills gap"
+            else:
+                job["coaching_label"] = "Growth opportunity"
+        logger.info(
+            f"[BatchScorer] Small result set ({len(eligible)} eligible, {len(uncached)} ambiguous) "
+            f"— using local scores only, skipping Haiku batch"
+        )
+        return jobs, True
+
     # --- User-level dedup: check if a batch is already in flight ---
     existing_future = None
     async with _user_batch_lock:
@@ -419,6 +445,16 @@ async def batch_semantic_rescore(
             existing_future = _user_batch_in_flight[user_id]
 
     if existing_future is not None:
+        # Fast path: if result set is small, don't wait for in-flight batch
+        if len(eligible) <= 20:
+            logger.info(f"[BatchScorer] Batch in flight but small result set ({len(eligible)}) — returning local scores")
+            for job in uncached:
+                ls = job.get("local_score", 0)
+                kw = job["holt_score"]
+                blended = round(kw * 0.3 + ls * 0.7)
+                job["holt_score"] = max(0, min(100, blended))
+                job["holt_breakdown"]["local_score"] = ls
+            return jobs, True
         # Another query already submitted a batch — wait for it
         logger.info(f"[BatchScorer] Batch already in flight for user {user_id[:8]}… — waiting")
         try:
