@@ -382,14 +382,23 @@ def calculate_holt_score(
 
     # Military enlistment/active duty — Nicole is a civilian job seeker, not
     # enlisting. "HR Officer" at Navy Reserve means military service, not corporate HR.
+    # Real API descriptions use: "Navy occupations", "duty station", "job training",
+    # "Career Information Program", "enlisted sailors".
+    _MILITARY_COMPANIES = [
+        "u.s. navy", "united states navy", "u.s. army", "united states army",
+        "u.s. air force", "u.s. marine", "u.s. coast guard",
+    ]
     _MILITARY_ENLISTMENT_SIGNALS = [
         "enlist", "active duty", "navy reserve", "army reserve",
         "air force reserve", "marine reserve", "coast guard reserve",
         "drill weekend", "deployment", "aboard ships", "military service",
         "national guard", "commissioned officer",
+        "duty station", "navy occupations", "career information program",
+        "enlisted sailor", "sailor",
     ]
-    if not domain_penalty_applied and any(
-        ms in job_desc or ms in job_company for ms in _MILITARY_ENLISTMENT_SIGNALS
+    if not domain_penalty_applied and (
+        any(mc in job_company for mc in _MILITARY_COMPANIES)
+        or any(ms in job_desc or ms in job_company for ms in _MILITARY_ENLISTMENT_SIGNALS)
     ):
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
@@ -412,25 +421,41 @@ def calculate_holt_score(
 
     # Landscaping/outdoor services — "Operations Manager" at a landscaping
     # company means managing lawn crews, not corporate operations.
-    _LANDSCAPING_TRIGGERS = [
-        "landscaping", "lawn care", "lawn mowing", "grounds maintenance",
-        "irrigation systems", "turf management", "outdoor services",
+    # Real API descriptions are often generic ("branch operations") so we also
+    # match known landscaping companies by name.
+    _LANDSCAPING_COMPANIES = [
+        "brightview", "trugreen", "yellowstone landscape", "davey tree",
+        "bartlett tree", "ruppert landscape", "gothic landscape",
     ]
-    if not domain_penalty_applied and any(
-        lt in job_desc or lt in job_company for lt in _LANDSCAPING_TRIGGERS
+    _LANDSCAPING_TRIGGERS = [
+        "landscaping", "landscape", "lawn care", "lawn mowing",
+        "grounds maintenance", "grounds", "irrigation systems",
+        "turf management", "outdoor services",
+    ]
+    if not domain_penalty_applied and (
+        any(lc in job_company for lc in _LANDSCAPING_COMPANIES)
+        or any(lt in job_desc or lt in job_company for lt in _LANDSCAPING_TRIGGERS)
     ):
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
 
     # Erosion/environmental construction — description signals that indicate
     # field construction work even when the title looks like generic ops.
+    # Real API data: Jooble often serves these under a different company name
+    # (e.g. "Valor Environmental" instead of "Watkins Erosion Control"), so
+    # match both description keywords AND known company names.
+    _EROSION_COMPANIES = [
+        "erosion", "valor environmental", "stormwater",
+        "environmental services",
+    ]
     _EROSION_CONSTRUCTION_TRIGGERS = [
         "erosion control", "silt fence", "sediment control",
         "stormwater management", "earthwork", "grading contractor",
         "soil stabilization",
     ]
-    if not domain_penalty_applied and any(
-        ec in job_desc for ec in _EROSION_CONSTRUCTION_TRIGGERS
+    if not domain_penalty_applied and (
+        any(ec in job_company for ec in _EROSION_COMPANIES)
+        or any(ec in job_desc for ec in _EROSION_CONSTRUCTION_TRIGGERS)
     ):
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
