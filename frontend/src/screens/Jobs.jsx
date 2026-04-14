@@ -1370,6 +1370,7 @@ export default function Jobs() {
       )}
 
       {/* Job cards */}
+      {console.log('[Render] activeJobs:', activeJobs.length, 'mainJobs:', mainJobs.length, 'unifiedJobs:', unifiedJobs.length, 'isSearched:', isSearched, 'isLoading:', isLoading, 'isProfileMatch:', isProfileMatch, 'useUnified:', useUnified)}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {(isProfileMatch ? mainJobs : activeJobs)
           .filter((job) => showDealbreakers || !job.dealbreaker_triggered)
