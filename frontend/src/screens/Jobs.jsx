@@ -470,7 +470,11 @@ export default function Jobs() {
     try {
       const result = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
       console.log('[handleSearch] Response received:', result?.jobs?.length, 'jobs, scoring_complete:', result?.scoring_complete);
-      if (!isMountedRef.current) return;
+      console.log('[handleSearch] isMountedRef.current:', isMountedRef.current);
+      if (!isMountedRef.current) {
+        console.warn('[handleSearch] BAILED — component unmounted during fetch');
+        return;
+      }
 
       const allJobs = result.jobs || [];
       console.log('[handleSearch] Setting unifiedJobs:', allJobs.length);
