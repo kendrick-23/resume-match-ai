@@ -469,15 +469,9 @@ export default function Jobs() {
 
     try {
       const result = await searchUnifiedMulti({ keywords: [kw], location: loc || undefined });
-      console.log('[handleSearch] Response received:', result?.jobs?.length, 'jobs, scoring_complete:', result?.scoring_complete);
-      console.log('[handleSearch] isMountedRef.current:', isMountedRef.current);
-      if (!isMountedRef.current) {
-        console.warn('[handleSearch] BAILED — component unmounted during fetch');
-        return;
-      }
+      if (!isMountedRef.current) return;
 
       const allJobs = result.jobs || [];
-      console.log('[handleSearch] Setting unifiedJobs:', allJobs.length);
       setUnifiedJobs(allJobs);
 
       if (result.degraded) {
@@ -512,17 +506,14 @@ export default function Jobs() {
                 _applyResults(fedRefresh, pvtRefresh, loc);
               }
             }
-          } catch (pollErr) { console.error('[handleSearch] Poll error:', pollErr); }
+          } catch { /* poll error — retry next interval */ }
         }, 15000);
       }
 
       const fedMerged = allJobs.filter((j) => j.source === 'usajobs');
       const pvtMerged = allJobs.filter((j) => j.source !== 'usajobs');
-      console.log('[handleSearch] Calling _applyResults: fed:', fedMerged.length, 'pvt:', pvtMerged.length);
       _applyResults(fedMerged, pvtMerged, loc);
-      console.log('[handleSearch] _applyResults complete');
     } catch (err) {
-      console.error('[handleSearch] ERROR:', err);
       if (!isMountedRef.current) return;
       setFedError(err.message);
     } finally {
@@ -999,7 +990,7 @@ export default function Jobs() {
       </div>
 
       {/* Search form */}
-      <form onSubmit={handleSearch} style={{
+      <div style={{
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--space-3)',
@@ -1027,10 +1018,10 @@ export default function Jobs() {
           </button>
         </div>
 
-        <Button full disabled={(fedLoading && pvtLoading) || !keyword.trim()}>
+        <Button full onClick={handleSearch} disabled={(fedLoading && pvtLoading) || !keyword.trim()}>
           {fedLoading && !fedJobs.length ? 'Searching...' : 'Search'}
         </Button>
-      </form>
+      </div>
 
       {/* Source tabs — only shown for legacy tab-split searches (not unified-multi) */}
       {!useUnified && (fedSearched || pvtSearched || fedLoading || pvtLoading) && (
@@ -1379,7 +1370,6 @@ export default function Jobs() {
       )}
 
       {/* Job cards */}
-      {console.log('[Render] activeJobs:', activeJobs.length, 'mainJobs:', mainJobs.length, 'unifiedJobs:', unifiedJobs.length, 'isSearched:', isSearched, 'isLoading:', isLoading, 'isProfileMatch:', isProfileMatch, 'useUnified:', useUnified)}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {(isProfileMatch ? mainJobs : activeJobs)
           .filter((job) => showDealbreakers || !job.dealbreaker_triggered)
