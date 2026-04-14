@@ -35,7 +35,7 @@ def _user_sb(user: dict):
     return sb
 
 
-async def _score_jobs(jobs: list, user: dict) -> tuple[list, bool]:
+async def _score_jobs(jobs: list, user: dict, is_profile_match: bool = False) -> tuple[list, bool]:
     """Enrich sparse descriptions then score using the 6-dimension Holt Score engine."""
     # Step 1: JD enrichment DISABLED — the batch semantic scorer reads
     # sparse JDs directly and infers context from the title + company.
@@ -112,17 +112,20 @@ async def _score_jobs(jobs: list, user: dict) -> tuple[list, bool]:
     except Exception as exc:
         logger.error(f"[BatchScorer] Semantic re-scoring failed: {exc}")
 
-    # Step 5: Claude-powered gap analysis — SKIP domain-penalized jobs entirely.
-    # Pass target_roles so the gap analyzer knows what direction the candidate
-    # is heading and doesn't flag misaligned skills as gaps.
-    try:
-        await analyze_gaps_batch(
-            jobs, resume_skills,
-            profile.get("target_roles") or "",
-            profile.get("job_title") or "",
-        )
-    except Exception as exc:
-        logger.error(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
+    # Step 5: Claude-powered gap analysis — ONLY for profile match searches.
+    # Skip for keyword/company searches (adds 20-30s latency for no benefit).
+    # Also skip domain-penalized jobs entirely.
+    if is_profile_match:
+        try:
+            await analyze_gaps_batch(
+                jobs, resume_skills,
+                profile.get("target_roles") or "",
+                profile.get("job_title") or "",
+            )
+        except Exception as exc:
+            logger.error(f"[GapAnalyzer] Batch gap analysis failed: {exc}")
+    else:
+        logger.info("[_score_jobs] Skipping gap analysis (not a profile match search)")
 
     # Step 6: FINAL domain penalty enforcement — 15% cap cannot be overridden.
     # This runs LAST so semantic re-scoring can never lift a domain-mismatched
@@ -407,9 +410,11 @@ async def search_unified_multi(
         if not keyword_list:
             return {"total": 0, "jobs": [], "degraded": False}
 
-        # Detect search intent for the primary keyword
-        search_mode = detect_search_mode(keyword_list[0]) if len(keyword_list) == 1 else "profile"
-        logger.info(f"[/jobs/unified-multi] mode={search_mode}, fetching {len(keyword_list)} queries: {keyword_list}")
+        # Detect search intent: profile match uses multiple synonym queries;
+        # keyword/company search uses a single user-typed query.
+        is_profile_match = len(keyword_list) > 1
+        search_mode = "profile" if is_profile_match else detect_search_mode(keyword_list[0])
+        logger.info(f"[/jobs/unified-multi] mode={search_mode}, profile_match={is_profile_match}, fetching {len(keyword_list)} queries: {keyword_list}")
 
         # Step 1: Fetch all keywords in parallel (no scoring)
         fetch_results = await asyncio.gather(
@@ -440,12 +445,18 @@ async def search_unified_multi(
         scoring_complete = True
         try:
             unique_jobs, scoring_complete = await asyncio.wait_for(
-                _score_jobs(unique_jobs, user),
+                _score_jobs(unique_jobs, user, is_profile_match=is_profile_match),
                 timeout=30.0,
             )
         except asyncio.TimeoutError:
-            logger.warning("[/jobs/unified-multi] Scoring pipeline timed out after 30s")
+            logger.warning("[/jobs/unified-multi] Scoring pipeline timed out after 30s — returning partially scored jobs")
             scoring_complete = False
+            # Apply domain penalties and dealbreaker filter on the partially scored jobs
+            for job in unique_jobs:
+                if job.get("domain_penalized"):
+                    job["holt_score"] = min(job.get("holt_score", 0), DOMAIN_PENALTY_CAP)
+                    job["coaching_label"] = "Different specialization"
+            unique_jobs = [j for j in unique_jobs if not j.get("dealbreaker_triggered")]
 
         # Step 4: Sort and return
         unique_jobs.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
