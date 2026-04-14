@@ -803,20 +803,23 @@ export default function Jobs() {
     });
   }
 
-  // Active tab data — keyword search uses tabs, profile match uses unified list
-  const isSearched = isProfileMatch
+  // Active tab data — both keyword and profile match now use unified-multi,
+  // so use unifiedJobs whenever available. Fall back to tab split only for
+  // legacy endpoints (searchFederal/searchPrivate) which are no longer called.
+  const useUnified = isProfileMatch || unifiedJobs.length > 0;
+  const isSearched = useUnified
     ? (fedSearched || pvtSearched)
     : (activeTab === 'federal' ? fedSearched : pvtSearched);
-  const isLoading = isProfileMatch
+  const isLoading = useUnified
     ? (fedLoading || pvtLoading)
     : (activeTab === 'federal' ? fedLoading : pvtLoading);
-  const rawJobs = isProfileMatch
+  const rawJobs = useUnified
     ? unifiedJobs
     : (activeTab === 'federal' ? fedJobs : pvtJobs);
-  const activeTotal = isProfileMatch
+  const activeTotal = useUnified
     ? unifiedJobs.length
     : (activeTab === 'federal' ? fedTotal : pvtTotal);
-  const tabLabel = isProfileMatch
+  const tabLabel = useUnified
     ? 'all sources'
     : (activeTab === 'federal' ? 'Federal' : 'Private');
 
@@ -1020,8 +1023,8 @@ export default function Jobs() {
         </Button>
       </form>
 
-      {/* Source tabs — keyword search only (profile match uses unified list) */}
-      {!isProfileMatch && (fedSearched || pvtSearched || fedLoading || pvtLoading) && (
+      {/* Source tabs — only shown for legacy tab-split searches (not unified-multi) */}
+      {!useUnified && (fedSearched || pvtSearched || fedLoading || pvtLoading) && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
           <div className="jobs-tabs">
             <button
