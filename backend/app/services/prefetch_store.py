@@ -18,6 +18,10 @@ PREFETCH_TTL_HOURS = int(os.getenv("PREFETCH_TTL_HOURS", "4"))
 
 _sb_service = None
 
+# TODO: migrate to Redis when backend scales to multiple workers
+# (same pattern as _user_batch_in_flight in batch_scorer.py)
+_prefetch_running: dict[str, bool] = {}
+
 
 def _service_client():
     global _sb_service
@@ -64,3 +68,16 @@ def upsert_prefetched_jobs(user_id: str, jobs: list, haiku_complete: bool) -> bo
     except Exception as exc:
         logger.error(f"[PrefetchStore] upsert failed for {user_id[:8]}…: {exc}", exc_info=True)
         return False
+
+
+def is_prefetch_running(user_id: str) -> bool:
+    """True if a pre-fetch pipeline is currently in flight for this user."""
+    return _prefetch_running.get(user_id, False)
+
+
+def set_prefetch_running(user_id: str, running: bool) -> None:
+    """Mark a pre-fetch pipeline as started or finished. Idempotent."""
+    if running:
+        _prefetch_running[user_id] = True
+    else:
+        _prefetch_running.pop(user_id, None)
