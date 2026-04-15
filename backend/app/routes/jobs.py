@@ -22,6 +22,8 @@ from app.services.enrich import enrich_jobs_batch
 from app.services.batch_scorer import batch_semantic_rescore, _user_batch_in_flight
 from app.services.gap_analyzer import analyze_gaps_batch
 from app.services.local_scorer import detect_search_mode
+from app.services.pre_fetch_pipeline import pre_fetch_pipeline
+from app.services.prefetch_store import is_prefetch_running
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -570,3 +572,22 @@ async def save_search_cache(
     except Exception as exc:
         logger.error(f"[Cache] Save failed: {exc}", exc_info=True)
         return {"ok": False}
+
+
+@router.post("/prefetch/run")
+@limiter.limit("10/hour")
+async def trigger_prefetch(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Manually trigger the pre-fetch pipeline for the authenticated user.
+
+    Returns immediately — the pipeline runs as a background task. Used by
+    manual testing and the Jobs-screen refresh button (Sprint 3 / E5-4).
+    """
+    user_id = user["user_id"]
+    if is_prefetch_running(user_id):
+        return {"status": "already_running"}
+
+    asyncio.create_task(pre_fetch_pipeline(user_id))
+    return {"status": "started"}
