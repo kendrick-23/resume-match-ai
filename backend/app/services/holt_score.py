@@ -393,6 +393,7 @@ def calculate_holt_score(
         "forever 21", "american eagle", "aeropostale", "hot topic",
         "express", "banana republic", "victoria's secret", "bath & body works",
         "buckle",
+        "dollar tree", "dollar general", "family dollar", "five below",
     ]
     _RETAIL_CLOTHING_DESC_TRIGGERS = [
         "apparel", "clothing store", "fashion retail", "retail clothing",
@@ -517,6 +518,45 @@ def calculate_holt_score(
     if not domain_penalty_applied and any(
         hv in job_desc or hv in job_title for hv in _HVAC_TRIGGERS
     ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Carwash / auto detailing — service roles requiring unrelated vehicle
+    # service experience. "Operations Manager" at a carwash ≠ corporate ops.
+    _CARWASH_TRIGGERS = [
+        "carwash", "car wash", "auto detailing", "car detailing",
+    ]
+    if not domain_penalty_applied and any(
+        cw in job_title or cw in job_desc or cw in job_company for cw in _CARWASH_TRIGGERS
+    ):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Clinical / medical specialist titles — require clinical licensure.
+    _CLINICAL_TITLE_TRIGGERS = [
+        "respiratory", "occupational therapist", "physician",
+        "neurolog", "dermatolog", "intensivist",
+        "otolaryngolog", "neurosurg",
+    ]
+    if not domain_penalty_applied and any(ct in job_title for ct in _CLINICAL_TITLE_TRIGGERS):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Technical IC engineering roles — wrong target for ops/training/compliance.
+    _TECH_IC_TRIGGERS = [
+        "data engineer", "software engineer", "data scientist",
+        "machine learning engineer", "devops engineer", "cloud engineer",
+    ]
+    if not domain_penalty_applied and any(te in job_title for te in _TECH_IC_TRIGGERS):
+        skills_match = min(skills_match, 10)
+        domain_penalty_applied = True
+
+    # Electrical / utility trades — require trade licensure and field experience.
+    _ELECTRICAL_TRIGGERS = [
+        "power distribution", "electrician", "lineman",
+        "substation", "utility technician",
+    ]
+    if not domain_penalty_applied and any(et in job_title for et in _ELECTRICAL_TRIGGERS):
         skills_match = min(skills_match, 10)
         domain_penalty_applied = True
 

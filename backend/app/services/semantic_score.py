@@ -88,7 +88,7 @@ def _build_candidate_summary(profile: dict) -> str:
 
 def _cache_key(job: dict, user_id: str) -> str:
     job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-    return f"lite_v4:{job_id}:{user_id}"
+    return f"lite_v5:{job_id}:{user_id}"
 
 
 async def semantic_rescore(job: dict, profile: dict, user_id: str) -> Optional[dict]:
@@ -259,6 +259,9 @@ async def semantic_rescore_batch(jobs: list, profile: dict, user_id: str = "") -
         keyword_score = job["holt_score"]
         sem_score = result["score"]
         blended = round(keyword_score * 0.3 + sem_score * 0.7)
+        # Regression floor — protect high-confidence keyword scores from Haiku non-determinism
+        if not job.get("domain_penalized", False) and keyword_score >= 80 and blended < keyword_score - 8:
+            blended = keyword_score
         job["holt_score"] = max(0, min(100, blended))
 
         job["holt_breakdown"]["semantic_score"] = sem_score

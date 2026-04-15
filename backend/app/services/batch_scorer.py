@@ -268,6 +268,9 @@ async def apply_batch_scores(
         keyword_score = job["holt_score"]
         sem_score = result["score"]
         blended = round(keyword_score * 0.3 + sem_score * 0.7)
+        # Regression floor — protect high-confidence keyword scores from Haiku non-determinism
+        if not job.get("domain_penalized", False) and keyword_score >= 80 and blended < keyword_score - 8:
+            blended = keyword_score
         job["holt_score"] = max(0, min(100, blended))
 
         job["holt_breakdown"]["semantic_score"] = sem_score
@@ -288,7 +291,7 @@ async def apply_batch_scores(
 
         # Write to in-memory cache (same key format as semantic_score.py)
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-        cache_key = f"lite_v4:{job_id}:{user_id}"
+        cache_key = f"lite_v5:{job_id}:{user_id}"
         _semantic_cache[cache_key] = (time.time(), result)
 
     return jobs
@@ -306,7 +309,7 @@ def _apply_cached_scores(jobs: list[dict], profile: dict, user_id: str) -> int:
         if kw_score < 55 or job.get("domain_penalized") or not _is_relevant_title(job.get("title") or ""):
             continue
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-        cache_key = f"lite_v4:{job_id}:{user_id}"
+        cache_key = f"lite_v5:{job_id}:{user_id}"
         if cache_key not in _semantic_cache:
             continue
         ts, cached = _semantic_cache[cache_key]
@@ -317,6 +320,9 @@ def _apply_cached_scores(jobs: list[dict], profile: dict, user_id: str) -> int:
         result = _apply_gates(result, job, profile)
         sem_score = result["score"]
         blended = round(kw_score * 0.3 + sem_score * 0.7)
+        # Regression floor — protect high-confidence keyword scores from Haiku non-determinism
+        if not job.get("domain_penalized", False) and kw_score >= 80 and blended < kw_score - 8:
+            blended = kw_score
         job["holt_score"] = max(0, min(100, blended))
         job["holt_breakdown"]["semantic_score"] = sem_score
         job["holt_breakdown"]["semantic_domain_alignment"] = result.get("domain_alignment")
@@ -402,7 +408,7 @@ async def batch_semantic_rescore(
         if ls > 78 or ls < 45:
             continue
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-        cache_key = f"lite_v4:{job_id}:{user_id}"
+        cache_key = f"lite_v5:{job_id}:{user_id}"
         if cache_key in _semantic_cache:
             ts, _ = _semantic_cache[cache_key]
             if time.time() - ts < _CACHE_TTL:
@@ -511,7 +517,7 @@ async def batch_semantic_rescore(
                 if result is None:
                     continue
                 job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
-                cache_key = f"lite_v4:{job_id}:{user_id}"
+                cache_key = f"lite_v5:{job_id}:{user_id}"
                 _semantic_cache[cache_key] = (time.time(), result)
 
             logger.info(f"[BatchScorer] Background: {len(batch_results)} scores written to cache")
