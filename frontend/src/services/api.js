@@ -211,6 +211,11 @@ export async function getScoringStatus() {
   return apiRequest(`${API_URL}/jobs/scoring-status`, { headers });
 }
 
+export async function getPrefetchStatus() {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/jobs/prefetch-status`, { headers });
+}
+
 export async function searchUnifiedMulti({ keywords, location, remote }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();
