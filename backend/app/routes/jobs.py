@@ -23,7 +23,7 @@ from app.services.batch_scorer import batch_semantic_rescore, _user_batch_in_fli
 from app.services.gap_analyzer import analyze_gaps_batch
 from app.services.local_scorer import detect_search_mode
 from app.services.pre_fetch_pipeline import pre_fetch_pipeline
-from app.services.prefetch_store import is_prefetch_running
+from app.services.prefetch_store import get_prefetched_jobs, is_prefetch_running
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -591,3 +591,27 @@ async def trigger_prefetch(
 
     asyncio.create_task(pre_fetch_pipeline(user_id))
     return {"status": "started"}
+
+
+@router.get("/prefetch-status")
+@limiter.limit("100/hour")
+async def prefetch_status(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Lightweight poll endpoint — frontend hits this to know if pre-fetched
+    jobs are ready and whether Haiku refinement has finished."""
+    row = get_prefetched_jobs(user["user_id"])
+    if not row:
+        return {
+            "ready": False,
+            "job_count": 0,
+            "haiku_complete": False,
+            "expires_at": None,
+        }
+    return {
+        "ready": True,
+        "job_count": row.get("job_count", 0),
+        "haiku_complete": bool(row.get("haiku_complete", False)),
+        "expires_at": row.get("expires_at"),
+    }
