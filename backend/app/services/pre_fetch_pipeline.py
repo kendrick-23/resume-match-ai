@@ -228,7 +228,7 @@ async def _run_phase_2(user_id: str, jobs: list, profile: dict) -> None:
     try:
         ambiguous = [
             j for j in jobs
-            if 45 <= j.get("holt_score", 0) <= 78
+            if 55 <= j.get("holt_score", 0) <= 78
             and not j.get("domain_penalized", False)
             and not j.get("dealbreaker_triggered", False)
         ]
@@ -241,6 +241,12 @@ async def _run_phase_2(user_id: str, jobs: list, profile: dict) -> None:
             upsert_prefetched_jobs(user_id, jobs, haiku_complete=True)
             return
 
+        # Cap batch size — Haiku timeouts above ~30 jobs. Keep highest-scoring
+        # jobs in the band; lower-scoring ambiguous jobs keep their keyword scores.
+        ambiguous.sort(key=lambda j: j.get("holt_score", 0), reverse=True)
+        haiku_jobs = ambiguous[:30]
+        logger.info(f"Haiku batch: {len(haiku_jobs)} jobs queued (band 55–78, cap 30)")
+
         # Reuse the Anthropic batch submit/poll/apply trio from batch_scorer.
         # apply_batch_scores already applies _apply_gates + the regression floor
         # added in the earlier scoring commit, so no extra blend logic here.
@@ -250,7 +256,7 @@ async def _run_phase_2(user_id: str, jobs: list, profile: dict) -> None:
             apply_batch_scores,
         )
 
-        batch_id = await submit_scoring_batch(ambiguous, profile, user_id)
+        batch_id = await submit_scoring_batch(haiku_jobs, profile, user_id)
         if not batch_id:
             logger.warning(f"[PreFetch] phase 2 batch submission failed for {user_id[:8]}")
             return
@@ -266,9 +272,11 @@ async def _run_phase_2(user_id: str, jobs: list, profile: dict) -> None:
             )
             return
 
-        # apply_batch_scores mutates each job dict in place. The ambiguous list
-        # holds references to the same dicts as `jobs`, so mutations propagate.
-        await apply_batch_scores(ambiguous, results, profile, user_id)
+        # apply_batch_scores mutates each job dict in place. haiku_jobs holds
+        # references to the same dicts as `jobs`, so mutations propagate. Must
+        # use the same list passed to submit_scoring_batch — custom_id is
+        # derived from index within that list.
+        await apply_batch_scores(haiku_jobs, results, profile, user_id)
 
         # Re-enforce final domain + salary caps (mirror _score_jobs steps 6-7).
         # Haiku blending could otherwise lift a domain-penalized score above 15.
