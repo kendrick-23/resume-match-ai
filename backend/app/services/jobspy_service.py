@@ -39,7 +39,8 @@ def _search_sync(keywords: str, location: str, results: int) -> dict:
 
     try:
         df = scrape_jobs(
-            site_name=["indeed", "glassdoor", "google", "zip_recruiter"],
+            # Removed 2026-04-17: glassdoor (400 "location not parsed"), zip_recruiter (403 "forbidden")
+            site_name=["indeed", "google"],
             search_term=keywords,
             location=location,
             results_wanted=results,
