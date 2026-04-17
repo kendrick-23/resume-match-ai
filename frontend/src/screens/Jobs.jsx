@@ -6,7 +6,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, getScoringStatus, getPrefetchStatus, createApplication, getProfile, getSearchCache, saveSearchCache } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, getScoringStatus, getPrefetchStatus, getPrefetchJobs, createApplication, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
@@ -317,17 +317,31 @@ export default function Jobs() {
   }, []);
 
   useEffect(() => {
-    // E3-2: non-blocking prefetch-status probe. Logs only for now; E3-3 will
-    // wire the ready=true path to a real GET /jobs/prefetch fetch. Failures
-    // fall through silently so live fetch is never gated on this call.
-    getPrefetchStatus().then((s) => {
+    // E3-3: If prefetched jobs are ready, serve them instantly instead of
+    // triggering a live fetch. Falls through to normal behaviour on any failure.
+    getPrefetchStatus().then(async (s) => {
       if (s?.ready) {
         console.log(`prefetch ready, ${s.job_count} jobs available (haiku_complete=${s.haiku_complete})`);
+        try {
+          const data = await getPrefetchJobs();
+          const allJobs = data.jobs || [];
+          if (allJobs.length > 0) {
+            setUnifiedJobs(allJobs);
+            const fedJobs = allJobs.filter((j) => j.source === 'usajobs');
+            const pvtJobs = allJobs.filter((j) => j.source !== 'usajobs');
+            setIsProfileMatch(true);
+            _applyResults(fedJobs, pvtJobs, location || 'Florida');
+            console.log(`prefetch served ${allJobs.length} jobs`);
+            return; // skip live fetch
+          }
+        } catch (e) {
+          console.log('prefetch fetch failed, falling back to live fetch');
+        }
       } else {
-        console.log('falling back to live fetch');
+        console.log('no prefetch available, falling back to live fetch');
       }
     }).catch(() => {
-      console.log('falling back to live fetch');
+      console.log('prefetch probe failed, falling back to live fetch');
     });
 
     // If we restored full page state (results + inputs), skip all API calls.

@@ -615,3 +615,20 @@ async def prefetch_status(
         "haiku_complete": bool(row.get("haiku_complete", False)),
         "expires_at": row.get("expires_at"),
     }
+
+
+@router.get("/prefetch")
+@limiter.limit("30/hour")
+async def prefetch_jobs(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Return the full prefetched job list for this user."""
+    row = get_prefetched_jobs(user["user_id"])
+    if not row:
+        raise HTTPException(status_code=404, detail="No prefetched jobs available")
+    return {
+        "jobs": row.get("jobs", []),
+        "job_count": row.get("job_count", 0),
+        "haiku_complete": bool(row.get("haiku_complete", False)),
+    }

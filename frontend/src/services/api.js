@@ -216,6 +216,11 @@ export async function getPrefetchStatus() {
   return apiRequest(`${API_URL}/jobs/prefetch-status`, { headers });
 }
 
+export async function getPrefetchJobs() {
+  const headers = await authHeaders();
+  return apiRequest(`${API_URL}/jobs/prefetch`, { headers });
+}
+
 export async function searchUnifiedMulti({ keywords, location, remote }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();
