@@ -6,7 +6,7 @@ import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Ott from '../components/ott/Ott';
-import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, getScoringStatus, getPrefetchStatus, getPrefetchJobs, createApplication, getProfile, getSearchCache, saveSearchCache } from '../services/api';
+import { searchJobs, searchAdzunaJobs, searchUnifiedJobs, searchUnifiedMulti, getScoringStatus, getPrefetchStatus, getPrefetchJobs, triggerPrefetchRun, createApplication, getProfile, getSearchCache, saveSearchCache } from '../services/api';
 import { MapPin, Clock, DollarSign, ExternalLink, Bookmark, Building2, Sparkles, ChevronDown, ChevronUp, Target, SlidersHorizontal, Star, AlertTriangle, Search } from 'lucide-react';
 import EmptyStateJobs from '../components/ui/EmptyStateJobs';
 import HintBubble from '../components/ui/HintBubble';
@@ -260,6 +260,7 @@ export default function Jobs() {
   const [profileTimedOut, setProfileTimedOut] = useState(false);
   const profileAbortRef = useRef(null);
   const scoringPollRef = useRef(null);
+  const haikuPollRef = useRef(null);
 
   // Cached profile from mount — handleProfileMatch reuses this instead of
   // re-fetching. Stale-on-edit is acceptable: the user goes to /profile to
@@ -287,7 +288,7 @@ export default function Jobs() {
 
   // Guard: prevent stale async responses from setting state after unmount.
   const isMountedRef = useRef(true);
-  useEffect(() => { return () => { isMountedRef.current = false; clearInterval(scoringPollRef.current); }; }, []);
+  useEffect(() => { return () => { isMountedRef.current = false; clearInterval(scoringPollRef.current); clearInterval(haikuPollRef.current); }; }, []);
 
   // Save scroll position + full state on unmount
   useEffect(() => {
@@ -332,13 +333,43 @@ export default function Jobs() {
             setIsProfileMatch(true);
             _applyResults(fedJobs, pvtJobs, location || 'Florida');
             console.log(`prefetch served ${allJobs.length} jobs`);
+            // E4-2: If Haiku hasn't finished yet, poll until it does and
+            // silently refresh the displayed jobs with refined scores.
+            if (!s.haiku_complete) {
+              let attempts = 0;
+              haikuPollRef.current = setInterval(async () => {
+                attempts++;
+                if (attempts > 10 || !isMountedRef.current) {
+                  clearInterval(haikuPollRef.current);
+                  haikuPollRef.current = null;
+                  return;
+                }
+                try {
+                  const poll = await getPrefetchStatus();
+                  if (poll?.haiku_complete) {
+                    clearInterval(haikuPollRef.current);
+                    haikuPollRef.current = null;
+                    const updated = await getPrefetchJobs();
+                    const updatedJobs = updated.jobs || [];
+                    if (updatedJobs.length > 0 && isMountedRef.current) {
+                      setUnifiedJobs(updatedJobs);
+                      const uFed = updatedJobs.filter((j) => j.source === 'usajobs');
+                      const uPvt = updatedJobs.filter((j) => j.source !== 'usajobs');
+                      _applyResults(uFed, uPvt, location || 'Florida');
+                      console.log('haiku scores updated — refreshing job display');
+                    }
+                  }
+                } catch { /* poll error — retry next interval */ }
+              }, 30000);
+            }
             return; // skip live fetch
           }
         } catch (e) {
           console.log('prefetch fetch failed, falling back to live fetch');
         }
       } else {
-        console.log('no prefetch available, falling back to live fetch');
+        console.log('prefetch cache miss — background refresh triggered');
+        triggerPrefetchRun();
       }
     }).catch(() => {
       console.log('prefetch probe failed, falling back to live fetch');
