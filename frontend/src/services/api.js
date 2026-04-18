@@ -221,6 +221,12 @@ export async function getPrefetchJobs() {
   return apiRequest(`${API_URL}/jobs/prefetch`, { headers });
 }
 
+export function triggerPrefetchRun() {
+  authHeaders().then((headers) => {
+    fetch(`${API_URL}/jobs/prefetch/run`, { method: 'POST', headers }).catch(() => {});
+  }).catch(() => {});
+}
+
 export async function searchUnifiedMulti({ keywords, location, remote }) {
   const headers = await authHeaders();
   const params = new URLSearchParams();
