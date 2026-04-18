@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import anthropic
-from app.clients import sync_client as anthropic_client
 from app.services.token_budget import check_opus_budget, estimate_tokens
 from supabase import create_client
 from dotenv import load_dotenv
@@ -29,6 +28,8 @@ from app.services.resume_vault import (
 )
 
 load_dotenv()
+
+from app.clients import sync_client as anthropic_client
 
 
 def _get_user_or_ip(request: Request) -> str:
