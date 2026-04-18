@@ -289,6 +289,178 @@ def calculate_holt_score(
                 domain_penalty_applied = True
             break
 
+    # --- Gate 1: credential hard disqualifiers (blocks A–F) ---
+    # Catches credential requirements that don't surface in the title-trigger
+    # table and don't match the legacy licensure-phrase regexes below. Each
+    # block scans the FULL description (not the 500-char head), independently
+    # guarded so the first hit wins.
+    gate1_full_text = f"{job_title} {job_desc}"
+
+    # Block A — Accounting / Finance hard credentials
+    if not domain_penalty_applied:
+        _acct_triggers = [
+            r"\bcpa\s+required\b",
+            r"\bcpa\s+is\s+required\b",
+            r"\bmust\s+hold\s+a?\s*cpa\b",
+            r"\bcertified\s+public\s+accountant\s+required\b",
+            r"\bcfa\s+required\b",
+            r"\bcia\s+required\b",
+            r"\b24\s+semester\s+hours?\s+of\s+accounting\b",
+            r"\bdegree\s+in\s+accounting\b",
+            r"\baccounting\s+degree\s+required\b",
+            r"\bseries\s+7\s+required\b",
+            r"\bseries\s+63\s+required\b",
+        ]
+        if any(re.search(p, gate1_full_text, re.IGNORECASE) for p in _acct_triggers):
+            has_acct_cred = (
+                bool(re.search(r"\bcpa\b", skills_str))
+                or "certified public accountant" in skills_str
+                or bool(re.search(r"\bcfa\b", skills_str))
+                or bool(re.search(r"\bcia\b", skills_str))
+                or "series 7" in skills_str
+                or "series 63" in skills_str
+                or "accounting degree" in skills_str
+                or bool(re.search(r"\bbs\s+accounting\b", skills_str))
+                or bool(re.search(r"\bbachelor.*accounting\b", skills_str))
+                or bool(re.search(r"\bcpa\b", degree))
+                or "accounting" in degree
+            )
+            if not has_acct_cred:
+                skills_match = min(skills_match, 10)
+                domain_penalty_applied = True
+                logger.info(f"[Gate1/Accounting] cred disqualifier fired for job: {job_title[:50]}")
+
+    # Block B — Engineering (PE license)
+    if not domain_penalty_applied:
+        _eng_triggers = [
+            r"\bpe\s+license\s+required\b",
+            r"\bprofessional\s+engineer\s+required\b",
+            r"\bregistered\s+professional\s+engineer\b",
+            r"\bmust\s+be\s+a\s+licensed\s+engineer\b",
+        ]
+        if any(re.search(p, gate1_full_text, re.IGNORECASE) for p in _eng_triggers):
+            has_eng_cred = (
+                "pe license" in skills_str
+                or "professional engineer" in skills_str
+                or "registered engineer" in skills_str
+                or "pe license" in degree
+                or "professional engineer" in degree
+            )
+            if not has_eng_cred:
+                skills_match = min(skills_match, 10)
+                domain_penalty_applied = True
+                logger.info(f"[Gate1/Engineering] fired for job: {job_title[:50]}")
+
+    # Block C — Legal / bar admission
+    if not domain_penalty_applied:
+        _legal_triggers = [
+            r"\bbar\s+admission\s+required\b",
+            r"\badmitted\s+to\s+the\s+bar\b",
+            r"\bjd\s+required\b",
+            r"\bjuris\s+doctor\s+required\b",
+            r"\bmust\s+be\s+licensed\s+to\s+practice\s+law\b",
+            r"\bactive\s+bar\s+membership\b",
+        ]
+        if any(re.search(p, gate1_full_text, re.IGNORECASE) for p in _legal_triggers):
+            has_legal_cred = (
+                bool(re.search(r"\bjd\b", skills_str))
+                or "juris doctor" in skills_str
+                or "bar admission" in skills_str
+                or "licensed attorney" in skills_str
+                or bool(re.search(r"\bjd\b", degree))
+                or "juris doctor" in degree
+            )
+            if not has_legal_cred:
+                skills_match = min(skills_match, 10)
+                domain_penalty_applied = True
+                logger.info(f"[Gate1/Legal] fired for job: {job_title[:50]}")
+
+    # Block D — Federal GS-level specialized experience
+    if not domain_penalty_applied:
+        _fed_patterns = [
+            r"\bgs-1[0-9]\s+(level\s+)?specialized\s+experience\b",
+            r"\bone\s+year.*gs-1[0-9]\b",
+            r"\bspecialized\s+experience.*gs-1[0-9]\b",
+            r"\bfederal\s+(financial\s+management|accounting)\s+experience\s+required\b",
+        ]
+        fed_matched = any(re.search(p, gate1_full_text, re.IGNORECASE) for p in _fed_patterns)
+        # OMB Circular or Treasury guidance co-occurring with "required" in the
+        # same sentence. Note: spec originally wrote "omg circular" — corrected
+        # to "omb" (the actual federal acronym) since "omg" never appears in
+        # real postings.
+        if not fed_matched:
+            for s in re.split(r"[.?!]+", gate1_full_text):
+                if (re.search(r"\bomb\s+circular\b", s, re.IGNORECASE)
+                        or re.search(r"\btreasury\s+guidance\b", s, re.IGNORECASE)) \
+                        and re.search(r"\brequired\b", s, re.IGNORECASE):
+                    fed_matched = True
+                    break
+        if fed_matched:
+            user_current_title = (profile.get("job_title") or "").lower()
+            has_fed_cred = (
+                "federal government" in skills_str
+                or "gs-" in skills_str
+                or "usajobs" in skills_str
+                or "federal agency" in skills_str
+                or "federal government" in degree
+                or "gs-" in degree
+                or "federal government" in user_current_title
+                or "gs-" in user_current_title
+                or "federal agency" in user_current_title
+            )
+            if not has_fed_cred:
+                skills_match = min(skills_match, 10)
+                domain_penalty_applied = True
+                logger.info(f"[Gate1/Federal] fired for job: {job_title[:50]}")
+
+    # Block E — Security clearance required
+    if not domain_penalty_applied:
+        _clr_patterns = [
+            r"\bactive\s+(secret|top\s+secret|ts/sci)\s+clearance\s+required\b",
+            r"\bmust\s+hold\s+(a\s+)?(secret|top\s+secret)\s+clearance\b",
+            r"\bmust\s+be\s+eligible\s+for\s+(secret|top\s+secret)\s+clearance\b",
+        ]
+        clr_matched = any(re.search(p, gate1_full_text, re.IGNORECASE) for p in _clr_patterns)
+        if not clr_matched:
+            # "clearance is required" co-occurring with "secret" or "ts" in the same sentence
+            for s in re.split(r"[.?!]+", gate1_full_text):
+                if re.search(r"\bclearance\s+is\s+required\b", s, re.IGNORECASE) \
+                        and re.search(r"\b(secret|ts)\b", s, re.IGNORECASE):
+                    clr_matched = True
+                    break
+        if clr_matched:
+            has_clr_cred = (
+                "security clearance" in skills_str
+                or "secret clearance" in skills_str
+                or "ts/sci" in skills_str
+                or "top secret" in skills_str
+            )
+            if not has_clr_cred:
+                skills_match = min(skills_match, 10)
+                domain_penalty_applied = True
+                logger.info(f"[Gate1/Clearance] fired for job: {job_title[:50]}")
+
+    # Block F — Degree domain specificity (non-generic degree requirements)
+    if not domain_penalty_applied:
+        _degree_domains = [
+            (r"\bdegree\s+in\s+computer\s+science\s+required\b",       "computer science"),
+            (r"\bdegree\s+in\s+software\s+engineering\s+required\b",   "software engineering"),
+            (r"\bdegree\s+in\s+electrical\s+engineering\s+required\b", "electrical engineering"),
+            (r"\bdegree\s+in\s+civil\s+engineering\s+required\b",      "civil engineering"),
+            (r"\bdegree\s+in\s+mechanical\s+engineering\s+required\b", "mechanical engineering"),
+            (r"\bdegree\s+in\s+chemical\s+engineering\s+required\b",   "chemical engineering"),
+            (r"\bbs\s+(cs|computer\s+science)\s+required\b",           "computer science"),
+            (r"\bdegree\s+in\s+nursing\s+required\b",                  "nursing"),
+            (r"\bbsn\s+required\b",                                    "nursing"),
+        ]
+        for pattern, domain_term in _degree_domains:
+            if re.search(pattern, gate1_full_text, re.IGNORECASE):
+                if domain_term not in skills_str and domain_term not in degree:
+                    skills_match = min(skills_match, 10)
+                    domain_penalty_applied = True
+                    logger.info(f"[Gate1/Degree] fired for job: {job_title[:50]}")
+                break
+
     # Title-trigger missed it — scan first 500 chars of description for HARD
     # licensure phrases. A job titled "Care Coordinator" with "MD required" in
     # the body must still be flagged as out-of-domain for an ops candidate.
