@@ -15,6 +15,7 @@ import time
 from typing import Optional
 
 from app.clients import async_client as anthropic_async
+from app.constants.scoring import get_coaching_label
 from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 from app.services.semantic_score import (
@@ -277,17 +278,7 @@ async def apply_batch_scores(
         job["holt_breakdown"]["semantic_domain_alignment"] = result.get("domain_alignment")
         job["holt_breakdown"]["reasoning"] = result.get("reasoning", "")
 
-        # Coaching label
-        if sem_score >= 80:
-            job["coaching_label"] = "Strong match — Ott recommends applying"
-        elif sem_score >= 70:
-            job["coaching_label"] = "Good match — worth a closer look"
-        elif sem_score >= 55:
-            job["coaching_label"] = "Within Reach — close your skills gap"
-        elif result.get("domain_alignment", 50) < 25:
-            job["coaching_label"] = "Different specialization"
-        else:
-            job["coaching_label"] = "Growth opportunity"
+        job["coaching_label"] = get_coaching_label(sem_score, result.get("domain_alignment", 100))
 
         # Write to in-memory cache (same key format as semantic_score.py)
         job_id = job.get("id") or f"{job.get('title', '')}:{job.get('company', '')}"
@@ -327,16 +318,7 @@ def _apply_cached_scores(jobs: list[dict], profile: dict, user_id: str) -> int:
         job["holt_breakdown"]["semantic_score"] = sem_score
         job["holt_breakdown"]["semantic_domain_alignment"] = result.get("domain_alignment")
         job["holt_breakdown"]["reasoning"] = result.get("reasoning", "")
-        if sem_score >= 80:
-            job["coaching_label"] = "Strong match — Ott recommends applying"
-        elif sem_score >= 70:
-            job["coaching_label"] = "Good match — worth a closer look"
-        elif sem_score >= 55:
-            job["coaching_label"] = "Within Reach — close your skills gap"
-        elif result.get("domain_alignment", 50) < 25:
-            job["coaching_label"] = "Different specialization"
-        else:
-            job["coaching_label"] = "Growth opportunity"
+        job["coaching_label"] = get_coaching_label(sem_score, result.get("domain_alignment", 100))
         applied += 1
     return applied
 
@@ -380,15 +362,7 @@ async def batch_semantic_rescore(
                 blended = round(kw * 0.3 + ls * 0.7)
                 job["holt_score"] = max(0, min(100, blended))
                 job["holt_breakdown"]["local_score"] = ls
-                # Set coaching label from local score
-                if ls >= 80:
-                    job["coaching_label"] = "Strong match — Ott recommends applying"
-                elif ls >= 70:
-                    job["coaching_label"] = "Good match — worth a closer look"
-                elif ls >= 55:
-                    job["coaching_label"] = "Within Reach — close your skills gap"
-                else:
-                    job["coaching_label"] = "Growth opportunity"
+                job["coaching_label"] = get_coaching_label(ls)
                 local_confident += 1
         logger.info(f"[BatchScorer] Local scorer: {local_confident}/{len(eligible)} jobs scored with high confidence")
     except Exception as exc:
@@ -430,14 +404,7 @@ async def batch_semantic_rescore(
             blended = round(kw * 0.3 + ls * 0.7)
             job["holt_score"] = max(0, min(100, blended))
             job["holt_breakdown"]["local_score"] = ls
-            if ls >= 80:
-                job["coaching_label"] = "Strong match — Ott recommends applying"
-            elif ls >= 70:
-                job["coaching_label"] = "Good match — worth a closer look"
-            elif ls >= 55:
-                job["coaching_label"] = "Within Reach — close your skills gap"
-            else:
-                job["coaching_label"] = "Growth opportunity"
+            job["coaching_label"] = get_coaching_label(ls)
         logger.info(
             f"[BatchScorer] Small result set ({len(eligible)} eligible, {len(uncached)} ambiguous) "
             f"— using local scores only, skipping Haiku batch"

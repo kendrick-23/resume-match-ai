@@ -15,6 +15,7 @@ import time
 from typing import Optional
 
 from app.clients import async_client as anthropic_async
+from app.constants.scoring import get_coaching_label
 from app.logger import logger
 from app.services.token_budget import check_budget, estimate_tokens
 
@@ -268,16 +269,6 @@ async def semantic_rescore_batch(jobs: list, profile: dict, user_id: str = "") -
         job["holt_breakdown"]["semantic_domain_alignment"] = result.get("domain_alignment")
         job["holt_breakdown"]["reasoning"] = result.get("reasoning", "")
 
-        # Coaching label based on semantic score
-        if sem_score >= 80:
-            job["coaching_label"] = "Strong match — Ott recommends applying"
-        elif sem_score >= 70:
-            job["coaching_label"] = "Good match — worth a closer look"
-        elif sem_score >= 55:
-            job["coaching_label"] = "Within Reach — close your skills gap"
-        elif result.get("domain_alignment", 50) < 25:
-            job["coaching_label"] = "Different specialization"
-        else:
-            job["coaching_label"] = "Growth opportunity"
+        job["coaching_label"] = get_coaching_label(sem_score, result.get("domain_alignment", 100))
 
     return jobs
