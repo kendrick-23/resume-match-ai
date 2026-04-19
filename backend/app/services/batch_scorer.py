@@ -27,7 +27,12 @@ from app.services.semantic_score import (
     _semantic_cache,
     _CACHE_TTL,
 )
-from app.services.local_scorer import hybrid_score_jobs
+from app.services.local_scorer import (
+    hybrid_score_jobs,
+    build_profile_text,
+    build_bm25_keywords,
+    get_user_embedding,
+)
 
 # ---------------------------------------------------------------------------
 # User-level batch deduplication — prevents 6 synonym queries from
@@ -352,7 +357,22 @@ async def batch_semantic_rescore(
     # Run BM25 + MiniLM hybrid scoring on ALL eligible jobs before touching
     # the Haiku cache or batch. This gives every job a local_score immediately.
     try:
-        hybrid_score_jobs(eligible)
+        # Resume skills live inside the profile dict — parse defensively
+        # since Supabase can return JSON strings for jsonb columns.
+        resume_skills = profile.get("skills_extracted") or []
+        if isinstance(resume_skills, str):
+            try:
+                resume_skills = json.loads(resume_skills)
+            except (json.JSONDecodeError, TypeError):
+                resume_skills = []
+        profile_text = build_profile_text(profile, resume_skills)
+        bm25_keywords = build_bm25_keywords(profile, resume_skills)
+        user_emb = get_user_embedding(user_id, profile_text)
+        hybrid_score_jobs(
+            eligible,
+            profile_keywords=bm25_keywords,
+            profile_embedding=user_emb,
+        )
         local_confident = 0
         for job in eligible:
             ls = job.get("local_score", 0)

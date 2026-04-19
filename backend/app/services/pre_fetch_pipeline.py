@@ -25,7 +25,12 @@ from app.services.adzuna import search_adzuna_jobs
 from app.services.jobspy_service import search_jobspy
 from app.services.jooble import search_jooble
 from app.services.holt_score import calculate_holt_score
-from app.services.local_scorer import hybrid_score_jobs
+from app.services.local_scorer import (
+    hybrid_score_jobs,
+    build_profile_text,
+    build_bm25_keywords,
+    get_user_embedding,
+)
 
 # Mirror of ROLE_SYNONYMS in frontend/src/screens/Jobs.jsx.
 # TODO: move to a shared source once we stop duplicating across backend/frontend.
@@ -185,7 +190,14 @@ async def _run_phase_1(
 
     # --- Phase 1d: local hybrid scoring (BM25 + MiniLM, ~500ms, $0) ---
     try:
-        hybrid_score_jobs(unique_jobs)
+        profile_text = build_profile_text(profile, resume_skills)
+        bm25_keywords = build_bm25_keywords(profile, resume_skills)
+        user_emb = get_user_embedding(user_id, profile_text)
+        hybrid_score_jobs(
+            unique_jobs,
+            profile_keywords=bm25_keywords,
+            profile_embedding=user_emb,
+        )
     except Exception as exc:
         logger.error(f"[PreFetch] local scorer failed: {exc}")
 

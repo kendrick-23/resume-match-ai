@@ -52,21 +52,94 @@ NICOLE_PROFILE_TEXT = (
     "paying $75,000 to $85,000 in Casselberry Florida area, Monday through Friday schedule."
 )
 
-# Cache Nicole's embedding — computed once per process startup
-_NICOLE_EMBEDDING = None
+def build_profile_text(user_profile: dict, resume_skills: list[str]) -> str:
+    """Build a profile text string from any user's profile data.
+    Falls back to NICOLE_PROFILE_TEXT if profile is empty."""
+    target_roles = user_profile.get("target_roles", "") or ""
+    location = user_profile.get("location", "") or ""
+    job_title = user_profile.get("job_title", "") or ""
+    salary_min = user_profile.get("target_salary_min")
+    salary_max = user_profile.get("target_salary_max")
+
+    skills_str = ", ".join(resume_skills[:20]) if resume_skills else ""
+
+    salary_str = ""
+    if salary_min and salary_max:
+        salary_str = f"paying ${salary_min:,} to ${salary_max:,}"
+    elif salary_min:
+        salary_str = f"paying at least ${salary_min:,}"
+
+    parts = []
+    if job_title:
+        parts.append(f"{job_title}")
+    if skills_str:
+        parts.append(f"Skills: {skills_str}")
+    if target_roles:
+        parts.append(f"Seeking {target_roles} role")
+    if salary_str:
+        parts.append(salary_str)
+    if location:
+        parts.append(f"in {location}")
+
+    text = ". ".join(parts) if parts else ""
+
+    if not text.strip():
+        return NICOLE_PROFILE_TEXT
+    return text
 
 
-def get_nicole_embedding() -> np.ndarray:
-    global _NICOLE_EMBEDDING
-    if _NICOLE_EMBEDDING is None:
+def build_bm25_keywords(user_profile: dict, resume_skills: list[str]) -> list[str]:
+    """Build BM25 keyword list from any user's profile data.
+    Falls back to NICOLE_BM25_KEYWORDS if profile is empty."""
+    keywords = []
+
+    target_roles = user_profile.get("target_roles", "") or ""
+    for role in target_roles.split(","):
+        keywords.extend(role.strip().lower().split())
+
+    for skill in resume_skills[:15]:
+        keywords.extend(skill.lower().split())
+
+    job_title = user_profile.get("job_title", "") or ""
+    if job_title:
+        keywords.extend(job_title.lower().split())
+
+    seen = set()
+    unique = []
+    for kw in keywords:
+        if kw not in seen and len(kw) > 2:
+            seen.add(kw)
+            unique.append(kw)
+
+    if not unique:
+        return NICOLE_BM25_KEYWORDS
+    return unique
+
+
+# Per-user embedding cache — computed lazily on first use, kept for the
+# lifetime of the process. Keyed by user_id; does NOT invalidate on profile
+# changes, so restarting the process is required to pick up a profile edit.
+_USER_EMBEDDINGS: dict[str, np.ndarray] = {}
+
+
+def get_user_embedding(user_id: str, profile_text: str) -> np.ndarray:
+    """Get or compute a normalized embedding for a user profile.
+    Cached in memory by user_id for the lifetime of the process."""
+    if user_id not in _USER_EMBEDDINGS:
         model = get_model()
-        _NICOLE_EMBEDDING = model.encode(
-            NICOLE_PROFILE_TEXT,
+        _USER_EMBEDDINGS[user_id] = model.encode(
+            profile_text,
             normalize_embeddings=True,
             convert_to_numpy=True,
         )
-        logger.info("[LocalScorer] Nicole's profile embedding cached")
-    return _NICOLE_EMBEDDING
+        logger.info(f"[LocalScorer] Embedding cached for user {user_id[:8]}")
+    return _USER_EMBEDDINGS[user_id]
+
+
+def get_nicole_embedding() -> np.ndarray:
+    """Backwards-compatible wrapper — returns Nicole's embedding.
+    Used by warmup() and any legacy call site."""
+    return get_user_embedding("nicole_legacy", NICOLE_PROFILE_TEXT)
 
 
 def _reciprocal_rank_fusion(rankings: list[list[int]], k: int = 60) -> dict[int, float]:
@@ -114,6 +187,7 @@ def detect_search_mode(query: str) -> str:
 def hybrid_score_jobs(
     jobs: list[dict],
     profile_keywords: list[str] | None = None,
+    profile_embedding: np.ndarray | None = None,
     mode: str = "profile",
 ) -> list[dict]:
     """
@@ -130,7 +204,8 @@ def hybrid_score_jobs(
 
     start = time.time()
     model = get_model()
-    nicole_embedding = get_nicole_embedding()
+    user_embedding = profile_embedding if profile_embedding is not None \
+        else get_nicole_embedding()
     keywords = profile_keywords or NICOLE_BM25_KEYWORDS
 
     # Build job text for each job (title + company + first 400 chars of description)
@@ -159,7 +234,7 @@ def hybrid_score_jobs(
         show_progress_bar=False,
     )
     # Cosine similarity = dot product since both are normalized
-    semantic_scores = np.dot(job_embeddings, nicole_embedding)
+    semantic_scores = np.dot(job_embeddings, user_embedding)
     # Rank indices by semantic score descending
     semantic_ranking = np.argsort(semantic_scores)[::-1].tolist()
 
