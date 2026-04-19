@@ -17,7 +17,17 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from app.constants.scoring import DOMAIN_PENALTY_CAP, get_coaching_label
+from app.constants.scoring import (
+    DOMAIN_PENALTY_CAP,
+    DIMENSION_WEIGHTS,
+    SKILLS_MATCH,
+    SALARY_ALIGNMENT,
+    SCHEDULE_FIT,
+    EXPERIENCE_MATCH_TIERS,
+    EXPERIENCE_MATCH_OVER,
+    LOCATION_FIT,
+    get_coaching_label,
+)
 
 
 # Hospitality / retail / food-service vocabulary → corporate operations vocabulary.
@@ -125,13 +135,14 @@ def calculate_holt_score(
         matches = 0.0
         for s in match_terms:
             if s in job_text:
-                matches += 1  # full phrase match (strongest)
+                matches += SKILLS_MATCH["full_phrase_credit"]  # strongest
             else:
                 # Check if any significant word from the term appears in job text
-                words = [w for w in s.split() if len(w) > 3]
+                words = [w for w in s.split() if len(w) > SKILLS_MATCH["min_word_length"]]
                 if words and any(w in job_text for w in words):
-                    matches += 0.6  # partial word match (weaker)
-        skills_match = min(100, round((matches / min(len(skills), 12)) * 100))
+                    matches += SKILLS_MATCH["partial_word_credit"]  # weaker
+        # The trailing * 100 is a percentage conversion, not a tunable constant.
+        skills_match = min(100, round((matches / min(len(skills), SKILLS_MATCH["denominator_cap"])) * 100))
     else:
         # Fallback: if no skills but target_roles exist, do basic role matching
         if target_roles:
@@ -146,7 +157,7 @@ def calculate_holt_score(
         role_parts = [r.strip() for r in target_roles.split(",") if r.strip()]
         for role in role_parts:
             if role in job_title:
-                skills_match = min(100, skills_match + 15)
+                skills_match = min(100, skills_match + SKILLS_MATCH["target_role_bonus"])
                 break
 
     # Operations/management role floor: ops professionals applying to ops roles
@@ -159,9 +170,9 @@ def calculate_holt_score(
         "operations coordinator", "operations director", "operations supervisor",
     ]
     is_ops_role = any(t in job_title for t in ops_role_titles)
-    has_ops_profile = len(skills) >= 3
-    if is_ops_role and has_ops_profile and skills_match < 65:
-        skills_match = 65
+    has_ops_profile = len(skills) >= SKILLS_MATCH["ops_skill_threshold"]
+    if is_ops_role and has_ops_profile and skills_match < SKILLS_MATCH["ops_floor"]:
+        skills_match = SKILLS_MATCH["ops_floor"]
 
     # Domain mismatch detection — scan title for licensed-profession triggers.
     # Each domain maps trigger words → required background signals.
@@ -284,7 +295,7 @@ def calculate_holt_score(
         if any(_trigger_matches(trigger) for trigger in domain["triggers"]):
             has_background = any(_signal_matches(sig) for sig in domain["signals"])
             if not has_background:
-                skills_match = max(0, skills_match - 40)
+                skills_match = max(0, skills_match + SKILLS_MATCH["licensed_penalty"])
                 degree_warning = True
                 domain_penalty_applied = True
             break
@@ -326,7 +337,7 @@ def calculate_holt_score(
                 or "accounting" in degree
             )
             if not has_acct_cred:
-                skills_match = min(skills_match, 10)
+                skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
                 domain_penalty_applied = True
                 logger.info(f"[Gate1/Accounting] cred disqualifier fired for job: {job_title[:50]}")
 
@@ -347,7 +358,7 @@ def calculate_holt_score(
                 or "professional engineer" in degree
             )
             if not has_eng_cred:
-                skills_match = min(skills_match, 10)
+                skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
                 domain_penalty_applied = True
                 logger.info(f"[Gate1/Engineering] fired for job: {job_title[:50]}")
 
@@ -371,7 +382,7 @@ def calculate_holt_score(
                 or "juris doctor" in degree
             )
             if not has_legal_cred:
-                skills_match = min(skills_match, 10)
+                skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
                 domain_penalty_applied = True
                 logger.info(f"[Gate1/Legal] fired for job: {job_title[:50]}")
 
@@ -409,7 +420,7 @@ def calculate_holt_score(
                 or "federal agency" in user_current_title
             )
             if not has_fed_cred:
-                skills_match = min(skills_match, 10)
+                skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
                 domain_penalty_applied = True
                 logger.info(f"[Gate1/Federal] fired for job: {job_title[:50]}")
 
@@ -436,7 +447,7 @@ def calculate_holt_score(
                 or "top secret" in skills_str
             )
             if not has_clr_cred:
-                skills_match = min(skills_match, 10)
+                skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
                 domain_penalty_applied = True
                 logger.info(f"[Gate1/Clearance] fired for job: {job_title[:50]}")
 
@@ -456,7 +467,7 @@ def calculate_holt_score(
         for pattern, domain_term in _degree_domains:
             if re.search(pattern, gate1_full_text, re.IGNORECASE):
                 if domain_term not in skills_str and domain_term not in degree:
-                    skills_match = min(skills_match, 10)
+                    skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
                     domain_penalty_applied = True
                     logger.info(f"[Gate1/Degree] fired for job: {job_title[:50]}")
                 break
@@ -499,7 +510,7 @@ def calculate_holt_score(
         for phrase in licensure_phrases:
             if re.search(phrase, desc_head):
                 if not candidate_has_credential:
-                    skills_match = max(0, skills_match - 40)
+                    skills_match = max(0, skills_match + SKILLS_MATCH["licensed_penalty"])
                     degree_warning = True
                     domain_penalty_applied = True
                 break
@@ -514,7 +525,7 @@ def calculate_holt_score(
     ops_keyword_count = sum(1 for kw in ops_keywords if kw in skills_str)
     if ops_match and ops_keyword_count >= 2 and not domain_penalty_applied:
         # Scale bonus by how many ops keywords the user has (2-8 → +5 to +20)
-        ops_bonus = min(20, ops_keyword_count * 3)
+        ops_bonus = min(SKILLS_MATCH["ops_bonus_max"], ops_keyword_count * SKILLS_MATCH["ops_bonus_per_kw"])
         skills_match = min(100, skills_match + ops_bonus)
 
     # Adzuna category-based domain penalty — fires FIRST, before any keyword
@@ -531,7 +542,7 @@ def calculate_holt_score(
     }
     adzuna_cat = job.get("adzuna_category", "")
     if not domain_penalty_applied and adzuna_cat in _ADZUNA_DOMAIN_PENALTY_CATEGORIES:
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Vocational/trade role exclusion — these roles require specific
@@ -549,12 +560,12 @@ def calculate_holt_score(
     _INDUSTRIAL_DESC_TRIGGERS = ["dewatering", "submergent", "excavation",
                                  "heavy equipment", "crane operator"]
     if not domain_penalty_applied and any(vt in job_title for vt in _VOCATIONAL_TRIGGERS):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
     if not domain_penalty_applied and any(
         idt in job_desc or idt in job_company for idt in _INDUSTRIAL_DESC_TRIGGERS
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Retail clothing companies — Nicole targets corporate ops, not retail floor mgmt.
@@ -574,7 +585,7 @@ def calculate_holt_score(
         any(rc in job_company for rc in _RETAIL_CLOTHING_COMPANIES)
         or any(rd in job_desc for rd in _RETAIL_CLOTHING_DESC_TRIGGERS)
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Military enlistment/active duty — Nicole is a civilian job seeker, not
@@ -597,7 +608,7 @@ def calculate_holt_score(
         any(mc in job_company for mc in _MILITARY_COMPANIES)
         or any(ms in job_desc or ms in job_company for ms in _MILITARY_ENLISTMENT_SIGNALS)
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Construction superintendent/foreman titles — require construction trade
@@ -613,7 +624,7 @@ def calculate_holt_score(
             "concrete", "steel", "framing", "roofing", "plumbing",
         ]
         if any(cc in job_company or cc in job_desc for cc in _CONSTRUCTION_CONTEXT):
-            skills_match = min(skills_match, 10)
+            skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
             domain_penalty_applied = True
 
     # Construction description standalone — catches "Construction Operations
@@ -625,7 +636,7 @@ def calculate_holt_score(
     if not domain_penalty_applied and any(
         cs in job_desc for cs in _CONSTRUCTION_DESC_STANDALONE
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Landscaping/outdoor services — "Operations Manager" at a landscaping
@@ -645,7 +656,7 @@ def calculate_holt_score(
         any(lc in job_company for lc in _LANDSCAPING_COMPANIES)
         or any(lt in job_desc or lt in job_company for lt in _LANDSCAPING_TRIGGERS)
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Erosion/environmental construction — description signals that indicate
@@ -666,7 +677,7 @@ def calculate_holt_score(
         any(ec in job_company for ec in _EROSION_COMPANIES)
         or any(ec in job_desc for ec in _EROSION_CONSTRUCTION_TRIGGERS)
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Installation/flooring trades — coordinator roles at flooring, HVAC, or
@@ -678,7 +689,7 @@ def calculate_holt_score(
     if not domain_penalty_applied and any(
         it in job_desc for it in _INSTALLATION_TRADES_TRIGGERS
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # HVAC/mechanical contractor — "HVAC Operations Manager" requires trade
@@ -690,7 +701,7 @@ def calculate_holt_score(
     if not domain_penalty_applied and any(
         hv in job_desc or hv in job_title for hv in _HVAC_TRIGGERS
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Carwash / auto detailing — service roles requiring unrelated vehicle
@@ -701,7 +712,7 @@ def calculate_holt_score(
     if not domain_penalty_applied and any(
         cw in job_title or cw in job_desc or cw in job_company for cw in _CARWASH_TRIGGERS
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Clinical / medical specialist titles — require clinical licensure.
@@ -711,7 +722,7 @@ def calculate_holt_score(
         "otolaryngolog", "neurosurg",
     ]
     if not domain_penalty_applied and any(ct in job_title for ct in _CLINICAL_TITLE_TRIGGERS):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Technical IC engineering roles — wrong target for ops/training/compliance.
@@ -720,7 +731,7 @@ def calculate_holt_score(
         "machine learning engineer", "devops engineer", "cloud engineer",
     ]
     if not domain_penalty_applied and any(te in job_title for te in _TECH_IC_TRIGGERS):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Electrical / utility trades — require trade licensure and field experience.
@@ -729,7 +740,7 @@ def calculate_holt_score(
         "substation", "utility technician",
     ]
     if not domain_penalty_applied and any(et in job_title for et in _ELECTRICAL_TRIGGERS):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Tax preparation / seasonal office — seasonal tax roles at H&R Block etc.
@@ -740,7 +751,7 @@ def calculate_holt_score(
         any(tc in job_company for tc in _TAX_COMPANIES)
         or any(tt in job_desc for tt in _TAX_TRIGGERS)
     ):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Housekeeping/custodial management — title triggers for facility cleaning
@@ -751,7 +762,7 @@ def calculate_holt_score(
         "janitorial manager",
     ]
     if not domain_penalty_applied and any(ht in job_title for ht in _HOUSEKEEPING_TITLE_TRIGGERS):
-        skills_match = min(skills_match, 10)
+        skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
         domain_penalty_applied = True
 
     # Revenue/yield management — soft demotion (not full penalty).
@@ -763,7 +774,7 @@ def calculate_holt_score(
     if not domain_penalty_applied and any(
         rm in job_title or rm in job_desc for rm in _REVENUE_MGMT_SIGNALS
     ):
-        skills_match = min(skills_match, 30)
+        skills_match = min(skills_match, SKILLS_MATCH["revenue_mgmt_soft_cap"])
 
     # Military/defense "Special Operations" exclusion — "special operations" at
     # defense contractors (CACI, Booz Allen, etc.) refers to military SpecOps
@@ -777,7 +788,7 @@ def calculate_holt_score(
     if not domain_penalty_applied and "special operations" in job_title:
         has_defense_context = any(sig in job_company or sig in job_desc for sig in _DEFENSE_SIGNALS)
         if has_defense_context:
-            skills_match = min(skills_match, 10)
+            skills_match = min(skills_match, SKILLS_MATCH["domain_cap"])
             domain_penalty_applied = True
 
     # --- Soft demotions removed (April 2026) ---
@@ -814,33 +825,50 @@ def calculate_holt_score(
         floor_min = target_salary_min
 
         if floor_min <= job_salary <= band_top:
-            salary_alignment = 100
+            salary_alignment = SALARY_ALIGNMENT["comfort_score"]
         elif job_salary > band_top:
-            # Overpay: gentle decline (seniority-creep signal). Floored at 70.
-            overpay_ratio = (job_salary - band_top) / (band_top * 0.25)
-            salary_alignment = max(70, round(100 - 10 * overpay_ratio))
-        elif job_salary >= floor_min * 0.9:
-            # Shoulder: linear 100 → 65 across the top 10% below floor.
-            salary_alignment = round(
-                65 + 35 * ((job_salary - floor_min * 0.9) / (floor_min * 0.1))
+            # Overpay: gentle decline (seniority-creep signal). Floored at overpay_floor.
+            overpay_ratio = (job_salary - band_top) / (band_top * SALARY_ALIGNMENT["overpay_width"])
+            salary_alignment = max(
+                SALARY_ALIGNMENT["overpay_floor"],
+                round(SALARY_ALIGNMENT["comfort_score"] - SALARY_ALIGNMENT["overpay_slope"] * overpay_ratio),
             )
-            salary_alignment = max(65, min(100, salary_alignment))
-        elif job_salary >= floor_min * 0.75:
-            # Steep decline: linear 65 → 25 across 10–25% below floor.
+        elif job_salary >= floor_min * SALARY_ALIGNMENT["shoulder_lower_bound"]:
+            # Shoulder: linear comfort_score → shoulder_base across (1 - shoulder_lower_bound) below floor.
+            # The 0.1 below = 1 - shoulder_lower_bound (derived span, not an independent knob).
             salary_alignment = round(
-                25 + 40 * ((job_salary - floor_min * 0.75) / (floor_min * 0.15))
+                SALARY_ALIGNMENT["shoulder_base"] + SALARY_ALIGNMENT["shoulder_range"] * (
+                    (job_salary - floor_min * SALARY_ALIGNMENT["shoulder_lower_bound"])
+                    / (floor_min * 0.1)
+                )
             )
-            salary_alignment = max(25, min(65, salary_alignment))
+            salary_alignment = max(
+                SALARY_ALIGNMENT["shoulder_base"],
+                min(SALARY_ALIGNMENT["comfort_score"], salary_alignment),
+            )
+        elif job_salary >= floor_min * SALARY_ALIGNMENT["steep_lower_bound"]:
+            # Steep decline: linear shoulder_base → steep_base across (shoulder_lower_bound - steep_lower_bound) below floor.
+            # The 0.15 below = shoulder_lower_bound - steep_lower_bound (derived span, not an independent knob).
+            salary_alignment = round(
+                SALARY_ALIGNMENT["steep_base"] + SALARY_ALIGNMENT["steep_range"] * (
+                    (job_salary - floor_min * SALARY_ALIGNMENT["steep_lower_bound"])
+                    / (floor_min * 0.15)
+                )
+            )
+            salary_alignment = max(
+                SALARY_ALIGNMENT["steep_base"],
+                min(SALARY_ALIGNMENT["shoulder_base"], salary_alignment),
+            )
         else:
             # Hard floor: > 25% below the seeker's stated minimum.
-            salary_alignment = 15
+            salary_alignment = SALARY_ALIGNMENT["hard_floor"]
             salary_floor_violation = True
             if dealbreakers.get("below_salary"):
                 dealbreaker_triggered = True
     else:
         # No salary data — slightly pessimistic prior (was 70). Stops rewarding
         # postings that hide their pay relative to honest postings near floor.
-        salary_alignment = 55
+        salary_alignment = SALARY_ALIGNMENT["undisclosed_default"]
         salary_not_disclosed = True
 
     # Salary dealbreaker — respect the user's stated minimum exactly.
@@ -876,42 +904,44 @@ def calculate_holt_score(
         is_low_salary_title = any(lp in job_title for lp in _LOW_SALARY_TITLE_PATTERNS)
         is_exempt = any(ep in job_title for ep in _EXEMPT_COORDINATOR_PREFIXES)
         if is_low_salary_title and not is_exempt:
-            salary_alignment = max(0, salary_alignment - 20)
+            salary_alignment = max(0, salary_alignment - SALARY_ALIGNMENT["undisclosed_title_penalty"])
 
     # --- 3. Schedule Fit (15%) ---
     schedule_red_flags = ["weekend", "nights", "shift", "rotating", "overnight"]
     has_schedule_flag = any(flag in job_desc for flag in schedule_red_flags)
 
     if schedule_pref == "monday_friday":
-        schedule_fit = 40 if has_schedule_flag else 90
+        schedule_fit = SCHEDULE_FIT["mf_red_flag"] if has_schedule_flag else SCHEDULE_FIT["mf_clean"]
     elif schedule_pref == "remote_only":
         if is_remote:
-            schedule_fit = 100
+            schedule_fit = SCHEDULE_FIT["remote_only_remote"]
         elif "hybrid" in job_desc or "hybrid" in job_title:
-            schedule_fit = 70
+            schedule_fit = SCHEDULE_FIT["remote_only_hybrid"]
         else:
-            schedule_fit = 20
+            schedule_fit = SCHEDULE_FIT["remote_only_onsite"]
     else:
-        schedule_fit = 85
+        schedule_fit = SCHEDULE_FIT["any"]
 
     # --- 4. Experience Match (15%) ---
     years_patterns = re.findall(r"(\d+)\+?\s*(?:years?|yrs?)", job_desc)
     required_years = max((int(y) for y in years_patterns), default=0)
 
-    if required_years == 0:
-        experience_match = 75
-    elif required_years <= 5:
-        experience_match = 90
-    elif required_years <= 10:
-        experience_match = 80
-    elif required_years <= 15:
-        experience_match = 65
+    # EXPERIENCE_MATCH_TIERS is a list of (max_years, score) tuples.
+    # Indexed access preserves the original if/elif ladder structure.
+    if required_years == EXPERIENCE_MATCH_TIERS[0][0]:
+        experience_match = EXPERIENCE_MATCH_TIERS[0][1]
+    elif required_years <= EXPERIENCE_MATCH_TIERS[1][0]:
+        experience_match = EXPERIENCE_MATCH_TIERS[1][1]
+    elif required_years <= EXPERIENCE_MATCH_TIERS[2][0]:
+        experience_match = EXPERIENCE_MATCH_TIERS[2][1]
+    elif required_years <= EXPERIENCE_MATCH_TIERS[3][0]:
+        experience_match = EXPERIENCE_MATCH_TIERS[3][1]
     else:
-        experience_match = 40
+        experience_match = EXPERIENCE_MATCH_OVER
 
     # --- 5. Location Fit (10%) ---
     if is_remote or "remote" in job_location:
-        location_fit = 100
+        location_fit = LOCATION_FIT["remote_or_same_city"]
     elif user_location:
         user_parts = [p.strip() for p in user_location.split(",")]
         user_city = user_parts[0] if user_parts else ""
@@ -979,11 +1009,11 @@ def calculate_holt_score(
             return False
 
         if user_city and user_city == job_city:
-            location_fit = 100
+            location_fit = LOCATION_FIT["remote_or_same_city"]
         elif user_city and job_city and in_same_metro(user_city, job_city):
-            location_fit = 90
+            location_fit = LOCATION_FIT["same_metro"]
         elif same_state:
-            location_fit = 70
+            location_fit = LOCATION_FIT["same_state"]
             # Same state but NOT same city/metro — outside commute range.
             # Daytona Beach is in FL but ~60 miles from Casselberry.
             if dealbreakers.get("outside_commute"):
@@ -993,7 +1023,7 @@ def calculate_holt_score(
                     job_location, user_location,
                 )
         else:
-            location_fit = 20
+            location_fit = LOCATION_FIT["different_state"]
             if dealbreakers.get("outside_commute"):
                 dealbreaker_triggered = True
                 logger.debug(
@@ -1001,7 +1031,7 @@ def calculate_holt_score(
                     job_location, user_location,
                 )
     else:
-        location_fit = 50
+        location_fit = LOCATION_FIT["unknown_user_loc"]
 
     # --- 6. Degree Flag ---
     degree_required_patterns = [
@@ -1030,12 +1060,13 @@ def calculate_holt_score(
         dealbreaker_triggered = True
 
     # --- Total Score ---
+    # Weights sum to 0.95 by design; see DIMENSION_WEIGHTS comment.
     total_score = round(
-        skills_match * 0.35
-        + salary_alignment * 0.20
-        + schedule_fit * 0.15
-        + experience_match * 0.15
-        + location_fit * 0.10
+        skills_match * DIMENSION_WEIGHTS["skills_match"]
+        + salary_alignment * DIMENSION_WEIGHTS["salary_alignment"]
+        + schedule_fit * DIMENSION_WEIGHTS["schedule_fit"]
+        + experience_match * DIMENSION_WEIGHTS["experience_match"]
+        + location_fit * DIMENSION_WEIGHTS["location_fit"]
     )
     total_score = max(0, min(100, total_score))
 
