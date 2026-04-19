@@ -164,7 +164,10 @@ export default function Tracker() {
         const analyses = await listAnalyses();
         if (analyses?.length > 0) {
           const latest = analyses[0];
-          gaps = typeof latest.gaps === 'string' ? JSON.parse(latest.gaps) : latest.gaps || [];
+          gaps = (typeof latest.gaps === 'string'
+            ? JSON.parse(latest.gaps)
+            : latest.gaps || []
+          ).map((g) => (typeof g === 'string' ? g : g?.gap)).filter(Boolean);
         }
       } catch {
         // No analysis — proceed without gaps
