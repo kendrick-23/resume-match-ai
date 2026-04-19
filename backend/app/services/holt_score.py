@@ -17,7 +17,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from app.constants.scoring import TIER_BREAKPOINTS, DOMAIN_PENALTY_CAP
+from app.constants.scoring import DOMAIN_PENALTY_CAP, get_coaching_label
 
 
 # Hospitality / retail / food-service vocabulary → corporate operations vocabulary.
@@ -1045,17 +1045,18 @@ def calculate_holt_score(
     if domain_penalty_applied:
         total_score = min(total_score, DOMAIN_PENALTY_CAP)
 
-    # Coaching label
-    if domain_penalty_applied:
-        coaching_label = "Different specialization"
-    elif salary_floor_violation:
+    # Coaching label — salary-floor is a special label not covered by the
+    # shared helper; everything else goes through get_coaching_label so
+    # thresholds stay unified across the backend. Passing domain_alignment=0
+    # when the deterministic scorer has flagged a domain penalty makes the
+    # helper emit "Different specialization" regardless of the capped score.
+    if salary_floor_violation and not domain_penalty_applied:
         coaching_label = "Below your salary range"
-    elif total_score >= TIER_BREAKPOINTS["strong"]:
-        coaching_label = "Strong match"
-    elif total_score >= TIER_BREAKPOINTS["stretch"]:
-        coaching_label = "Within Reach"
     else:
-        coaching_label = "Growth opportunity"
+        coaching_label = get_coaching_label(
+            total_score,
+            0 if domain_penalty_applied else 100,
+        )
 
     # Target company check
     is_target_company = job_company in target_companies if target_companies else False

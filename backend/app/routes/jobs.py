@@ -11,7 +11,7 @@ from supabase import create_client
 
 from app.main import limiter, get_current_user
 from app.logger import logger
-from app.constants.scoring import DOMAIN_PENALTY_CAP, SALARY_FLOOR_CAP, TIER_BREAKPOINTS
+from app.constants.scoring import DOMAIN_PENALTY_CAP, SALARY_FLOOR_CAP, TIER_BREAKPOINTS, get_coaching_label
 from app.services.token_budget import is_budget_exhausted
 from app.services.usajobs import search_usajobs
 from app.services.adzuna import search_adzuna_jobs
@@ -97,7 +97,7 @@ async def _score_jobs(jobs: list, user: dict, is_profile_match: bool = False) ->
                 "skills_match": 50, "salary_alignment": 50, "schedule_fit": 50,
                 "experience_match": 50, "location_fit": 50, "degree_flag": "none",
             }
-            job["coaching_label"] = "Within Reach"
+            job["coaching_label"] = get_coaching_label(50)
             job["degree_warning"] = False
             job["dealbreaker_triggered"] = False
             job["is_target_company"] = False
@@ -136,7 +136,7 @@ async def _score_jobs(jobs: list, user: dict, is_profile_match: bool = False) ->
     for job in jobs:
         if job.get("domain_penalized"):
             job["holt_score"] = min(job["holt_score"], DOMAIN_PENALTY_CAP)
-            job["coaching_label"] = "Different specialization"
+            job["coaching_label"] = get_coaching_label(job["holt_score"], 0)
 
     # Step 7: FINAL salary-floor enforcement — composite cap @ 25 for jobs that
     # pay > 25% below the seeker's stated minimum. Same architectural pattern as
@@ -457,7 +457,7 @@ async def search_unified_multi(
             for job in unique_jobs:
                 if job.get("domain_penalized"):
                     job["holt_score"] = min(job.get("holt_score", 0), DOMAIN_PENALTY_CAP)
-                    job["coaching_label"] = "Different specialization"
+                    job["coaching_label"] = get_coaching_label(job["holt_score"], 0)
             for job in unique_jobs:
                 if job.get("salary_floor_violation") and not job.get("domain_penalized"):
                     job["holt_score"] = min(job.get("holt_score", 0), SALARY_FLOOR_CAP)

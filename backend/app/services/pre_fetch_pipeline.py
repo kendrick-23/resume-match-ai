@@ -12,7 +12,7 @@ import json
 import time
 from typing import Optional
 
-from app.constants.scoring import DOMAIN_PENALTY_CAP, SALARY_FLOOR_CAP
+from app.constants.scoring import DOMAIN_PENALTY_CAP, SALARY_FLOOR_CAP, get_coaching_label
 from app.logger import logger
 from app.services.prefetch_store import (
     _service_client,
@@ -197,7 +197,7 @@ async def _run_phase_1(
     for job in unique_jobs:
         if job.get("domain_penalized"):
             job["holt_score"] = min(job.get("holt_score", 0), DOMAIN_PENALTY_CAP)
-            job["coaching_label"] = "Different specialization"
+            job["coaching_label"] = get_coaching_label(job["holt_score"], 0)
     for job in unique_jobs:
         if job.get("salary_floor_violation") and not job.get("domain_penalized"):
             job["holt_score"] = min(job.get("holt_score", 0), SALARY_FLOOR_CAP)
@@ -283,7 +283,7 @@ async def _run_phase_2(user_id: str, jobs: list, profile: dict) -> None:
         for job in jobs:
             if job.get("domain_penalized"):
                 job["holt_score"] = min(job.get("holt_score", 0), DOMAIN_PENALTY_CAP)
-                job["coaching_label"] = "Different specialization"
+                job["coaching_label"] = get_coaching_label(job["holt_score"], 0)
         for job in jobs:
             if job.get("salary_floor_violation") and not job.get("domain_penalized"):
                 job["holt_score"] = min(job.get("holt_score", 0), SALARY_FLOOR_CAP)
