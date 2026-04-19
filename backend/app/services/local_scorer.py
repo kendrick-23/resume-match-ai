@@ -124,16 +124,18 @@ _USER_EMBEDDINGS: dict[str, np.ndarray] = {}
 
 def get_user_embedding(user_id: str, profile_text: str) -> np.ndarray:
     """Get or compute a normalized embedding for a user profile.
-    Cached in memory by user_id for the lifetime of the process."""
-    if user_id not in _USER_EMBEDDINGS:
+    Cached by (user_id, hash(profile_text)) so profile edits invalidate
+    automatically within the same process."""
+    cache_key = f"{user_id}:{hash(profile_text)}"
+    if cache_key not in _USER_EMBEDDINGS:
         model = get_model()
-        _USER_EMBEDDINGS[user_id] = model.encode(
+        _USER_EMBEDDINGS[cache_key] = model.encode(
             profile_text,
             normalize_embeddings=True,
             convert_to_numpy=True,
         )
         logger.info(f"[LocalScorer] Embedding cached for user {user_id[:8]}")
-    return _USER_EMBEDDINGS[user_id]
+    return _USER_EMBEDDINGS[cache_key]
 
 
 def get_nicole_embedding() -> np.ndarray:
