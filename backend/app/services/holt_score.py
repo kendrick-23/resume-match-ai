@@ -21,11 +21,13 @@ from app.constants.scoring import (
     DOMAIN_PENALTY_CAP,
     DIMENSION_WEIGHTS,
     SKILLS_MATCH,
+    SKILLS_MATCH_CREDITS,
     SALARY_ALIGNMENT,
     SCHEDULE_FIT,
     EXPERIENCE_MATCH_TIERS,
     EXPERIENCE_MATCH_OVER,
     LOCATION_FIT,
+    UPWARD_SENIORITY_CAP,
     get_coaching_label,
 )
 
@@ -117,6 +119,39 @@ def calculate_holt_score(
     dealbreaker_triggered = False
     degree_warning = False
 
+    # --- Required vs Preferred context extraction ---
+    # Split the JD into sentence-like chunks and classify each as "required"
+    # or "preferred" context based on cue phrases. Words inside each bucket
+    # become the lookup sets used by the skills-match loop below. Required
+    # wins when a sentence contains BOTH cues (elif branch). Works on the
+    # full description — no truncation.
+    _required_context_patterns = [
+        r"required[:\s]", r"must\s+have[:\s]", r"must\s+possess",
+        r"minimum\s+qualifications?", r"minimum\s+requirements?",
+        r"you\s+must\s+have", r"we\s+require",
+    ]
+    _preferred_context_patterns = [
+        r"preferred[:\s]", r"nice\s+to\s+have", r"a\s+plus",
+        r"desired[:\s]", r"bonus\s+if", r"ideally\s+you",
+        r"preferred\s+qualifications?",
+    ]
+    _req_words: set[str] = set()
+    _pref_words: set[str] = set()
+    for _sent in re.split(r"[.\n;•·\-–]", job_desc):
+        _sent_lower = _sent.lower().strip()
+        if not _sent_lower:
+            continue
+        _is_required = any(re.search(p, _sent_lower) for p in _required_context_patterns)
+        _is_preferred = any(re.search(p, _sent_lower) for p in _preferred_context_patterns)
+        # Normalize punctuation before splitting — without this, a trailing
+        # comma ("compliance,") prevents the skill-word intersection from
+        # matching the bare skill ("compliance") below.
+        _tokens = re.sub(r"[^\w\s&]", " ", _sent_lower).split()
+        if _is_required:
+            _req_words.update(_tokens)
+        elif _is_preferred:
+            _pref_words.update(_tokens)
+
     # --- 1. Skills Match (35%) ---
     # Only use positive skills (skills_extracted) — never analysis_gaps.
     # Gaps represent what the user LACKS, so matching them would inflate scores.
@@ -129,18 +164,38 @@ def calculate_holt_score(
         # are always preserved; the bridge only ADDS additional match terms.
         match_terms = _expand_skills_with_bridge(skills)
 
-        # Match full phrases AND significant individual words. Denominator stays
-        # tied to the ORIGINAL skill count so the bridge can only improve the
-        # score, never dilute it.
+        # Match full phrases AND significant individual words, weighted by
+        # whether the JD lists the skill as required vs preferred. Denominator
+        # stays tied to the ORIGINAL skill count so the bridge can only improve
+        # the score, never dilute it.
         matches = 0.0
+        preferred_matches = 0.0  # tracked separately for post-bonus context penalty
         for s in match_terms:
-            if s in job_text:
-                matches += SKILLS_MATCH["full_phrase_credit"]  # strongest
+            full_phrase_match = s in job_text
+            words = [w for w in s.split() if len(w) > SKILLS_MATCH["min_word_length"]]
+            partial_match = bool(words) and any(w in job_text for w in words)
+            if not (full_phrase_match or partial_match):
+                continue
+            skill_words = set(s.split())
+            in_required = bool(skill_words & _req_words)
+            in_preferred = bool(skill_words & _pref_words)
+            if full_phrase_match:
+                if in_required:
+                    credit = SKILLS_MATCH_CREDITS["required_full"]
+                elif in_preferred:
+                    credit = SKILLS_MATCH_CREDITS["preferred_full"]
+                else:
+                    credit = SKILLS_MATCH_CREDITS["neutral_full"]
             else:
-                # Check if any significant word from the term appears in job text
-                words = [w for w in s.split() if len(w) > SKILLS_MATCH["min_word_length"]]
-                if words and any(w in job_text for w in words):
-                    matches += SKILLS_MATCH["partial_word_credit"]  # weaker
+                if in_required:
+                    credit = SKILLS_MATCH_CREDITS["required_partial"]
+                elif in_preferred:
+                    credit = SKILLS_MATCH_CREDITS["preferred_partial"]
+                else:
+                    credit = SKILLS_MATCH_CREDITS["neutral_partial"]
+            matches += credit
+            if in_preferred and not in_required:
+                preferred_matches += credit
         # The trailing * 100 is a percentage conversion, not a tunable constant.
         skills_match = min(100, round((matches / min(len(skills), SKILLS_MATCH["denominator_cap"])) * 100))
     else:
@@ -151,6 +206,40 @@ def calculate_holt_score(
             skills_match = 60 if role_match else 40
         else:
             skills_match = 50
+
+    # --- Upward seniority cap ---
+    # Mirrors the DOWNWARD seniority cap in batch_scorer._apply_gates
+    # (coordinator/specialist title vs. manager user → cap at 55).
+    # Fires before the ops floor / ops bonus so the cap cannot be overridden
+    # by those bonuses. Skips the ops floor and ops bonus entirely when
+    # triggered.
+    _EXECUTIVE_PHRASES = (
+        "vice president", "vp of", "vp,", "chief ", "c-suite",
+        "president", "managing director", "general counsel",
+        "partner,", "equity partner",
+    )
+    # Short acronyms matched with word boundaries to avoid hits on
+    # "cook"/"cooperative"/"ceremony"/etc.
+    _EXECUTIVE_TOKENS = {"svp", "evp", "avp", "coo", "ceo", "cfo", "cto", "cmo"}
+    _ENTRY_MID_USER_SIGNALS = (
+        "coordinator", "specialist", "associate", "assistant",
+        "analyst", "representative", "agent", "clerk",
+    )
+    _MANAGER_USER_SIGNALS = ("manager", "agm", "supervisor", "lead", "director")
+    _user_title_lower = (profile.get("job_title") or "").lower()
+    _title_words = set(re.findall(r"[a-z]+", job_title))
+    _job_is_executive = (
+        any(p in job_title for p in _EXECUTIVE_PHRASES)
+        or bool(_title_words & _EXECUTIVE_TOKENS)
+    )
+    _user_is_below_exec = (
+        any(s in _user_title_lower for s in _ENTRY_MID_USER_SIGNALS)
+        or any(s in _user_title_lower for s in _MANAGER_USER_SIGNALS)
+    )
+    _skip_ops_bonus = False
+    if _job_is_executive and _user_is_below_exec:
+        skills_match = min(skills_match, UPWARD_SENIORITY_CAP["skills_match_ceiling"])
+        _skip_ops_bonus = True
 
     # Bonus for title matching target roles
     if target_roles:
@@ -171,7 +260,12 @@ def calculate_holt_score(
     ]
     is_ops_role = any(t in job_title for t in ops_role_titles)
     has_ops_profile = len(skills) >= SKILLS_MATCH["ops_skill_threshold"]
-    if is_ops_role and has_ops_profile and skills_match < SKILLS_MATCH["ops_floor"]:
+    if (
+        not _skip_ops_bonus
+        and is_ops_role
+        and has_ops_profile
+        and skills_match < SKILLS_MATCH["ops_floor"]
+    ):
         skills_match = SKILLS_MATCH["ops_floor"]
 
     # Domain mismatch detection — scan title for licensed-profession triggers.
@@ -523,10 +617,27 @@ def calculate_holt_score(
     ops_keywords = ["operations", "management", "leadership", "compliance",
                     "training", "scheduling", "inventory", "customer service"]
     ops_keyword_count = sum(1 for kw in ops_keywords if kw in skills_str)
-    if ops_match and ops_keyword_count >= 2 and not domain_penalty_applied:
+    if (
+        ops_match
+        and ops_keyword_count >= 2
+        and not domain_penalty_applied
+        and not _skip_ops_bonus
+    ):
         # Scale bonus by how many ops keywords the user has (2-8 → +5 to +20)
         ops_bonus = min(SKILLS_MATCH["ops_bonus_max"], ops_keyword_count * SKILLS_MATCH["ops_bonus_per_kw"])
         skills_match = min(100, skills_match + ops_bonus)
+
+    # Post-bonus context penalty: preserve the required-vs-preferred signal
+    # through the target-role + ops-bonus clamps. Without this, a JD that
+    # lists a candidate's skills as "preferred" can score identically to a
+    # JD that lists them as "required" once both clamp at 100. The penalty
+    # is proportional to the share of matches that came from preferred-only
+    # context, capped at 15 points (covers the clamp headroom of +15 target
+    # + +18 ops without negating the ops floor).
+    if skills and matches > 0:
+        _preferred_share = preferred_matches / matches
+        _context_penalty = round(15 * _preferred_share)
+        skills_match = max(0, skills_match - _context_penalty)
 
     # Adzuna category-based domain penalty — fires FIRST, before any keyword
     # checks. Adzuna pre-classifies every job; wrong-domain categories get
@@ -990,19 +1101,19 @@ def calculate_holt_score(
         metro_areas = {
             "orlando": {"orlando", "casselberry", "winter springs", "altamonte springs",
                         "oviedo", "sanford", "kissimmee", "maitland", "longwood",
-                        "lake mary", "middleton", "apopka", "winter park", "clermont",
+                        "lake mary", "apopka", "winter park", "clermont",
                         "winter garden", "st cloud"},
             "tampa": {"tampa", "st petersburg", "clearwater", "brandon", "lakeland",
                       "plant city", "wesley chapel", "new port richey", "largo"},
             "jacksonville": {"jacksonville", "orange park", "fleming island",
-                             "st augustine", "ponte vedra"},
+                             "st augustine", "ponte vedra", "ponte vedra beach"},
             "miami": {"miami", "fort lauderdale", "hollywood", "hialeah",
                       "coral gables", "doral", "boca raton", "pompano beach"},
         }
 
         def in_same_metro(city1: str, city2: str) -> bool:
-            c1 = city1.lower().strip()
-            c2 = city2.lower().strip()
+            c1 = city1.lower().strip().replace(".", "").replace(",", "")
+            c2 = city2.lower().strip().replace(".", "").replace(",", "")
             for cities in metro_areas.values():
                 if c1 in cities and c2 in cities:
                     return True

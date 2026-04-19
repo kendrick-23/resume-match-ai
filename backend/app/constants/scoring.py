@@ -73,6 +73,27 @@ SKILLS_MATCH = {
     "licensed_penalty":      -40,
 }
 
+# 5-tier skills credit (replaces full_phrase_credit + partial_word_credit):
+# required > neutral > preferred at both the full-phrase and partial-word
+# levels. "neutral" is the fallback when a skill word appears in the JD but
+# not inside any required/preferred context sentence.
+SKILLS_MATCH_CREDITS = {
+    "required_full":     1.0,
+    "neutral_full":      0.85,
+    "preferred_full":    0.75,
+    "required_partial":  0.65,
+    "neutral_partial":   0.55,
+    "preferred_partial": 0.45,
+}
+
+# Upward-seniority cap — applied in holt_score.py when a VP/C-suite job is
+# scored against a manager/AGM/IC user. Skills-match is capped BEFORE the
+# ops floor + ops bonus fire so the total_score stays within the ceiling.
+UPWARD_SENIORITY_CAP = {
+    "skills_match_ceiling": 60,   # caps skills_match before bonuses
+    "score_ceiling":        65,   # resulting total should be ≤ 65
+}
+
 # ─── Salary alignment constants ──────────────────────────────────────
 SALARY_ALIGNMENT = {
     "comfort_score":             100,

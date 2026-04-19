@@ -355,3 +355,140 @@ def test_legacy_vocational_domain_penalty():
     })
     assert r["total_score"] <= 15
     assert r["domain_penalized"] is True
+
+
+# --- Upcoming-fix tests (expected red until the corresponding fix lands) ----
+
+# TEST 16 — Required-vs-preferred skill weighting (Fix 1). A JD that lists
+# Nicole's skills as REQUIRED should score at least as high as an otherwise
+# identical JD that lists the same skills as PREFERRED. Currently the matcher
+# treats "required" and "preferred" identically so this will fail red until
+# the weighted scanner is implemented.
+def test_required_skill_scores_higher_than_preferred():
+    job_required = {
+        "title": "Operations Manager",
+        "description": (
+            "Manage daily operations. Required: compliance management, "
+            "team leadership, scheduling. Must have: SAP experience. "
+            "Preferred: project management, data analysis."
+        ),
+        "company": "Corp A",
+        "location": "Orlando, FL",
+        "salary_min": 75000,
+        "salary_max": 85000,
+    }
+    job_preferred = {
+        "title": "Operations Manager",
+        "description": (
+            "Manage daily operations. Preferred: compliance management, "
+            "team leadership, scheduling. Nice to have: SAP experience. "
+            "Required: budget management, P&L oversight."
+        ),
+        "company": "Corp B",
+        "location": "Orlando, FL",
+        "salary_min": 75000,
+        "salary_max": 85000,
+    }
+    r_req = _score(job_required)
+    r_pref = _score(job_preferred)
+    assert r_req["total_score"] > r_pref["total_score"]
+
+
+# TEST 17 — A JD listing Nicole's skills as PREFERRED should still reach the
+# Within-Reach band. Preferred skills are positive signals, just weighted
+# less than required. This may pass today because the current matcher already
+# credits them like required skills; it will still need to pass after Fix 1.
+def test_preferred_skill_not_penalized():
+    r = _score({
+        "title": "Operations Manager",
+        "description": (
+            "Manage operations team. Preferred: compliance, team leadership, "
+            "scheduling, onboarding, SAP. Nice to have: training experience."
+        ),
+        "company": "Corp C",
+        "location": "Orlando, FL",
+        "salary_min": 75000,
+        "salary_max": 85000,
+    })
+    assert r["total_score"] >= 55
+    assert r["domain_penalized"] is False
+
+
+# TEST 18 — Upward-seniority cap (Fix 2). A VP role is too far above an
+# AGM-level candidate to be a realistic match. There is no upward-seniority
+# cap today, so the deterministic scorer will likely land above 65 — this
+# is expected red until Fix 2 introduces the cap.
+def test_upward_seniority_cap_vp_role():
+    r = _score({
+        "title": "Vice President of Operations",
+        "description": (
+            "Lead enterprise-wide operations strategy. VP level role. "
+            "10+ years senior leadership required. P&L ownership across "
+            "multiple business units."
+        ),
+        "company": "Enterprise Corp",
+        "location": "Orlando, FL",
+        "salary_min": 150000,
+        "salary_max": 200000,
+    })
+    assert r["total_score"] <= 65
+    assert r["domain_penalized"] is False
+
+
+# TEST 19 — Upward-seniority cap (Fix 2) — SVP variant. Same expectation as
+# VP: should cap at 65 once the upward-seniority rule is in place. Uses
+# "SVP of Operations" so the title still hits the ops-floor/ops-bonus path
+# (guaranteeing a genuine red today); a title without "operations" would
+# pass incidentally for the wrong reason. Expected red until Fix 2.
+def test_upward_seniority_cap_chief_officer():
+    r = _score({
+        "title": "SVP of Operations",
+        "description": (
+            "Senior Vice President of Operations role. Enterprise-wide "
+            "operational leadership. SVP level. 15+ years senior "
+            "operations leadership required. Executive team member."
+        ),
+        "company": "Large Corp",
+        "location": "Orlando, FL",
+        "salary_min": 200000,
+        "salary_max": 300000,
+    })
+    assert r["total_score"] <= 65
+    assert r["domain_penalized"] is False
+
+
+# TEST 20 — Metro table period-stripping (Fix 3). "St. Petersburg, FL"
+# (with period) should match the Tampa metro for a Tampa-based user.
+# Current matcher does literal string compare so the period breaks the
+# match — expected red until period-stripping is added.
+def test_metro_table_st_petersburg_with_period():
+    r = _score(
+        {
+            "title": "Operations Manager",
+            "description": "Manage operations, compliance, team leadership",
+            "company": "Bay Corp",
+            "location": "St. Petersburg, FL",
+            "salary_min": 75000,
+            "salary_max": 85000,
+        },
+        profile_overrides={"location": "Tampa, FL"},
+    )
+    assert r["breakdown"]["location_fit"] == 90
+
+
+# TEST 21 — Metro table alternate-name coverage (Fix 3). "Ponte Vedra Beach"
+# should match the Jacksonville cluster. Currently the cluster only contains
+# "ponte vedra" — expected red until Fix 3 adds the "beach" form.
+def test_metro_table_ponte_vedra_beach():
+    r = _score(
+        {
+            "title": "Operations Manager",
+            "description": "Manage operations, team leadership, compliance",
+            "company": "Beach Corp",
+            "location": "Ponte Vedra Beach, FL",
+            "salary_min": 75000,
+            "salary_max": 85000,
+        },
+        profile_overrides={"location": "Jacksonville, FL"},
+    )
+    assert r["breakdown"]["location_fit"] == 90
